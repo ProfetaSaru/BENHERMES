@@ -14,15 +14,27 @@
 /* Header do Módulo */
 .templates-header {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  gap: 1rem;
+  flex-direction: column;
+  gap: 1.25rem;
   background: var(--paper);
   padding: 1.5rem 1.75rem;
   border-radius: var(--radius-lg);
   border: 1px solid var(--line);
   box-shadow: var(--shadow-sm);
+}
+
+.templates-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  width: 100%;
+}
+
+.templates-header-info {
+  flex: 1;
+  min-width: 280px;
 }
 
 .templates-header-info h2 {
@@ -39,6 +51,7 @@
   color: var(--muted);
   font-size: 0.9rem;
   margin: 0;
+  line-height: 1.45;
 }
 
 /* Abas de Modelos */
@@ -48,6 +61,7 @@
   gap: 0.5rem;
   overflow-x: auto;
   padding-bottom: 0.25rem;
+  width: 100%;
 }
 
 .template-tab-btn {
@@ -701,4 +715,126 @@
   border-color: var(--yellow);
   font-weight: 700;
 }
+
+:root[data-theme="dark"] .runner-header-bar {
+  background: var(--paper);
+  border-color: var(--line);
+}
+
+:root[data-theme="dark"] .runner-preview-content-box {
+  background: var(--paper-surface);
+  border-color: var(--line);
+}
+
+:root[data-theme="dark"] .system-auto-chips-box {
+  background: rgba(29, 78, 216, 0.12);
+  border-color: rgba(29, 78, 216, 0.3);
+}
+
+:root[data-theme="dark"] .system-chip {
+  background: var(--paper);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+:root[data-theme="dark"] .tag-chip-btn {
+  background: var(--paper);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+:root[data-theme="dark"] .tag-chip-btn:hover {
+  border-color: var(--yellow);
+  color: var(--yellow);
+}
+
+:root[data-theme="dark"] .tag-chip-btn.tag-chip-auto {
+  background: rgba(234, 179, 8, 0.12);
+  border-color: rgba(234, 179, 8, 0.25);
+  color: var(--yellow);
+}
+
+:root[data-theme="dark"] .detected-field-badge {
+  background: var(--paper);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+:root[data-theme="dark"] .detected-field-badge.is-auto {
+  border-color: rgba(234, 179, 8, 0.3);
+  color: var(--yellow);
+}
+
+:root[data-theme="dark"] .detected-field-badge .auto-pill {
+  background: rgba(234, 179, 8, 0.15);
+  color: var(--yellow);
+}
+
+:root[data-theme="dark"] .runner-origin-badge.builtin {
+  background: var(--paper-surface);
+  color: var(--muted);
+  border-color: var(--line);
+}
+
+:root[data-theme="dark"] .runner-origin-badge.custom {
+  background: rgba(219, 39, 119, 0.15);
+  color: #f472b6;
+  border-color: rgba(219, 39, 119, 0.3);
+}
+
+:root[data-theme="dark"] .doc-h1 {
+  border-bottom-color: var(--yellow);
+}
+
+:root[data-theme="dark"] .doc-bullet-dot {
+  color: var(--yellow);
+}
+
+:root[data-theme="dark"] .doc-table-row:first-of-type {
+  background: var(--paper-surface);
+  border-color: var(--line-strong);
+}
+
+:root[data-theme="dark"] .doc-table-row {
+  border-color: var(--line);
+}
+
+:root[data-theme="dark"] .ai-step-card {
+  background: var(--paper-surface);
+  border-color: var(--line);
+}
+
+:root[data-theme="dark"] .ai-prompt-box {
+  border-color: var(--line);
+}
+
+:root[data-theme="dark"] .ai-prompt-box-header {
+  background: var(--paper);
+  border-color: var(--line);
+}
+
+:root[data-theme="dark"] .ai-prompt-content {
+  background: var(--paper-surface);
+  color: var(--ink);
+}
+
+:root[data-theme="dark"] .preview-format-toggles {
+  background: var(--paper-surface);
+  border-color: var(--line);
+}
+
+:root[data-theme="dark"] .preview-format-btn.active {
+  background: var(--yellow);
+  color: #000000;
+  font-weight: 700;
+}
+
+:root[data-theme="dark"] .preview-templates-link {
+  color: var(--yellow);
+}
+
+:root[data-theme="dark"] .preview-templates-link:hover {
+  background: rgba(234, 179, 8, 0.12);
+}
+
 
