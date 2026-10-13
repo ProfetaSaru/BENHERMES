@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Copy, Trash2, Check, Bookmark, BookmarkPlus, X, Calendar, Clock, FileText } from 'lucide-react';
 import { Task } from '../../types/task';
 import { Panel } from '../common/Panel';
@@ -7,6 +7,7 @@ import { Button } from '../common/Button';
 import { TaskList } from './TaskList';
 import { ReportPreview } from './ReportPreview';
 import { generateReport } from '../../utils/formatReport';
+import { formatTasksTable, formatTasksList } from '../../utils/markdownTemplateParser';
 
 interface ReportPanelProps {
   tasks: Task[];
@@ -21,6 +22,7 @@ interface ReportPanelProps {
     note?: string;
   }) => void;
   onNotify: (message: string, type: 'success' | 'error') => void;
+  onNavigateToTemplates?: () => void;
 }
 
 function padZero(num: number): string {
@@ -35,9 +37,11 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({
   onSaveReportQuick,
   onSaveReportCustom,
   onNotify,
+  onNavigateToTemplates,
 }) => {
   const [copied, setCopied] = useState(false);
   const [isSaveAsModalOpen, setIsSaveAsModalOpen] = useState(false);
+  const [reportFormat, setReportFormat] = useState<'classic' | 'table' | 'list'>('classic');
 
   // Estados do Modal "Salvar como..."
   const [customTitle, setCustomTitle] = useState('');
@@ -45,15 +49,24 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({
   const [customTime, setCustomTime] = useState('');
   const [customNote, setCustomNote] = useState('');
 
+  const currentReportText = useMemo(() => {
+    if (reportFormat === 'table') {
+      return formatTasksTable(tasks);
+    }
+    if (reportFormat === 'list') {
+      return formatTasksList(tasks);
+    }
+    return generateReport(tasks);
+  }, [tasks, reportFormat]);
+
   const handleCopyReport = async () => {
     if (tasks.length === 0) {
       onNotify('Adicione uma tarefa antes de copiar.', 'error');
       return;
     }
 
-    const reportText = generateReport(tasks);
     try {
-      await navigator.clipboard.writeText(reportText);
+      await navigator.clipboard.writeText(currentReportText);
       setCopied(true);
       onNotify('Relatório copiado com sucesso!', 'success');
       setTimeout(() => setCopied(false), 2000);
@@ -158,22 +171,28 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({
 
         <ReportPreview
           tasks={tasks}
+          reportText={currentReportText}
+          format={reportFormat}
+          onSelectFormat={setReportFormat}
+          onNavigateToTemplates={onNavigateToTemplates}
         />
       </Panel>
 
       {/* Modal: Salvar Relatório Como... */}
       {isSaveAsModalOpen && (
-        <div className="save-as-modal-backdrop">
-          <div className="save-as-modal-box">
-            <div className="save-as-modal-header">
-              <h3>
-                <BookmarkPlus size={18} style={{ color: 'var(--yellow)' }} />
-                Salvar Relatório Como
-              </h3>
+        <div className="modal-backdrop" onClick={() => setIsSaveAsModalOpen(false)}>
+          <div className="modal-container" style={{ maxWidth: '500px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title-group">
+                <span className="modal-kicker">Histórico & Arquivos</span>
+                <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <BookmarkPlus size={18} style={{ color: 'var(--yellow)' }} />
+                  Salvar Relatório Como
+                </h3>
+              </div>
               <button
                 type="button"
-                className="field-icon-btn"
-                style={{ position: 'static' }}
+                className="modal-close-btn"
                 onClick={() => setIsSaveAsModalOpen(false)}
                 aria-label="Fechar"
               >
@@ -182,7 +201,7 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({
             </div>
 
             <form onSubmit={handleConfirmSaveAs}>
-              <div className="save-as-modal-body">
+              <div className="modal-body">
                 <div className="field-group">
                   <label className="field-label" htmlFor="save-as-title">
                     <span><FileText size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} /> Título do Relatório</span>
@@ -243,7 +262,7 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({
                 </div>
               </div>
 
-              <div className="save-as-modal-footer">
+              <div className="modal-footer">
                 <button
                   type="button"
                   className="btn btn-secondary"

@@ -152,10 +152,47 @@ export function useSavedReports() {
     persistReports([]);
   }, []);
 
+  /**
+   * Salvar relatório diretamente com texto fornecido (usado por modelos Markdown).
+   */
+  const saveDirectReport = useCallback(
+    (title: string, reportText: string, tasks: Task[] = []): SavedReport => {
+      const now = new Date();
+      const dateStr = getFormattedDate(now);
+      const timeStr = getFormattedTime(now);
+
+      const [yyyy, mm, dd] = dateStr.split('-');
+      const fallbackTitle = `Relatório de ${dd}/${mm}/${yyyy} às ${timeStr}`;
+      const finalTitle = title.trim() || fallbackTitle;
+
+      const newReport: SavedReport = {
+        id: crypto.randomUUID(),
+        title: finalTitle,
+        createdAt: now.toISOString(),
+        displayDate: dateStr,
+        displayTime: timeStr,
+        tasks: [...tasks],
+        reportText,
+        taskCount: tasks.length,
+        periodSummary: formatPeriodSummary(tasks),
+      };
+
+      setSavedReports((prev) => {
+        const updated = [newReport, ...prev];
+        persistReports(updated);
+        return updated;
+      });
+
+      return newReport;
+    },
+    []
+  );
+
   return {
     savedReports,
     saveReportQuick,
     saveReportCustom,
+    saveDirectReport,
     deleteReport,
     renameReport,
     clearAllReports,
