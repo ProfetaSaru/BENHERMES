@@ -23,6 +23,7 @@ export const App: React.FC = () => {
     savedReports,
     saveReportQuick,
     saveReportCustom,
+    saveDirectReport,
     deleteReport,
     renameReport,
     clearAllReports,
@@ -188,6 +189,7 @@ export const App: React.FC = () => {
                   onSaveReportQuick={handleSaveReportQuick}
                   onSaveReportCustom={handleSaveReportCustom}
                   onNotify={notify}
+                  onNavigateToTemplates={() => setActiveToolId('modelos')}
                 />
               </div>
             </main>
@@ -196,6 +198,11 @@ export const App: React.FC = () => {
               <QuickTemplatesHub
                 notification={notification}
                 onNotify={notify}
+                tasks={tasks}
+                onSaveToHistory={(title, reportText) => {
+                  saveDirectReport(title, reportText, tasks);
+                  notify('Relatório salvo no Histórico!', 'success');
+                }}
               />
             </main>
           ) : activeToolId === 'historico' ? (
