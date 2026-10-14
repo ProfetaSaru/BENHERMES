@@ -1,7 +1,6 @@
 import {
   FileText,
   TableProperties,
-  Wand2,
   BarChart3,
   History,
   Settings,
@@ -11,11 +10,11 @@ import { NavigationItem } from '../types/navigation';
 export const getNavigationItems = (taskCount: number, savedReportsCount = 0): NavigationItem[] => [
   {
     id: 'relatorios',
-    name: 'Gerador de Relatórios',
+    name: 'Central de Relatórios',
     shortName: 'Relatórios',
-    description: 'Criação estruturada de apontamentos de atividades e tarefas diárias.',
+    description: 'Central unificada de relatórios diários expansíveis e modelos dinâmicos.',
     category: 'automacoes',
-    badge: taskCount > 0 ? `${taskCount}` : 'Ativo',
+    badge: taskCount > 0 ? `${taskCount} tarefas` : 'Ativo',
     badgeVariant: taskCount > 0 ? 'primary' : 'success',
     isReady: true,
     icon: <FileText size={20} />,
@@ -30,17 +29,6 @@ export const getNavigationItems = (taskCount: number, savedReportsCount = 0): Na
     badgeVariant: 'warning',
     isReady: false,
     icon: <TableProperties size={20} />,
-  },
-  {
-    id: 'modelos',
-    name: 'Modelos de Textos Rápidos',
-    shortName: 'Modelos',
-    description: 'Templates dinâmicos para e-mails, comunicados e respostas automáticas.',
-    category: 'automacoes',
-    badge: 'Ativo',
-    badgeVariant: 'success',
-    isReady: true,
-    icon: <Wand2 size={20} />,
   },
   {
     id: 'metricas',

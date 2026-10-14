@@ -4,14 +4,11 @@ import { useTaskForm } from './hooks/useTaskForm';
 import { useNotification } from './hooks/useNotification';
 import { useTheme } from './hooks/useTheme';
 import { useSavedReports } from './hooks/useSavedReports';
-import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
 import { TopNavbar } from './components/layout/TopNavbar';
 import { ToolPlaceholder } from './components/layout/ToolPlaceholder';
-import { QuickTemplatesHub } from './components/templates/QuickTemplatesHub';
+import { ReportsHub } from './components/reports/ReportsHub';
 import { ReportsHistoryHub } from './components/history/ReportsHistoryHub';
-import { TaskForm } from './components/task/TaskForm';
-import { ReportPanel } from './components/task/ReportPanel';
 import { Modal } from './components/common/Modal';
 import { Task } from './types/task';
 import { getNavigationItems } from './utils/navigationItems';
@@ -65,26 +62,28 @@ export const App: React.FC = () => {
   const navItems = getNavigationItems(tasks.length, savedReports.length);
   const activeItem = navItems.find((item) => item.id === activeToolId) || navItems[0];
 
-  const handleSaveReportQuick = () => {
-    if (tasks.length === 0) {
+  const handleSaveReportQuick = (reportTasks: Task[], customText?: string) => {
+    if (reportTasks.length === 0) {
       notify('Adicione pelo menos uma tarefa para salvar o relatório.', 'error');
       return;
     }
-    saveReportQuick(tasks);
+    saveReportQuick(reportTasks, customText);
     notify('Relatório salvo com sucesso no Histórico!', 'success');
   };
 
   const handleSaveReportCustom = (params: {
+    tasks: Task[];
     title: string;
     date: string;
     time: string;
     note?: string;
+    customText?: string;
   }) => {
-    if (tasks.length === 0) {
+    if (params.tasks.length === 0) {
       notify('Adicione pelo menos uma tarefa para salvar o relatório.', 'error');
       return;
     }
-    saveReportCustom({ tasks, ...params });
+    saveReportCustom(params);
     notify('Relatório personalizado salvo no Histórico!', 'success');
   };
 
@@ -167,42 +166,25 @@ export const App: React.FC = () => {
         />
 
         <div className="dashboard-content-area">
-          {activeToolId === 'relatorios' ? (
-            <main className="container">
-              <Header taskCount={tasks.length} />
-
-              <div className="layout">
-                <TaskForm
-                  formData={formData}
-                  isEditing={isEditing}
-                  notification={notification}
-                  onFieldChange={setFieldValue}
-                  onSubmit={handleSubmit}
-                  onCancelEdit={resetForm}
-                />
-
-                <ReportPanel
-                  tasks={tasks}
-                  onEditTask={handleEditTask}
-                  onDeleteTask={handleDeleteTask}
-                  onRequestClearAll={handleOpenClearModal}
-                  onSaveReportQuick={handleSaveReportQuick}
-                  onSaveReportCustom={handleSaveReportCustom}
-                  onNotify={notify}
-                  onNavigateToTemplates={() => setActiveToolId('modelos')}
-                />
-              </div>
-            </main>
-          ) : activeToolId === 'modelos' ? (
-            <main className="container" style={{ maxWidth: '1360px' }}>
-              <QuickTemplatesHub
+          {activeToolId === 'relatorios' || activeToolId === 'modelos' ? (
+            <main className="container" style={{ maxWidth: '1480px', padding: '0 16px' }}>
+              <ReportsHub
+                tasks={tasks}
+                formData={formData}
+                isEditing={isEditing}
+                onFieldChange={setFieldValue}
+                onSubmitTask={handleSubmit}
+                onCancelEditTask={resetForm}
+                onEditTask={handleEditTask}
+                onDeleteTask={handleDeleteTask}
+                onRequestClearAll={handleOpenClearModal}
+                onSaveReportQuick={handleSaveReportQuick}
+                onSaveReportCustom={handleSaveReportCustom}
+                onSaveDirectReport={(title, reportText, tpls) => {
+                  saveDirectReport(title, reportText, tpls);
+                }}
                 notification={notification}
                 onNotify={notify}
-                tasks={tasks}
-                onSaveToHistory={(title, reportText) => {
-                  saveDirectReport(title, reportText, tasks);
-                  notify('Relatório salvo no Histórico!', 'success');
-                }}
               />
             </main>
           ) : activeToolId === 'historico' ? (

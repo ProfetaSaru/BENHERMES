@@ -48,7 +48,7 @@ export function useSavedReports() {
   /**
    * Salvamento rápido em 1 clique com data e hora atuais.
    */
-  const saveReportQuick = useCallback((tasks: Task[]): SavedReport => {
+  const saveReportQuick = useCallback((tasks: Task[], customText?: string): SavedReport => {
     const now = new Date();
     const dateStr = getFormattedDate(now);
     const timeStr = getFormattedTime(now);
@@ -63,7 +63,7 @@ export function useSavedReports() {
       displayDate: dateStr,
       displayTime: timeStr,
       tasks: [...tasks],
-      reportText: generateReport(tasks),
+      reportText: customText || generateReport(tasks),
       taskCount: tasks.length,
       periodSummary: formatPeriodSummary(tasks),
     };
@@ -87,6 +87,7 @@ export function useSavedReports() {
       date: string; // YYYY-MM-DD
       time: string; // HH:mm
       note?: string;
+      customText?: string;
     }): SavedReport => {
       const now = new Date();
       const dateStr = params.date || getFormattedDate(now);
@@ -103,7 +104,7 @@ export function useSavedReports() {
         displayDate: dateStr,
         displayTime: timeStr,
         tasks: [...params.tasks],
-        reportText: generateReport(params.tasks),
+        reportText: params.customText || generateReport(params.tasks),
         taskCount: params.tasks.length,
         periodSummary: formatPeriodSummary(params.tasks),
         note: params.note?.trim(),

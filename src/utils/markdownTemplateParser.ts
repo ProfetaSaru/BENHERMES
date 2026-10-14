@@ -49,6 +49,7 @@ export function parseFrontmatter(rawContent: string): FrontmatterResult {
 
     if (key === 'title') metadata.title = value;
     else if (key === 'description') metadata.description = value;
+    else if (key === 'expandable') metadata.expandable = value.toLowerCase() === 'true';
     else if (key === 'category') {
       const cat = value.toLowerCase();
       if (
@@ -110,10 +111,14 @@ export function extractTemplateFields(body: string): TemplateField[] {
       type = 'system';
       isSystemAuto = true;
       systemSource = 'hora_atual';
+    } else if (explicitType === 'password') {
+      type = 'password';
     } else if (explicitType === 'textarea') {
       type = 'textarea';
     } else if (explicitType === 'text') {
       type = 'text';
+    } else if (rawId.includes('senha') || rawId.includes('password')) {
+      type = 'password';
     } else if (
       rawId.includes('descricao') ||
       rawId.includes('detalhes') ||
@@ -127,13 +132,25 @@ export function extractTemplateFields(body: string): TemplateField[] {
       type = 'textarea';
     }
 
+    let placeholder = `Informe ${humanizeLabel(rawId).toLowerCase()}...`;
+    let defaultValue: string | undefined;
+
+    if (rawId === 'link_vanguard') {
+      defaultValue = 'https://gestao.sistemacorban.com.br/index.php/';
+      placeholder = 'https://gestao.sistemacorban.com.br/index.php/';
+    } else if (rawId === 'periodo') {
+      defaultValue = '08:00 - 17:00';
+      placeholder = 'Ex: 08:00 - 17:00';
+    }
+
     fieldsMap.set(rawId, {
       id: rawId,
       label: humanizeLabel(rawId),
       type,
+      defaultValue,
       isSystemAuto,
       systemSource,
-      placeholder: `Informe ${humanizeLabel(rawId).toLowerCase()}...`,
+      placeholder,
     });
   }
 
@@ -219,12 +236,23 @@ export function renderTemplate(
 
       // Prioridade 1: Valor informado pelo usuário no form
       if (fieldValues[cleanId] !== undefined && fieldValues[cleanId] !== '') {
+        if (cleanId === 'nome_completo' || cleanId === 'nome_colaborador') {
+          return fieldValues[cleanId].toUpperCase();
+        }
         return fieldValues[cleanId];
       }
 
       // Prioridade 2: Valor do sistema se for uma tag especial
       if (systemValues[cleanId] !== undefined) {
         return systemValues[cleanId];
+      }
+
+      // Prioridade 3: Valores padrão convenientes para novos acessos
+      if (cleanId === 'link_vanguard') {
+        return 'https://gestao.sistemacorban.com.br/index.php/';
+      }
+      if (cleanId === 'periodo') {
+        return '08:00 - 17:00';
       }
 
       // Valor não preenchido: retorna a tag amigável ou vazio
@@ -251,6 +279,11 @@ export function parseMarkdownTemplate(
 
   const category = metadata.category || 'personalizado';
 
+  const isExplicitExpandable =
+    metadata.expandable !== undefined
+      ? metadata.expandable
+      : fields.some((f) => f.type === 'tasks');
+
   const meta: MarkdownTemplateMeta = {
     id: fallbackId,
     title,
@@ -258,6 +291,7 @@ export function parseMarkdownTemplate(
     category,
     icon: metadata.icon || 'FileText',
     isBuiltin: false,
+    expandable: isExplicitExpandable,
     rawContent,
   };
 

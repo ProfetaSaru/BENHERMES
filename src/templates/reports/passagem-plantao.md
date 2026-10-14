@@ -3,6 +3,7 @@ title: Passagem de Plantão & Troca de Turno
 description: Alinhamento de turno com tarefas concluídas, pendências operacionais e contatos de plantão
 category: operacional
 icon: Clock
+expandable: true
 ---
 
 # 🔄 PASSAGEM DE PLANTÃO / TURNO

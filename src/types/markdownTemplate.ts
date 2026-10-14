@@ -1,4 +1,4 @@
-export type TemplateFieldType = 'text' | 'textarea' | 'tasks' | 'system';
+export type TemplateFieldType = 'text' | 'textarea' | 'tasks' | 'system' | 'password';
 
 export type SystemAutoSource =
   | 'tarefas'
@@ -24,6 +24,7 @@ export interface MarkdownTemplateMeta {
   category: 'atividades' | 'operacional' | 'comunicados' | 'incidentes' | 'personalizado';
   icon?: string;
   isBuiltin: boolean;
+  expandable?: boolean;
   createdAt?: string;
   rawContent: string;
 }

@@ -3,6 +3,7 @@ title: Relatório de Incidente / Pós-Mortem
 description: Documentação técnica pós-incidente com impacto, causa raiz e medidas corretivas
 category: incidentes
 icon: AlertTriangle
+expandable: false
 ---
 
 # 🚨 RELATÓRIO DE INCIDENTE & ANÁLISE PÓS-MORTEM

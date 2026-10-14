@@ -43,14 +43,17 @@ export const MarkdownTemplateEditorModal: React.FC<Props> = ({
 }) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [isExpandable, setIsExpandable] = useState(true);
 
   useEffect(() => {
     if (editingTemplate) {
       setTitle(editingTemplate.title);
       setContent(editingTemplate.rawContent);
+      setIsExpandable(editingTemplate.expandable ?? false);
     } else {
       setTitle('Meu Novo Modelo');
       setContent(STARTER_MD_TEMPLATE);
+      setIsExpandable(true);
     }
   }, [editingTemplate, isOpen]);
 
@@ -76,7 +79,24 @@ export const MarkdownTemplateEditorModal: React.FC<Props> = ({
       return;
     }
 
-    onSave(title.trim(), content);
+    // Garante que o frontmatter tenha expandable: true/false conforme selecionado
+    let finalContent = content;
+    if (finalContent.startsWith('---')) {
+      const closingIdx = finalContent.indexOf('\n---', 3);
+      if (closingIdx !== -1) {
+        const fm = finalContent.slice(0, closingIdx);
+        const rest = finalContent.slice(closingIdx);
+        if (/expandable:\s*(true|false)/i.test(fm)) {
+          finalContent = fm.replace(/expandable:\s*(true|false)/i, `expandable: ${isExpandable}`) + rest;
+        } else {
+          finalContent = `${fm}\nexpandable: ${isExpandable}${rest}`;
+        }
+      }
+    } else {
+      finalContent = `---\ntitle: ${title.trim()}\nexpandable: ${isExpandable}\n---\n\n${content}`;
+    }
+
+    onSave(title.trim(), finalContent);
     onNotify(editingTemplate ? 'Modelo atualizado com sucesso!' : 'Novo modelo salvo com sucesso!', 'success');
     onClose();
   };
@@ -125,6 +145,35 @@ export const MarkdownTemplateEditorModal: React.FC<Props> = ({
               />
             </div>
 
+            <div className="form-group" style={{ margin: '0 0 4px 0' }}>
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  fontWeight: 500,
+                  color: 'var(--text-primary)',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={isExpandable}
+                  onChange={(e) => setIsExpandable(e.target.checked)}
+                  style={{ width: '16px', height: '16px', accentColor: 'var(--blue)', cursor: 'pointer' }}
+                />
+                <span>
+                  <strong>Relatório Expansível</strong> (integra formulário e grade de tarefas dinâmicas)
+                </span>
+              </label>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginLeft: '24px', display: 'block' }}>
+                {isExpandable
+                  ? 'Exibirá os apontamentos de tarefas e lista de horários diários na Central de Relatórios.'
+                  : 'Exibirá apenas os campos pontuais de formulário direto sem lista de tarefas diárias.'}
+              </span>
+            </div>
+
             {/* Barra de atalhos de tags */}
             <div className="template-editor-tag-toolbar">
               <span className="template-toolbar-label">
@@ -138,6 +187,14 @@ export const MarkdownTemplateEditorModal: React.FC<Props> = ({
                   title="Campo de texto normal"
                 >
                   {'+ {{campo}}'}
+                </button>
+                <button
+                  type="button"
+                  className="tag-chip-btn"
+                  onClick={() => handleInsertTag('senha:password')}
+                  title="Campo protegido de senha com botão de exibir/ocultar"
+                >
+                  {'+ {{senha:password}}'}
                 </button>
                 <button
                   type="button"

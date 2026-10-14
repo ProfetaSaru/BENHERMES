@@ -14,15 +14,18 @@ interface ReportPanelProps {
   onEditTask: (task: Task) => void;
   onDeleteTask: (id: string, title: string) => void;
   onRequestClearAll: () => void;
-  onSaveReportQuick: () => void;
+  onSaveReportQuick: (customText?: string) => void;
   onSaveReportCustom: (params: {
     title: string;
     date: string;
     time: string;
     note?: string;
+    customText?: string;
   }) => void;
   onNotify: (message: string, type: 'success' | 'error') => void;
   onNavigateToTemplates?: () => void;
+  activeTemplateText?: string;
+  activeTemplateTitle?: string;
 }
 
 function padZero(num: number): string {
@@ -38,6 +41,8 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({
   onSaveReportCustom,
   onNotify,
   onNavigateToTemplates,
+  activeTemplateText,
+  activeTemplateTitle,
 }) => {
   const [copied, setCopied] = useState(false);
   const [isSaveAsModalOpen, setIsSaveAsModalOpen] = useState(false);
@@ -50,6 +55,9 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({
   const [customNote, setCustomNote] = useState('');
 
   const currentReportText = useMemo(() => {
+    if (activeTemplateText) {
+      return activeTemplateText;
+    }
     if (reportFormat === 'table') {
       return formatTasksTable(tasks);
     }
@@ -57,7 +65,7 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({
       return formatTasksList(tasks);
     }
     return generateReport(tasks);
-  }, [tasks, reportFormat]);
+  }, [tasks, reportFormat, activeTemplateText]);
 
   const handleCopyReport = async () => {
     if (tasks.length === 0) {
@@ -80,7 +88,7 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({
       onNotify('Adicione pelo menos uma tarefa para salvar o relatório.', 'error');
       return;
     }
-    onSaveReportQuick();
+    onSaveReportQuick(currentReportText);
   };
 
   const handleOpenSaveAsModal = () => {
@@ -96,7 +104,11 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({
     const hh = padZero(now.getHours());
     const min = padZero(now.getMinutes());
 
-    setCustomTitle(`Relatório de ${dd}/${mm}/${yyyy} às ${hh}:${min}`);
+    const baseTitle = activeTemplateTitle
+      ? `${activeTemplateTitle} - ${dd}/${mm}`
+      : `Relatório de ${dd}/${mm}/${yyyy} às ${hh}:${min}`;
+
+    setCustomTitle(baseTitle);
     setCustomDate(`${yyyy}-${mm}-${dd}`);
     setCustomTime(`${hh}:${min}`);
     setCustomNote('');
@@ -110,6 +122,7 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({
       date: customDate,
       time: customTime,
       note: customNote,
+      customText: currentReportText,
     });
     setIsSaveAsModalOpen(false);
   };

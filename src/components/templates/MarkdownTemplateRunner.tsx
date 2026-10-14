@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Copy,
   Check,
@@ -8,12 +8,14 @@ import {
   Edit3,
   Trash2,
   Eye,
+  EyeOff,
   Code,
   Sparkles,
   Layers,
   Calendar,
   Clock,
   Table,
+  FolderKanban,
 } from 'lucide-react';
 import { Task } from '../../types/task';
 import { ParsedMarkdownTemplate } from '../../types/markdownTemplate';
@@ -22,6 +24,7 @@ import { Panel } from '../common/Panel';
 import { SectionHeading } from '../common/SectionHeading';
 import { renderTemplate } from '../../utils/markdownTemplateParser';
 import { downloadMarkdownFile } from '../../utils/aiPromptTemplate';
+import { generateBenhubEmail, formatToTitleCase } from '../../utils/templateHelpers';
 
 interface Props {
   template: ParsedMarkdownTemplate;
@@ -29,6 +32,7 @@ interface Props {
   fieldValues: Record<string, string>;
   onFieldChange: (fieldId: string, value: string) => void;
   onResetFields: () => void;
+  onOpenSelector?: () => void;
   onEditTemplate?: () => void;
   onDeleteTemplate?: () => void;
   onExportTemplateFile: () => void;
@@ -42,6 +46,7 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
   fieldValues,
   onFieldChange,
   onResetFields,
+  onOpenSelector,
   onEditTemplate,
   onDeleteTemplate,
   onExportTemplateFile,
@@ -50,6 +55,59 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [viewMode, setViewMode] = useState<'formatted' | 'raw'>('formatted');
+  const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
+  const [isNomeBenhubCustom, setIsNomeBenhubCustom] = useState(false);
+  const [isEmailBenhubCustom, setIsEmailBenhubCustom] = useState(false);
+
+  useEffect(() => {
+    setIsNomeBenhubCustom(false);
+    setIsEmailBenhubCustom(false);
+  }, [template.meta.id]);
+
+  const togglePasswordVisibility = (fieldId: string) => {
+    setVisiblePasswords((prev) => ({
+      ...prev,
+      [fieldId]: !prev[fieldId],
+    }));
+  };
+
+  const handleSmartFieldChange = (fieldId: string, rawValue: string) => {
+    const isNameField = fieldId === 'nome_completo' || fieldId === 'nome_colaborador';
+    const value = isNameField ? rawValue.toUpperCase() : rawValue;
+
+    onFieldChange(fieldId, value);
+
+    // Se o usuário digitou diretamente em nome_benhub ou email_benhub, marca como customizado
+    if (fieldId === 'nome_benhub') {
+      setIsNomeBenhubCustom(value.trim().length > 0);
+      return;
+    }
+
+    if (fieldId === 'email_benhub') {
+      setIsEmailBenhubCustom(value.trim().length > 0);
+      return;
+    }
+
+    // Sugestão automática de e-mail e formatação se estiver digitando o nome do colaborador
+    if (isNameField) {
+      const suggestedEmail = generateBenhubEmail(rawValue);
+      const titleCased = formatToTitleCase(rawValue);
+
+      if (template.fields.some((f) => f.id === 'nome_benhub') && !isNomeBenhubCustom) {
+        onFieldChange('nome_benhub', titleCased);
+      }
+
+      if (template.fields.some((f) => f.id === 'email_benhub') && !isEmailBenhubCustom) {
+        onFieldChange('email_benhub', suggestedEmail);
+      }
+    }
+  };
+
+  const handleReset = () => {
+    setIsNomeBenhubCustom(false);
+    setIsEmailBenhubCustom(false);
+    onResetFields();
+  };
 
   // Gera o texto Markdown substituindo as variáveis
   const renderedMarkdown = useMemo(() => {
@@ -108,6 +166,18 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
         </div>
 
         <div className="runner-header-actions">
+          {onOpenSelector && (
+            <Button
+              variant="primary"
+              onClick={onOpenSelector}
+              title="Abrir catálogo para escolher outro modelo ou relatório"
+              style={{ padding: '6px 14px', fontSize: '0.85rem' }}
+            >
+              <FolderKanban size={15} />
+              Mudar Modelo
+            </Button>
+          )}
+
           <Button
             variant="secondary"
             onClick={onExportTemplateFile}
@@ -153,7 +223,7 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
                 <button
                   type="button"
                   className="runner-reset-btn"
-                  onClick={onResetFields}
+                  onClick={handleReset}
                   title="Limpar todos os campos digitados"
                 >
                   <RotateCcw size={13} />
@@ -205,16 +275,47 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
                         className="textarea-field"
                         rows={3}
                         value={fieldValues[field.id] || ''}
-                        onChange={(e) => onFieldChange(field.id, e.target.value)}
+                        onChange={(e) => handleSmartFieldChange(field.id, e.target.value)}
                         placeholder={field.placeholder || `Digite ${field.label.toLowerCase()}...`}
                       />
+                    ) : field.type === 'password' ? (
+                      <div className="password-input-wrapper" style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <input
+                          id={`field-${field.id}`}
+                          type={visiblePasswords[field.id] ? 'text' : 'password'}
+                          className="input-field"
+                          style={{ paddingRight: '40px' }}
+                          value={fieldValues[field.id] || ''}
+                          onChange={(e) => handleSmartFieldChange(field.id, e.target.value)}
+                          placeholder={field.placeholder || `Digite ${field.label.toLowerCase()}...`}
+                        />
+                        <button
+                          type="button"
+                          className="password-toggle-btn"
+                          onClick={() => togglePasswordVisibility(field.id)}
+                          style={{
+                            position: 'absolute',
+                            right: '8px',
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--text-muted)',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                          }}
+                          title={visiblePasswords[field.id] ? 'Ocultar senha' : 'Ver senha'}
+                        >
+                          {visiblePasswords[field.id] ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
                     ) : (
                       <input
                         id={`field-${field.id}`}
                         type="text"
                         className="input-field"
                         value={fieldValues[field.id] || ''}
-                        onChange={(e) => onFieldChange(field.id, e.target.value)}
+                        onChange={(e) => handleSmartFieldChange(field.id, e.target.value)}
                         placeholder={field.placeholder || `Digite ${field.label.toLowerCase()}...`}
                       />
                     )}

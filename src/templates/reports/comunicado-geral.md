@@ -3,6 +3,7 @@ title: Comunicado Geral & Aviso Interno
 description: Mensagem oficial estruturada para disparos em canais corporativos e e-mails
 category: comunicados
 icon: Mail
+expandable: false
 ---
 
 # 📢 COMUNICADO OFICIAL: {{assunto}}

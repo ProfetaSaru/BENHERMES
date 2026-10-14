@@ -3,6 +3,7 @@ title: Relatório de Atividades em Tabela
 description: Apresentação gerencial com tarefas estruturadas em tabela Markdown e resumo executivo
 category: atividades
 icon: TableProperties
+expandable: true
 ---
 
 # 📊 RELATÓRIO GERENCIAL DE PRODUTIVIDADE
