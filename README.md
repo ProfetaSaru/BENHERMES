@@ -17,6 +17,161 @@ Construída com **React 18**, **TypeScript**, **Vite** e estilização modular, 
 - **📋 Geração de Relatório com 1 Clique**: Preview do relatório formatado e botão de cópia direta para a área de transferência (`navigator.clipboard`).
 - **💾 Persistência Local**: Sincronização automática e segura no `localStorage` do navegador sob a chave `'relatorio-atividades'`.
 - **📱 Design Responsivo & Acessível**: Layout em duas colunas para desktop e empilhado em dispositivos móveis, com micro-animações e ícones [`lucide-react`](https://lucide.dev/).
+- **💾 Histórico Universal com Restauração Fiel**: Qualquer relatório salvo no histórico (seja de atividades ou baseado em modelo) é restaurado completamente com todos os campos e modelo ativo pronto para edição.
+- **⚡ Rascunhos Temporários em Tempo Real**: Cada modelo mantém automaticamente seus dados preenchidos no navegador, lembrando o último modelo utilizado mesmo após recarregar a página (F5).
+
+---
+
+## 📑 Como Criar Novos Relatórios (Expansíveis e Não Expansíveis)
+
+A aplicação utiliza um motor dinâmico baseado em arquivos **Markdown (.md)** com metadados **YAML Frontmatter** no topo. Existem dois tipos de relatórios:
+
+| Tipo | `expandable` | Comportamento | Casos de Uso Típicos |
+| :--- | :---: | :--- | :--- |
+| **Expansível** | `true` | Integra o painel de cadastro de tarefas diárias com horários e suporte a variáveis extras de cabeçalho. | Relatório Diário Clássico, Grade de Produtividade em Tabela. |
+| **Não Expansível** | `false` | Funciona como formulário dinâmico puro. Transforma variáveis do markdown em inputs e textareas automáticos. | Pós-Mortem / Incidentes, Onboarding de Novo Colaborador, Passagem de Plantão, Comunicados. |
+
+---
+
+### 1. Anatomia e Sintaxe de um Arquivo de Modelo (.md)
+
+Todo modelo possui um bloco **Frontmatter** no topo (entre `---`) seguido pelo corpo do documento em Markdown:
+
+```markdown
+---
+title: Nome Exibido no Catálogo
+description: Descrição curta do objetivo do relatório
+category: atividades # categorias: atividades | incidentes | rh | suporte | comunicados | geral
+icon: FileText       # ícone Lucide: FileText, TableProperties, AlertTriangle, UserCheck, Radio, etc.
+expandable: true     # true para expansível (com tarefas) ou false para não expansível (formulário)
+---
+
+# 📋 TÍTULO DO RELATÓRIO
+**Data:** {{data_atual}}
+**Responsável:** {{nome_colaborador}}
+
+---
+
+{{conteudo_ou_tarefas}}
+```
+
+#### 🏷️ Variáveis Dinâmicas e Tags Especiais
+
+- **Campos de Texto Simples:** `{{nome_campo}}` cria um input de texto comum.
+- **Campos Multilinha (Textarea):** Adicione o sufixo `:textarea` (ex: `{{observacoes:textarea}}`) ou utilize nomes como `descricao`, `motivo`, `detalhes`, `pendencias`, `acoes`.
+- **Campos de Senha:** Use o sufixo `:password` (ex: `{{senha_temporaria:password}}`) para gerar um campo com botão de mostrar/ocultar senha.
+- **Variáveis Automáticas do Sistema:** `{{data_atual}}` e `{{hora_atual}}` são preenchidas automaticamente com a data e hora do momento.
+- **Tags de Tarefas (Exclusivo para `expandable: true`):**
+  - `{{tarefas}}`: Insere as tarefas cadastradas no formato de lista clássica com horários.
+  - `{{tarefas_tabela}}` ou `{{tabela_tarefas}}`: Formata as tarefas cadastradas diretamente em uma tabela Markdown organizada.
+
+---
+
+### 2. Exemplo: Criando um Relatório EXPANSÍVEL
+
+Um relatório expansível permite que o usuário adicione quantas atividades quiser ao longo do dia, podendo também solicitar campos extras (como número da sprint, squad ou colaborador):
+
+Crie o arquivo em `src/templates/reports/atividades-sprint.md`:
+
+```markdown
+---
+title: Fechamento de Sprint Diária
+description: Registro de atividades integrado com metas e identificação da sprint
+category: atividades
+icon: TableProperties
+expandable: true
+---
+
+# 🏃‍♂️ RELATÓRIO DIÁRIO DE SPRINT
+
+**Sprint:** {{numero_sprint}}
+**Squad / Projeto:** {{nome_squad}}
+**Data:** {{data_atual}} às {{hora_atual}}
+
+---
+
+### 🎯 Metas e Entregas do Dia
+{{metas_atingidas:textarea}}
+
+---
+
+### 📋 Atividades Realizadas
+{{tarefas_tabela}}
+
+---
+
+### 🚧 Bloqueios e Impedimentos
+{{impedimentos:textarea}}
+```
+
+---
+
+### 3. Exemplo: Criando um Relatório NÃO EXPANSÍVEL
+
+Um relatório não expansível gera uma interface de formulário direto, ideal para checklists, registros pontuais, comunicados ou incidentes:
+
+Crie o arquivo em `src/templates/reports/checklist-deploy.md`:
+
+```markdown
+---
+title: Checklist de Deploy em Produção
+description: Registro e validação de liberação de versão em ambiente produtivo
+category: suporte
+icon: Radio
+expandable: false
+---
+
+# 🚀 RELATÓRIO DE DEPLOY EM PRODUÇÃO
+
+**Versão / Tag:** {{versao_sistema}}
+**Ambiente:** {{ambiente}}
+**Horário de Início:** {{hora_inicio}}
+**Horário de Término:** {{hora_termino}}
+**Responsável pelo Deploy:** {{responsavel}}
+
+---
+
+## 🔍 Validações Realizadas
+- [x] Backup de banco de dados executado
+- [x] Migrations aplicadas sem erros
+- [x] Testes de fumaça (Smoke Tests) validados
+
+### 📝 Observações e Rollback Plan
+{{observacoes_rollback:textarea}}
+```
+
+---
+
+### 4. Como Registrar Novos Modelos no Código-Fonte
+
+Após criar seu arquivo `.md` na pasta `src/templates/reports/`:
+
+1. Abra o arquivo [`src/templates/reports/index.ts`](src/templates/reports/index.ts).
+2. Importe o arquivo utilizando a diretiva `?raw` do Vite:
+   ```ts
+   import checklistDeployRaw from './checklist-deploy.md?raw';
+   ```
+3. Adicione o modelo ao array `BUILTIN_TEMPLATES`:
+   ```ts
+   export const BUILTIN_TEMPLATES: MarkdownTemplateMeta[] = [
+     // Modelos existentes...
+     { ...parseMarkdownTemplate(checklistDeployRaw, 'checklist-deploy').meta, isBuiltin: true },
+   ];
+   ```
+
+Pronto! Ao salvar, o novo modelo aparecerá automaticamente no catálogo **"Mudar Modelo"**, já com suporte a salvamento no histórico, filtros e restauração completos.
+
+---
+
+### 5. Como Adicionar pela Própria Interface Web (Sem Alterar Código)
+
+Você também pode adicionar modelos diretamente pelo navegador:
+
+1. No Gerador, clique no botão **"Mudar Modelo"**.
+2. Escolha uma das opções disponíveis:
+   - **"Novo Modelo"**: Abre um editor integrado com syntax highlighting e validação em tempo real. Digite seu frontmatter e corpo markdown e clique em salvar.
+   - **"Importar .md"**: Selecione qualquer arquivo `.md` do seu computador.
+   - **"Gerar Prompt para IA"**: Copia um prompt estruturado para que o ChatGPT, Claude ou Gemini gere o modelo Markdown exato pronto para você colar no sistema.
 
 ---
 
