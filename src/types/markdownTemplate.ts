@@ -25,6 +25,8 @@ export interface MarkdownTemplateMeta {
   icon?: string;
   isBuiltin: boolean;
   expandable?: boolean;
+  categories?: string[];
+  itemLabel?: string;
   createdAt?: string;
   rawContent: string;
 }

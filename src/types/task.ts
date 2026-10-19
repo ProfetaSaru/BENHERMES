@@ -4,6 +4,7 @@ export interface Task {
   end: string;
   title: string;
   description: string;
+  category?: string;
 }
 
 export type TaskFormData = Omit<Task, 'id'>;
