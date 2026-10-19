@@ -383,3 +383,160 @@
   background: rgba(250, 204, 21, 0.15);
   color: var(--yellow);
 }
+
+/* ==========================================================================
+   FILTROS RÁPIDOS POR CATEGORIA (Pills)
+   ========================================================================== */
+.history-category-filters {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.25rem;
+}
+
+.history-filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: var(--paper);
+  color: var(--muted);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.history-filter-pill:hover {
+  background: var(--paper-surface);
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+
+.history-filter-pill.active {
+  background: var(--yellow);
+  color: #000000;
+  border-color: var(--yellow);
+  box-shadow: 0 2px 6px rgba(250, 204, 21, 0.25);
+}
+
+.history-filter-pill .pill-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.history-filter-pill.active .pill-count {
+  background: rgba(0, 0, 0, 0.2);
+  color: #000000;
+}
+
+/* ==========================================================================
+   BADGES DE MODELO E CAMPOS DESTAQUES NOS CARDS
+   ========================================================================== */
+.history-card-badges-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.4rem;
+}
+
+.history-category-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.history-badge-cat-atividades {
+  background: var(--blue-soft, rgba(37, 99, 235, 0.12));
+  color: var(--blue);
+  border: 1px solid rgba(37, 99, 235, 0.25);
+}
+
+.history-badge-cat-incidente {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--red);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.history-badge-cat-rh {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--green);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.history-badge-cat-plantao {
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--yellow);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.history-badge-cat-comunicado {
+  background: rgba(168, 85, 247, 0.12);
+  color: #a855f7;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+.history-badge-cat-custom {
+  background: rgba(236, 72, 153, 0.12);
+  color: #ec4899;
+  border: 1px solid rgba(236, 72, 153, 0.3);
+}
+
+.history-model-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--paper-surface);
+  border: 1px solid var(--line);
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.history-card-highlights {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.highlight-chip {
+  font-size: 0.75rem;
+  background: var(--paper-surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.highlight-chip strong {
+  color: var(--muted);
+  font-weight: 600;
+  margin-right: 2px;
+}
+
+.highlight-restore {
+  background: var(--yellow) !important;
+  color: #000000 !important;
+  border-color: var(--yellow) !important;
+  font-weight: 700 !important;
+}
+
+.highlight-restore:hover {
+  background: var(--yellow-hover) !important;
+  transform: translateY(-1px);
+}
+

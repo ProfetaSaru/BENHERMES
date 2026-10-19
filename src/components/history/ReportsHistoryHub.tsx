@@ -14,17 +14,93 @@ import {
   Check,
   Edit2,
   CheckCircle,
+  Layers,
+  Sparkles,
+  Tag,
+  AlertTriangle,
+  UserCheck,
+  Radio,
 } from 'lucide-react';
-import { SavedReport, Task } from '../../types/task';
+import { SavedReport } from '../../types/task';
 
 interface ReportsHistoryHubProps {
   savedReports: SavedReport[];
   onDeleteReport: (id: string) => void;
   onRenameReport: (id: string, newTitle: string) => void;
   onClearAllReports: () => void;
-  onRestoreTasks: (tasks: Task[], reportTitle: string) => void;
+  onRestoreReport: (report: SavedReport) => void;
   onNotify: (message: string, type: 'success' | 'error' | '') => void;
   onNavigateToGenerator: () => void;
+}
+
+type FilterCategory = 'all' | 'atividades' | 'incidentes' | 'rh' | 'plantao' | 'custom';
+
+function matchesCategory(report: SavedReport, category: FilterCategory): boolean {
+  if (category === 'all') return true;
+  const cat = (report.templateCategory || '').toLowerCase();
+  const id = (report.templateId || '').toLowerCase();
+
+  switch (category) {
+    case 'atividades':
+      return report.isExpandable === true || id.includes('atividade') || cat === 'geral';
+    case 'incidentes':
+      return cat === 'incidentes' || id.includes('incidente');
+    case 'rh':
+      return cat === 'rh' || id.includes('colaborador') || id.includes('acesso');
+    case 'plantao':
+      return cat === 'suporte' || cat === 'plantao' || id.includes('plantao');
+    case 'custom':
+      return cat === 'custom' || id.startsWith('custom-');
+    default:
+      return true;
+  }
+}
+
+function getCategoryBadgeInfo(report: SavedReport): { label: string; className: string } {
+  const cat = (report.templateCategory || '').toLowerCase();
+  const id = (report.templateId || '').toLowerCase();
+
+  if (id.startsWith('custom-') || cat === 'custom') {
+    return { label: 'Customizado', className: 'history-badge-cat-custom' };
+  }
+  if (id.includes('incidente') || cat === 'incidentes') {
+    return { label: 'Incidente', className: 'history-badge-cat-incidente' };
+  }
+  if (id.includes('colaborador') || cat === 'rh') {
+    return { label: 'RH & Acesso', className: 'history-badge-cat-rh' };
+  }
+  if (id.includes('plantao') || cat === 'suporte') {
+    return { label: 'Plantão', className: 'history-badge-cat-plantao' };
+  }
+  if (id.includes('comunicado')) {
+    return { label: 'Comunicado', className: 'history-badge-cat-comunicado' };
+  }
+  return { label: 'Atividades', className: 'history-badge-cat-atividades' };
+}
+
+function getKeyFieldHighlights(report: SavedReport): { label: string; value: string }[] {
+  if (!report.fieldValues) return [];
+  const fields = report.fieldValues;
+  const list: { label: string; value: string }[] = [];
+
+  const addIf = (key: string, label: string) => {
+    if (fields[key] && fields[key].trim()) {
+      list.push({ label, value: fields[key].trim() });
+    }
+  };
+
+  addIf('nome_completo', 'Colaborador');
+  addIf('nome_colaborador', 'Colaborador');
+  addIf('colaborador', 'Colaborador');
+  addIf('cargo', 'Cargo');
+  addIf('sistema_afetado', 'Sistema');
+  addIf('gravidade', 'Gravidade');
+  addIf('titulo_incidente', 'Incidente');
+  addIf('colaborador_saindo', 'Saindo');
+  addIf('colaborador_entrando', 'Entrando');
+  addIf('titulo_comunicado', 'Comunicado');
+
+  return list.slice(0, 3);
 }
 
 export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
@@ -32,11 +108,12 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
   onDeleteReport,
   onRenameReport,
   onClearAllReports,
-  onRestoreTasks,
+  onRestoreReport,
   onNotify,
   onNavigateToGenerator,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<FilterCategory>('all');
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -44,23 +121,57 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitleValue, setEditTitleValue] = useState('');
 
-  // Filtragem
-  const filteredReports = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return savedReports;
+  // Contadores por categoria
+  const categoryCounts = useMemo(() => {
+    return {
+      all: savedReports.length,
+      atividades: savedReports.filter((r) => matchesCategory(r, 'atividades')).length,
+      incidentes: savedReports.filter((r) => matchesCategory(r, 'incidentes')).length,
+      rh: savedReports.filter((r) => matchesCategory(r, 'rh')).length,
+      plantao: savedReports.filter((r) => matchesCategory(r, 'plantao')).length,
+      custom: savedReports.filter((r) => matchesCategory(r, 'custom')).length,
+    };
+  }, [savedReports]);
 
-    return savedReports.filter((report) => {
+  // Filtragem combinada (categoria + busca textual)
+  const filteredReports = useMemo(() => {
+    let list = savedReports;
+
+    if (selectedCategory !== 'all') {
+      list = list.filter((r) => matchesCategory(r, selectedCategory));
+    }
+
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return list;
+
+    return list.filter((report) => {
       const matchTitle = report.title.toLowerCase().includes(q);
+      const matchTemplateTitle = report.templateTitle?.toLowerCase().includes(q);
       const matchNote = report.note ? report.note.toLowerCase().includes(q) : false;
       const matchDate = report.displayDate.includes(q);
+      const matchReportText = report.reportText.toLowerCase().includes(q);
       const matchTasks = report.tasks.some(
         (t) =>
           t.title.toLowerCase().includes(q) ||
           t.description.toLowerCase().includes(q)
       );
-      return matchTitle || matchNote || matchDate || matchTasks;
+      const matchFields = report.fieldValues
+        ? Object.values(report.fieldValues).some((v) =>
+            typeof v === 'string' && v.toLowerCase().includes(q)
+          )
+        : false;
+
+      return (
+        matchTitle ||
+        matchTemplateTitle ||
+        matchNote ||
+        matchDate ||
+        matchReportText ||
+        matchTasks ||
+        matchFields
+      );
     });
-  }, [savedReports, searchQuery]);
+  }, [savedReports, selectedCategory, searchQuery]);
 
   const toggleExpand = (id: string) => {
     setExpandedIds((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -77,32 +188,25 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
     }
   };
 
-  const handleDownloadTxt = (report: SavedReport) => {
+  const handleDownloadFile = (report: SavedReport, format: 'txt' | 'md') => {
     try {
-      const blob = new Blob([report.reportText], { type: 'text/plain;charset=utf-8' });
+      const mime = format === 'md' ? 'text/markdown;charset=utf-8' : 'text/plain;charset=utf-8';
+      const blob = new Blob([report.reportText], { type: mime });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       const safeTitle = report.title.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40);
-      link.download = `${safeTitle}.txt`;
+      link.download = `${safeTitle}.${format}`;
       link.click();
       URL.revokeObjectURL(url);
-      onNotify('Download do arquivo .txt iniciado!', 'success');
+      onNotify(`Download do arquivo .${format} realizado!`, 'success');
     } catch {
       onNotify('Erro ao baixar arquivo do relatório.', 'error');
     }
   };
 
   const handleRestore = (report: SavedReport) => {
-    const confirmed = window.confirm(
-      `Restaurar as ${report.taskCount} atividades de "${report.title}" para o Gerador de Relatórios?\n\nAs tarefas ativas atuais serão substituídas.`
-    );
-
-    if (confirmed) {
-      onRestoreTasks(report.tasks, report.title);
-      onNavigateToGenerator();
-      onNotify(`Atividades restauradas de "${report.title}".`, 'success');
-    }
+    onRestoreReport(report);
   };
 
   const handleDelete = (report: SavedReport) => {
@@ -147,7 +251,7 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
             Histórico & Arquivos de Relatórios
           </h2>
           <p>
-            Consolidação dos relatórios diários salvos no navegador. Consulte, copie, baixe ou restaure atividades anteriores.
+            Consolidação de todos os relatórios e modelos salvos. Restaure para o Gerador com 1 clique para continuar editando.
           </p>
         </div>
 
@@ -171,7 +275,72 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
         </div>
       </div>
 
-      {/* Barra de Filtro e Busca */}
+      {/* Barra de Filtros por Categoria */}
+      <div className="history-category-filters">
+        <button
+          type="button"
+          className={`history-filter-pill ${selectedCategory === 'all' ? 'active' : ''}`}
+          onClick={() => setSelectedCategory('all')}
+        >
+          <Layers size={14} />
+          Todos
+          <span className="pill-count">{categoryCounts.all}</span>
+        </button>
+
+        <button
+          type="button"
+          className={`history-filter-pill ${selectedCategory === 'atividades' ? 'active' : ''}`}
+          onClick={() => setSelectedCategory('atividades')}
+        >
+          <Clock size={14} />
+          Atividades Diárias
+          <span className="pill-count">{categoryCounts.atividades}</span>
+        </button>
+
+        <button
+          type="button"
+          className={`history-filter-pill ${selectedCategory === 'incidentes' ? 'active' : ''}`}
+          onClick={() => setSelectedCategory('incidentes')}
+        >
+          <AlertTriangle size={14} />
+          Incidentes
+          <span className="pill-count">{categoryCounts.incidentes}</span>
+        </button>
+
+        <button
+          type="button"
+          className={`history-filter-pill ${selectedCategory === 'rh' ? 'active' : ''}`}
+          onClick={() => setSelectedCategory('rh')}
+        >
+          <UserCheck size={14} />
+          RH & Acesso
+          <span className="pill-count">{categoryCounts.rh}</span>
+        </button>
+
+        <button
+          type="button"
+          className={`history-filter-pill ${selectedCategory === 'plantao' ? 'active' : ''}`}
+          onClick={() => setSelectedCategory('plantao')}
+        >
+          <Radio size={14} />
+          Plantão
+          <span className="pill-count">{categoryCounts.plantao}</span>
+        </button>
+
+        {categoryCounts.custom > 0 && (
+          <button
+            type="button"
+            className={`history-filter-pill ${selectedCategory === 'custom' ? 'active' : ''}`}
+            onClick={() => setSelectedCategory('custom')}
+          >
+            <Sparkles size={14} />
+            Customizados
+            <span className="pill-count">{categoryCounts.custom}</span>
+          </button>
+        )}
+      </div>
+
+      {/* Barra de Busca Textual */}
       {savedReports.length > 0 && (
         <div className="history-toolbar">
           <div className="history-search-wrapper">
@@ -179,10 +348,21 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
             <input
               type="text"
               className="history-search-input"
-              placeholder="Pesquisar por título, data ou atividade do relatório..."
+              placeholder="Pesquisar por título, colaborador, sistema, modelo ou conteúdo do relatório..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
+            {searchQuery && (
+              <button
+                type="button"
+                className="field-icon-btn"
+                style={{ position: 'static', padding: 4 }}
+                onClick={() => setSearchQuery('')}
+                title="Limpar busca"
+              >
+                ✕
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -197,7 +377,7 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
             <>
               <h3>Nenhum relatório salvo ainda</h3>
               <p>
-                Quando você finalizar suas atividades no Gerador de Relatórios, clique no botão <strong>"Salvar"</strong> ou <strong>"Salvar como..."</strong> para arquivá-las aqui.
+                Quando você finalizar ou quiser pausar um relatório ou modelo, clique no botão <strong>"Salvar"</strong> ou <strong>"Salvar como..."</strong> para arquivá-lo aqui.
               </p>
               <button
                 type="button"
@@ -210,8 +390,19 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
             </>
           ) : (
             <>
-              <h3>Nenhum resultado para a busca</h3>
-              <p>Tente outros termos de pesquisa para localizar os relatórios arquivados.</p>
+              <h3>Nenhum resultado nesta categoria</h3>
+              <p>Não há relatórios correspondentes aos filtros e termos de pesquisa aplicados.</p>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ width: 'auto', marginTop: '0.5rem' }}
+                onClick={() => {
+                  setSelectedCategory('all');
+                  setSearchQuery('');
+                }}
+              >
+                Limpar filtros e exibir todos
+              </button>
             </>
           )}
         </div>
@@ -221,6 +412,8 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
             const isExpanded = !!expandedIds[report.id];
             const isCopied = copiedId === report.id;
             const isEditing = editingId === report.id;
+            const catBadge = getCategoryBadgeInfo(report);
+            const fieldHighlights = getKeyFieldHighlights(report);
 
             // Formatação amigável da data exibida
             const [yyyy, mm, dd] = report.displayDate.split('-');
@@ -230,6 +423,16 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
               <div key={report.id} className="history-card">
                 <div className="history-card-header">
                   <div className="history-card-title-group" style={{ flex: 1, minWidth: '260px' }}>
+                    <div className="history-card-badges-row">
+                      <span className={`history-category-badge ${catBadge.className}`}>
+                        {catBadge.label}
+                      </span>
+                      <span className="history-model-badge">
+                        <Tag size={11} style={{ marginRight: 3, verticalAlign: 'middle' }} />
+                        {report.templateTitle || 'Relatório'}
+                      </span>
+                    </div>
+
                     {isEditing ? (
                       <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '8px' }}>
                         <input
@@ -275,16 +478,35 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
                         {formattedDateBR} às {report.displayTime}
                       </span>
 
-                      <span className="history-card-meta-item">
-                        <Clock size={13} style={{ color: 'var(--yellow)' }} />
-                        Período: {report.periodSummary}
-                      </span>
-
-                      <span className="history-card-meta-item">
-                        <CheckCircle size={13} style={{ color: 'var(--green)' }} />
-                        {report.taskCount} {report.taskCount === 1 ? 'atividade' : 'atividades'}
-                      </span>
+                      {report.isExpandable ? (
+                        <>
+                          <span className="history-card-meta-item">
+                            <Clock size={13} style={{ color: 'var(--yellow)' }} />
+                            Período: {report.periodSummary}
+                          </span>
+                          <span className="history-card-meta-item">
+                            <CheckCircle size={13} style={{ color: 'var(--green)' }} />
+                            {report.taskCount} {report.taskCount === 1 ? 'tarefa' : 'tarefas'}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="history-card-meta-item">
+                          <Layers size={13} style={{ color: 'var(--yellow)' }} />
+                          Formulário de Modelo
+                        </span>
+                      )}
                     </div>
+
+                    {/* Destaques de campos principais do modelo */}
+                    {fieldHighlights.length > 0 && (
+                      <div className="history-card-highlights">
+                        {fieldHighlights.map((fh, idx) => (
+                          <span key={idx} className="highlight-chip">
+                            <strong>{fh.label}:</strong> {fh.value}
+                          </span>
+                        ))}
+                      </div>
+                    )}
 
                     {report.note && (
                       <div className="history-card-note">
@@ -308,18 +530,28 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
                     <button
                       type="button"
                       className="btn-history-action"
-                      onClick={() => handleDownloadTxt(report)}
+                      onClick={() => handleDownloadFile(report, 'txt')}
                       title="Baixar como arquivo .txt"
                     >
                       <Download size={14} />
-                      Baixar .txt
+                      .txt
                     </button>
 
                     <button
                       type="button"
-                      className="btn-history-action restore"
+                      className="btn-history-action"
+                      onClick={() => handleDownloadFile(report, 'md')}
+                      title="Baixar como arquivo .md"
+                    >
+                      <Download size={14} />
+                      .md
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn-history-action restore highlight-restore"
                       onClick={() => handleRestore(report)}
-                      title="Restaurar estas atividades no Gerador de Relatórios para continuar editando"
+                      title="Restaurar este relatório no Gerador: carrega o modelo e preenche todos os campos para edição"
                     >
                       <RotateCcw size={14} />
                       Restaurar no Gerador
