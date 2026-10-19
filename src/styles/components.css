@@ -92,9 +92,8 @@ h3 {
 
 /* Form & Fields */
 .time-fields {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  display: flex;
+  flex-direction: column;
 }
 
 .field {
@@ -1359,7 +1358,8 @@ pre {
 }
 
 .time-fields.single-time-field {
-  grid-template-columns: 1fr;
+  display: flex;
+  flex-direction: column;
 }
 
 .task-meta-row {
