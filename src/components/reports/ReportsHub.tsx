@@ -6,7 +6,7 @@ import {
   Trash2,
   FolderKanban,
 } from 'lucide-react';
-import { Task, TaskFormData, NotificationState, NotificationType } from '../../types/task';
+import { Task, TaskFormData, NotificationState, NotificationType, SaveReportParams } from '../../types/task';
 import { VerticalReportSelector } from './VerticalReportSelector';
 import { TaskForm } from '../task/TaskForm';
 import { ReportPanel } from '../task/ReportPanel';
@@ -31,18 +31,11 @@ interface Props {
   onEditTask: (task: Task) => void;
   onDeleteTask: (id: string, title: string) => void;
   onRequestClearAll: () => void;
-  onSaveReportQuick: (tasks: Task[], customText?: string) => void;
-  onSaveReportCustom: (params: {
-    tasks: Task[];
-    title: string;
-    date: string;
-    time: string;
-    note?: string;
-    customText?: string;
-  }) => void;
-  onSaveDirectReport: (title: string, reportText: string, tasks: Task[]) => void;
+  onSaveReportQuick: (params: SaveReportParams) => void;
+  onSaveReportCustom: (params: SaveReportParams) => void;
   notification: NotificationState;
   onNotify: (message: string, type?: NotificationType) => void;
+  templateControls: ReturnType<typeof useMarkdownTemplates>;
 }
 
 export const ReportsHub: React.FC<Props> = ({
@@ -57,9 +50,9 @@ export const ReportsHub: React.FC<Props> = ({
   onRequestClearAll,
   onSaveReportQuick,
   onSaveReportCustom,
-  onSaveDirectReport,
   notification,
   onNotify,
+  templateControls,
 }) => {
   const {
     templates,
@@ -76,7 +69,7 @@ export const ReportsHub: React.FC<Props> = ({
     importTemplateFromFile,
     exportTemplateToFile,
     downloadExampleBase,
-  } = useMarkdownTemplates();
+  } = templateControls;
 
   // Modais
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
@@ -351,8 +344,32 @@ export const ReportsHub: React.FC<Props> = ({
                   onEditTask={onEditTask}
                   onDeleteTask={onDeleteTask}
                   onRequestClearAll={onRequestClearAll}
-                  onSaveReportQuick={(customText) => onSaveReportQuick(tasks, customText)}
-                  onSaveReportCustom={(params) => onSaveReportCustom({ tasks, ...params })}
+                  onSaveReportQuick={(customText) =>
+                    onSaveReportQuick({
+                      templateId: parsedActiveTemplate.meta.id,
+                      templateTitle: parsedActiveTemplate.meta.title,
+                      templateCategory: parsedActiveTemplate.meta.category,
+                      isExpandable: true,
+                      fieldValues,
+                      tasks,
+                      reportText: customText || renderedTemplateMarkdown,
+                    })
+                  }
+                  onSaveReportCustom={(params) =>
+                    onSaveReportCustom({
+                      templateId: parsedActiveTemplate.meta.id,
+                      templateTitle: parsedActiveTemplate.meta.title,
+                      templateCategory: parsedActiveTemplate.meta.category,
+                      isExpandable: true,
+                      fieldValues,
+                      tasks,
+                      reportText: params.customText || renderedTemplateMarkdown,
+                      title: params.title,
+                      date: params.date,
+                      time: params.time,
+                      note: params.note,
+                    })
+                  }
                   onNotify={onNotify}
                   activeTemplateText={renderedTemplateMarkdown}
                   activeTemplateTitle={parsedActiveTemplate.meta.title}
@@ -372,10 +389,8 @@ export const ReportsHub: React.FC<Props> = ({
                 onEditTemplate={!activeTemplate.isBuiltin ? handleOpenEditModal : undefined}
                 onDeleteTemplate={!activeTemplate.isBuiltin ? handleDeleteActiveTemplate : undefined}
                 onExportTemplateFile={() => exportTemplateToFile(activeTemplate)}
-                onSaveToHistory={(title, reportText) => {
-                  onSaveDirectReport(title, reportText, tasks);
-                  onNotify('Relatório salvo no Histórico com sucesso!', 'success');
-                }}
+                onSaveQuick={onSaveReportQuick}
+                onSaveCustom={onSaveReportCustom}
                 onNotify={onNotify}
               />
             </div>

@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { Copy, Trash2, Check, Bookmark, BookmarkPlus, X, Calendar, Clock, FileText } from 'lucide-react';
+import { Copy, Trash2, Check, Bookmark, BookmarkPlus } from 'lucide-react';
 import { Task } from '../../types/task';
 import { Panel } from '../common/Panel';
 import { SectionHeading } from '../common/SectionHeading';
 import { Button } from '../common/Button';
+import { SaveReportModal } from '../common/SaveReportModal';
 import { TaskList } from './TaskList';
 import { ReportPreview } from './ReportPreview';
 import { generateReport } from '../../utils/formatReport';
@@ -48,12 +49,6 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({
   const [isSaveAsModalOpen, setIsSaveAsModalOpen] = useState(false);
   const [reportFormat, setReportFormat] = useState<'classic' | 'table' | 'list'>('classic');
 
-  // Estados do Modal "Salvar como..."
-  const [customTitle, setCustomTitle] = useState('');
-  const [customDate, setCustomDate] = useState('');
-  const [customTime, setCustomTime] = useState('');
-  const [customNote, setCustomNote] = useState('');
-
   const currentReportText = useMemo(() => {
     if (activeTemplateText) {
       return activeTemplateText;
@@ -66,6 +61,19 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({
     }
     return generateReport(tasks);
   }, [tasks, reportFormat, activeTemplateText]);
+
+  const defaultSaveTitle = useMemo(() => {
+    const now = new Date();
+    const dd = padZero(now.getDate());
+    const mm = padZero(now.getMonth() + 1);
+    const yyyy = now.getFullYear();
+    const hh = padZero(now.getHours());
+    const min = padZero(now.getMinutes());
+
+    return activeTemplateTitle
+      ? `${activeTemplateTitle} - ${dd}/${mm}`
+      : `Relatório de ${dd}/${mm}/${yyyy} às ${hh}:${min}`;
+  }, [activeTemplateTitle]);
 
   const handleCopyReport = async () => {
     if (tasks.length === 0) {
@@ -96,35 +104,17 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({
       onNotify('Adicione pelo menos uma tarefa para salvar o relatório.', 'error');
       return;
     }
-
-    const now = new Date();
-    const yyyy = now.getFullYear();
-    const mm = padZero(now.getMonth() + 1);
-    const dd = padZero(now.getDate());
-    const hh = padZero(now.getHours());
-    const min = padZero(now.getMinutes());
-
-    const baseTitle = activeTemplateTitle
-      ? `${activeTemplateTitle} - ${dd}/${mm}`
-      : `Relatório de ${dd}/${mm}/${yyyy} às ${hh}:${min}`;
-
-    setCustomTitle(baseTitle);
-    setCustomDate(`${yyyy}-${mm}-${dd}`);
-    setCustomTime(`${hh}:${min}`);
-    setCustomNote('');
     setIsSaveAsModalOpen(true);
   };
 
-  const handleConfirmSaveAs = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleConfirmSaveAs = (data: { title: string; date: string; time: string; note?: string }) => {
     onSaveReportCustom({
-      title: customTitle,
-      date: customDate,
-      time: customTime,
-      note: customNote,
+      title: data.title,
+      date: data.date,
+      time: data.time,
+      note: data.note,
       customText: currentReportText,
     });
-    setIsSaveAsModalOpen(false);
   };
 
   return (
@@ -192,109 +182,12 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({
       </Panel>
 
       {/* Modal: Salvar Relatório Como... */}
-      {isSaveAsModalOpen && (
-        <div className="modal-backdrop" onClick={() => setIsSaveAsModalOpen(false)}>
-          <div className="modal-container" style={{ maxWidth: '500px' }} onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <div className="modal-title-group">
-                <span className="modal-kicker">Histórico & Arquivos</span>
-                <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <BookmarkPlus size={18} style={{ color: 'var(--yellow)' }} />
-                  Salvar Relatório Como
-                </h3>
-              </div>
-              <button
-                type="button"
-                className="modal-close-btn"
-                onClick={() => setIsSaveAsModalOpen(false)}
-                aria-label="Fechar"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleConfirmSaveAs}>
-              <div className="modal-body">
-                <div className="field-group">
-                  <label className="field-label" htmlFor="save-as-title">
-                    <span><FileText size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} /> Título do Relatório</span>
-                  </label>
-                  <input
-                    id="save-as-title"
-                    className="field-input"
-                    type="text"
-                    value={customTitle}
-                    onChange={(e) => setCustomTitle(e.target.value)}
-                    required
-                    autoFocus
-                  />
-                </div>
-
-                <div className="form-grid-2">
-                  <div className="field-group">
-                    <label className="field-label" htmlFor="save-as-date">
-                      <span><Calendar size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} /> Data de Registro</span>
-                    </label>
-                    <input
-                      id="save-as-date"
-                      className="field-input"
-                      type="date"
-                      value={customDate}
-                      onChange={(e) => setCustomDate(e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div className="field-group">
-                    <label className="field-label" htmlFor="save-as-time">
-                      <span><Clock size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} /> Horário</span>
-                    </label>
-                    <input
-                      id="save-as-time"
-                      className="field-input"
-                      type="time"
-                      value={customTime}
-                      onChange={(e) => setCustomTime(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="field-group">
-                  <label className="field-label" htmlFor="save-as-note">
-                    <span>Observação / Contexto (Opcional)</span>
-                  </label>
-                  <input
-                    id="save-as-note"
-                    className="field-input"
-                    type="text"
-                    placeholder="Ex: Plantão especial, Fechamento quinzenal..."
-                    value={customNote}
-                    onChange={(e) => setCustomNote(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setIsSaveAsModalOpen(false)}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  style={{ width: 'auto' }}
-                >
-                  Salvar no Histórico
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <SaveReportModal
+        isOpen={isSaveAsModalOpen}
+        defaultTitle={defaultSaveTitle}
+        onClose={() => setIsSaveAsModalOpen(false)}
+        onSave={handleConfirmSaveAs}
+      />
     </>
   );
 };

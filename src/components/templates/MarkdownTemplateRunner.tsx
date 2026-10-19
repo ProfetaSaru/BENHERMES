@@ -4,6 +4,7 @@ import {
   Check,
   Download,
   Bookmark,
+  BookmarkPlus,
   RotateCcw,
   Edit3,
   Trash2,
@@ -17,11 +18,12 @@ import {
   Table,
   FolderKanban,
 } from 'lucide-react';
-import { Task } from '../../types/task';
+import { Task, SaveReportParams } from '../../types/task';
 import { ParsedMarkdownTemplate } from '../../types/markdownTemplate';
 import { Button } from '../common/Button';
 import { Panel } from '../common/Panel';
 import { SectionHeading } from '../common/SectionHeading';
+import { SaveReportModal } from '../common/SaveReportModal';
 import { renderTemplate } from '../../utils/markdownTemplateParser';
 import { downloadMarkdownFile } from '../../utils/aiPromptTemplate';
 import { generateBenhubEmail, formatToTitleCase } from '../../utils/templateHelpers';
@@ -36,7 +38,8 @@ interface Props {
   onEditTemplate?: () => void;
   onDeleteTemplate?: () => void;
   onExportTemplateFile: () => void;
-  onSaveToHistory: (title: string, reportText: string) => void;
+  onSaveQuick: (params: SaveReportParams) => void;
+  onSaveCustom: (params: SaveReportParams) => void;
   onNotify: (message: string, type?: 'success' | 'error' | '') => void;
 }
 
@@ -50,7 +53,8 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
   onEditTemplate,
   onDeleteTemplate,
   onExportTemplateFile,
-  onSaveToHistory,
+  onSaveQuick,
+  onSaveCustom,
   onNotify,
 }) => {
   const [copied, setCopied] = useState(false);
@@ -58,6 +62,7 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
   const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
   const [isNomeBenhubCustom, setIsNomeBenhubCustom] = useState(false);
   const [isEmailBenhubCustom, setIsEmailBenhubCustom] = useState(false);
+  const [isSaveAsModalOpen, setIsSaveAsModalOpen] = useState(false);
 
   useEffect(() => {
     setIsNomeBenhubCustom(false);
@@ -133,14 +138,46 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
     onNotify('Download do relatório em .md realizado!', 'success');
   };
 
-  const handleSaveHistory = () => {
+  const handleQuickSave = () => {
+    onSaveQuick({
+      templateId: template.meta.id,
+      templateTitle: template.meta.title,
+      templateCategory: template.meta.category,
+      isExpandable: false,
+      fieldValues,
+      tasks: [],
+      reportText: renderedMarkdown,
+    });
+    onNotify('Relatório salvo no Histórico com sucesso!', 'success');
+  };
+
+  const handleOpenSaveAs = () => {
+    setIsSaveAsModalOpen(true);
+  };
+
+  const handleConfirmSaveAs = (data: { title: string; date: string; time: string; note?: string }) => {
+    onSaveCustom({
+      templateId: template.meta.id,
+      templateTitle: template.meta.title,
+      templateCategory: template.meta.category,
+      isExpandable: false,
+      fieldValues,
+      tasks: [],
+      reportText: renderedMarkdown,
+      title: data.title,
+      date: data.date,
+      time: data.time,
+      note: data.note,
+    });
+    onNotify('Relatório salvo no Histórico com sucesso!', 'success');
+  };
+
+  const defaultSaveTitle = useMemo(() => {
     const now = new Date();
     const dd = String(now.getDate()).padStart(2, '0');
     const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const title = `${template.meta.title} - ${dd}/${mm}`;
-    onSaveToHistory(title, renderedMarkdown);
-    onNotify('Relatório salvo no Histórico com sucesso!', 'success');
-  };
+    return `${template.meta.title} - ${dd}/${mm}`;
+  }, [template.meta.title]);
 
   // Separa campos manuais dos campos que possuem preenchimento automático pelo sistema
   const manualFields = template.fields.filter((f) => !f.isSystemAuto);
@@ -377,11 +414,20 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
 
               <Button
                 variant="secondary"
-                onClick={handleSaveHistory}
-                title="Salvar cópia na aba Histórico do BENHERMES"
+                icon={<Bookmark size={15} />}
+                onClick={handleQuickSave}
+                title="Salvar rapidamente no Histórico com data e hora atuais"
               >
-                <Bookmark size={16} />
-                Salvar no Histórico
+                Salvar
+              </Button>
+
+              <Button
+                variant="secondary"
+                icon={<BookmarkPlus size={15} />}
+                onClick={handleOpenSaveAs}
+                title="Salvar no Histórico personalizando título, data e notas"
+              >
+                Salvar como...
               </Button>
 
               <Button
@@ -396,6 +442,13 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
           </Panel>
         </div>
       </div>
+
+      <SaveReportModal
+        isOpen={isSaveAsModalOpen}
+        defaultTitle={defaultSaveTitle}
+        onClose={() => setIsSaveAsModalOpen(false)}
+        onSave={handleConfirmSaveAs}
+      />
     </div>
   );
 };

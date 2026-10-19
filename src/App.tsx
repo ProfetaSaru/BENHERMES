@@ -4,27 +4,29 @@ import { useTaskForm } from './hooks/useTaskForm';
 import { useNotification } from './hooks/useNotification';
 import { useTheme } from './hooks/useTheme';
 import { useSavedReports } from './hooks/useSavedReports';
+import { useMarkdownTemplates } from './hooks/useMarkdownTemplates';
 import { Sidebar } from './components/layout/Sidebar';
 import { TopNavbar } from './components/layout/TopNavbar';
 import { ToolPlaceholder } from './components/layout/ToolPlaceholder';
 import { ReportsHub } from './components/reports/ReportsHub';
 import { ReportsHistoryHub } from './components/history/ReportsHistoryHub';
 import { Modal } from './components/common/Modal';
-import { Task } from './types/task';
+import { Task, SavedReport, SaveReportParams } from './types/task';
 import { getNavigationItems } from './utils/navigationItems';
 
 export const App: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const { tasks, addTask, updateTask, deleteTask, clearAllTasks, restoreTasks } = useTasks();
+  const templateControls = useMarkdownTemplates();
   const {
     savedReports,
     saveReportQuick,
     saveReportCustom,
-    saveDirectReport,
     deleteReport,
     renameReport,
     clearAllReports,
   } = useSavedReports();
+
   const {
     formData,
     editingTaskId,
@@ -34,6 +36,7 @@ export const App: React.FC = () => {
     resetForm,
     validate,
   } = useTaskForm();
+
   const { notification, notify } = useNotification();
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
 
@@ -62,34 +65,36 @@ export const App: React.FC = () => {
   const navItems = getNavigationItems(tasks.length, savedReports.length);
   const activeItem = navItems.find((item) => item.id === activeToolId) || navItems[0];
 
-  const handleSaveReportQuick = (reportTasks: Task[], customText?: string) => {
-    if (reportTasks.length === 0) {
-      notify('Adicione pelo menos uma tarefa para salvar o relatório.', 'error');
-      return;
-    }
-    saveReportQuick(reportTasks, customText);
+  const handleSaveReportQuick = (params: SaveReportParams) => {
+    saveReportQuick(params);
     notify('Relatório salvo com sucesso no Histórico!', 'success');
   };
 
-  const handleSaveReportCustom = (params: {
-    tasks: Task[];
-    title: string;
-    date: string;
-    time: string;
-    note?: string;
-    customText?: string;
-  }) => {
-    if (params.tasks.length === 0) {
-      notify('Adicione pelo menos uma tarefa para salvar o relatório.', 'error');
-      return;
-    }
+  const handleSaveReportCustom = (params: SaveReportParams) => {
     saveReportCustom(params);
     notify('Relatório personalizado salvo no Histórico!', 'success');
   };
 
-  const handleRestoreTasksFromHistory = (restoredTasks: Task[]) => {
-    restoreTasks(restoredTasks);
+  /**
+   * Restauração universal de qualquer relatório do histórico.
+   * Carrega o modelo exato, preenche seus campos, suas tarefas e navega para o gerador.
+   */
+  const handleRestoreReport = (report: SavedReport) => {
+    const hasCurrentData =
+      tasks.length > 0 || Object.keys(templateControls.fieldValues).length > 0;
+
+    if (hasCurrentData) {
+      const confirmed = window.confirm(
+        `Deseja restaurar o relatório "${report.title}" no Gerador?\n\nO modelo correspondente ("${report.templateTitle}") será selecionado e os dados atuais do formulário serão substituídos.`
+      );
+      if (!confirmed) return;
+    }
+
+    templateControls.restoreTemplateState(report.templateId, report.fieldValues || {});
+    restoreTasks(report.tasks || []);
     resetForm();
+    setActiveToolId('relatorios');
+    notify(`Relatório "${report.title}" restaurado com sucesso!`, 'success');
   };
 
   const handleSubmit = (event: React.FormEvent) => {
@@ -180,11 +185,9 @@ export const App: React.FC = () => {
                 onRequestClearAll={handleOpenClearModal}
                 onSaveReportQuick={handleSaveReportQuick}
                 onSaveReportCustom={handleSaveReportCustom}
-                onSaveDirectReport={(title, reportText, tpls) => {
-                  saveDirectReport(title, reportText, tpls);
-                }}
                 notification={notification}
                 onNotify={notify}
+                templateControls={templateControls}
               />
             </main>
           ) : activeToolId === 'historico' ? (
@@ -194,7 +197,7 @@ export const App: React.FC = () => {
                 onDeleteReport={deleteReport}
                 onRenameReport={renameReport}
                 onClearAllReports={clearAllReports}
-                onRestoreTasks={handleRestoreTasksFromHistory}
+                onRestoreReport={handleRestoreReport}
                 onNotify={notify}
                 onNavigateToGenerator={() => setActiveToolId('relatorios')}
               />

@@ -299,7 +299,12 @@ export const QuickTemplatesHub: React.FC<Props> = ({
           onEditTemplate={!activeTemplate.isBuiltin ? handleOpenEditModal : undefined}
           onDeleteTemplate={!activeTemplate.isBuiltin ? handleDeleteActiveTemplate : undefined}
           onExportTemplateFile={() => exportTemplateToFile(activeTemplate)}
-          onSaveToHistory={handleInternalSaveToHistory}
+          onSaveQuick={(p) => {
+            handleInternalSaveToHistory(p.title || p.templateTitle, p.reportText);
+          }}
+          onSaveCustom={(p) => {
+            handleInternalSaveToHistory(p.title || p.templateTitle, p.reportText);
+          }}
           onNotify={onNotify}
         />
       )}
