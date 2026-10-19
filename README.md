@@ -61,9 +61,18 @@ expandable: true     # true para expansível (com tarefas) ou false para não ex
 - **Campos Multilinha (Textarea):** Adicione o sufixo `:textarea` (ex: `{{observacoes:textarea}}`) ou utilize nomes como `descricao`, `motivo`, `detalhes`, `pendencias`, `acoes`.
 - **Campos de Senha:** Use o sufixo `:password` (ex: `{{senha_temporaria:password}}`) para gerar um campo com botão de mostrar/ocultar senha.
 - **Variáveis Automáticas do Sistema:** `{{data_atual}}` e `{{hora_atual}}` são preenchidas automaticamente com a data e hora do momento.
-- **Tags de Tarefas (Exclusivo para `expandable: true`):**
+- **Tags de Tarefas e Produtividade (Exclusivo para `expandable: true`):**
   - `{{tarefas}}`: Insere as tarefas cadastradas no formato de lista clássica com horários.
   - `{{tarefas_tabela}}` ou `{{tabela_tarefas}}`: Formata as tarefas cadastradas diretamente em uma tabela Markdown organizada.
+  - `{{bloco_produtividade}}`: Gera o bloco operacional completo organizado por seções (Desbloqueados, Formalização, Anuência, Tentativas de contato), separadores padronizados, contagem de itens e TMA calculado.
+  - `{{tma}}` / `{{tma_medio}}`: Tempo Médio de Atendimento calculado automaticamente a partir dos horários inicial e final (ex: `22 min`).
+  - `{{total_geral_finalizado}}`: Total de atendimentos concluídos com hora inicial e final.
+  - `{{total_desbloqueados}}`, `{{total_formalizados}}`, `{{total_anuencia}}`: Contadores específicos por etapa.
+  - `{{tentativas_contato}}`: Lista de contatos no formato `CPF HORA`.
+
+- **Categorias e Rótulos Customizados no Frontmatter:**
+  - `categories`: Lista de etapas/categorias que geram botões de seleção rápida (pills) no formulário (ex.: `[Desbloqueados, Formalização, Anuência, Tentativas de contato]`). Para tentativas de contato, a hora final torna-se opcional automaticamente.
+  - `itemLabel`: Rótulo dinâmico do formulário (ex.: `CPF do Cliente`), alterando o título e os botões da interface.
 
 ---
 
@@ -102,6 +111,34 @@ expandable: true
 
 ### 🚧 Bloqueios e Impedimentos
 {{impedimentos:textarea}}
+```
+
+---
+
+### 2.1 Exemplo: Relatório de Produtividade com Categorias por CPF e TMA
+
+Para relatórios operacionais divididos em etapas (ex.: Desbloqueados, Formalização, Anuência e Tentativas de contato) com cálculo de Tempo Médio de Atendimento:
+
+Crie o arquivo em `src/templates/reports/produtividade-atendimento.md`:
+
+```markdown
+---
+title: Relatório de Produtividade & TMA
+description: Apontamento operacional por CPF com cálculo automático de totais por etapa e TMA
+category: operacional
+icon: Activity
+expandable: true
+categories:
+  - Desbloqueados
+  - Formalização
+  - Anuência
+  - Tentativas de contato
+itemLabel: CPF do Cliente
+---
+
+RELATÓRIO DE PRODUTIVIDADE - {{nome_colaborador}}
+========================================
+{{bloco_produtividade}}
 ```
 
 ---
