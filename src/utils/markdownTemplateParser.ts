@@ -39,17 +39,51 @@ export function parseFrontmatter(rawContent: string): FrontmatterResult {
   const body = lines.slice(closingIndex + 1).join('\n').trimStart();
 
   const metadata: Partial<MarkdownTemplateMeta> = {};
+  let currentListKey: string | null = null;
+  const listAccumulator: Record<string, string[]> = {};
 
   for (const line of frontmatterLines) {
+    const trimmedLine = line.trim();
+    if (trimmedLine.startsWith('- ') && currentListKey) {
+      const item = trimmedLine.slice(2).trim().replace(/^['"](.*)['"]$/, '$1');
+      if (!listAccumulator[currentListKey]) listAccumulator[currentListKey] = [];
+      listAccumulator[currentListKey].push(item);
+      continue;
+    }
+
     const colonIdx = line.indexOf(':');
     if (colonIdx === -1) continue;
 
     const key = line.slice(0, colonIdx).trim().toLowerCase();
     const value = line.slice(colonIdx + 1).trim().replace(/^['"](.*)['"]$/, '$1');
 
+    if (key === 'categories') {
+      currentListKey = 'categories';
+      if (value) {
+        if (value.startsWith('[') && value.endsWith(']')) {
+          metadata.categories = value
+            .slice(1, -1)
+            .split(',')
+            .map((s) => s.trim().replace(/^['"](.*)['"]$/, '$1'))
+            .filter(Boolean);
+        } else if (value.includes(',')) {
+          metadata.categories = value
+            .split(',')
+            .map((s) => s.trim().replace(/^['"](.*)['"]$/, '$1'))
+            .filter(Boolean);
+        } else {
+          metadata.categories = [value];
+        }
+      }
+      continue;
+    } else {
+      currentListKey = null;
+    }
+
     if (key === 'title') metadata.title = value;
     else if (key === 'description') metadata.description = value;
     else if (key === 'expandable') metadata.expandable = value.toLowerCase() === 'true';
+    else if (key === 'itemlabel') metadata.itemLabel = value;
     else if (key === 'category') {
       const cat = value.toLowerCase();
       if (
@@ -62,6 +96,10 @@ export function parseFrontmatter(rawContent: string): FrontmatterResult {
         metadata.category = cat;
       }
     } else if (key === 'icon') metadata.icon = value;
+  }
+
+  if (listAccumulator['categories'] && listAccumulator['categories'].length > 0) {
+    metadata.categories = listAccumulator['categories'];
   }
 
   return { metadata, body };
@@ -91,7 +129,16 @@ export function extractTemplateFields(body: string): TemplateField[] {
     let isSystemAuto = false;
     let systemSource: SystemAutoSource | undefined;
 
-    if (rawId === 'tarefas') {
+    if (
+      rawId === 'tarefas' ||
+      rawId === 'bloco_produtividade' ||
+      rawId === 'tma' ||
+      rawId === 'tma_medio' ||
+      rawId === 'total_geral_finalizado' ||
+      rawId.startsWith('total_') ||
+      rawId.startsWith('itens_') ||
+      rawId === 'tentativas_contato'
+    ) {
       type = 'tasks';
       isSystemAuto = true;
       systemSource = 'tarefas';
@@ -200,6 +247,123 @@ export function formatTasksList(tasks: Task[]): string {
     .join('\n');
 }
 
+export function calculateTMA(tasks: Task[]): string {
+  const validTasks = tasks.filter((t) => {
+    if (!t.start || !t.end) return false;
+    const cat = (t.category || '').toLowerCase();
+    return !cat.includes('tentativa');
+  });
+
+  if (validTasks.length === 0) {
+    return '0 min';
+  }
+
+  let totalMinutes = 0;
+  let count = 0;
+
+  for (const t of validTasks) {
+    const [sh, sm] = t.start.split(':').map(Number);
+    const [eh, em] = t.end.split(':').map(Number);
+
+    if (isNaN(sh) || isNaN(sm) || isNaN(eh) || isNaN(em)) continue;
+
+    let startTotal = sh * 60 + sm;
+    let endTotal = eh * 60 + em;
+
+    if (endTotal < startTotal) {
+      endTotal += 24 * 60;
+    }
+
+    totalMinutes += endTotal - startTotal;
+    count++;
+  }
+
+  if (count === 0) return '0 min';
+  return `${Math.round(totalMinutes / count)} min`;
+}
+
+export function formatProductivityBlock(tasks: Task[]): string {
+  const isCategory = (t: Task, pattern: string) => {
+    const cat = (t.category || '').toLowerCase();
+    return cat.includes(pattern);
+  };
+
+  const desbloqueados = tasks.filter((t) => isCategory(t, 'desbloquead'));
+  const formalizados = tasks.filter((t) => isCategory(t, 'formaliza'));
+  const anuencia = tasks.filter((t) => isCategory(t, 'anuencia') || isCategory(t, 'anuência'));
+  const tentativas = tasks.filter((t) => isCategory(t, 'tentativa'));
+  const outros = tasks.filter(
+    (t) =>
+      !isCategory(t, 'desbloquead') &&
+      !isCategory(t, 'formaliza') &&
+      !isCategory(t, 'anuencia') &&
+      !isCategory(t, 'anuência') &&
+      !isCategory(t, 'tentativa')
+  );
+
+  const formatItem = (t: Task) => {
+    const lines = [`CPF: ${t.title.trim().toUpperCase()}`, `Iniciou: ${t.start}`];
+    if (t.end) {
+      lines.push(`Finalizou: ${t.end}`);
+    }
+    return lines.join('\n');
+  };
+
+  const formatSectionItems = (items: Task[]) => {
+    if (items.length === 0) return '';
+    return items.map(formatItem).join('\n\n');
+  };
+
+  const formatTentativas = (items: Task[]) => {
+    if (items.length === 0) return '';
+    return items.map((t) => `${t.title.trim().toUpperCase()} ${t.start}`).join('\n');
+  };
+
+  const totalGeralFinalizado = tasks.filter((t) => !isCategory(t, 'tentativa') && !!t.end).length;
+  const tma = calculateTMA(tasks);
+
+  const parts: string[] = [];
+
+  // DESBLOQUEADOS
+  parts.push('DESBLOQUEADOS\n');
+  const dText = formatSectionItems(desbloqueados);
+  if (dText) parts.push(dText + '\n');
+  parts.push(`TOTAL DESBLOQUEADO: ${desbloqueados.length}`);
+  parts.push('------------------------------------------------');
+
+  // FORMALIZAÇÃO
+  parts.push('FORMALIZAÇÃO:\n');
+  const fText = formatSectionItems(formalizados);
+  if (fText) parts.push(fText + '\n');
+  parts.push(`TOTAL FORMALIZADO: ${formalizados.length}`);
+  parts.push('------------------------------------------------------------------------');
+
+  // ANUENCIA
+  parts.push('ANUENCIA:\n');
+  const aText = formatSectionItems(anuencia);
+  if (aText) parts.push(aText + '\n');
+  parts.push(`TOTAL: ${anuencia.length}`);
+  parts.push('----------------------------------------------------------------------');
+
+  // TOTAIS GERAIS & TMA
+  parts.push(`TOTAL GERAL FINALIZADO: ${totalGeralFinalizado}`);
+  parts.push(`TMA: ${tma}`);
+  parts.push('=====================================');
+
+  // Tentativas de contato
+  parts.push('Tentativas de contato:');
+  const tText = formatTentativas(tentativas);
+  if (tText) parts.push(tText);
+
+  // Outros (se existirem)
+  if (outros.length > 0) {
+    parts.push('\nOUTROS:');
+    parts.push(formatSectionItems(outros));
+  }
+
+  return parts.join('\n');
+}
+
 export function getSystemAutoValues(tasks: Task[]): Record<string, string> {
   const now = new Date();
   const dd = String(now.getDate()).padStart(2, '0');
@@ -211,6 +375,25 @@ export function getSystemAutoValues(tasks: Task[]): Record<string, string> {
   const formattedDate = `${dd}/${mm}/${yyyy}`;
   const formattedTime = `${hh}:${min}`;
 
+  const isCategory = (t: Task, pattern: string) => {
+    const cat = (t.category || '').toLowerCase();
+    return cat.includes(pattern);
+  };
+
+  const desbloqueados = tasks.filter((t) => isCategory(t, 'desbloquead'));
+  const formalizados = tasks.filter((t) => isCategory(t, 'formaliza'));
+  const anuencia = tasks.filter((t) => isCategory(t, 'anuencia') || isCategory(t, 'anuência'));
+  const tentativas = tasks.filter((t) => isCategory(t, 'tentativa'));
+
+  const formatItem = (t: Task) => {
+    const lines = [`CPF: ${t.title.trim().toUpperCase()}`, `Iniciou: ${t.start}`];
+    if (t.end) lines.push(`Finalizou: ${t.end}`);
+    return lines.join('\n');
+  };
+
+  const totalGeralFinalizado = tasks.filter((t) => !isCategory(t, 'tentativa') && !!t.end).length;
+  const tma = calculateTMA(tasks);
+
   return {
     tarefas: formatTasksClassic(tasks),
     tarefas_tabela: formatTasksTable(tasks),
@@ -219,6 +402,19 @@ export function getSystemAutoValues(tasks: Task[]): Record<string, string> {
     data: formattedDate,
     hora_atual: formattedTime,
     hora: formattedTime,
+    bloco_produtividade: formatProductivityBlock(tasks),
+    total_desbloqueados: String(desbloqueados.length),
+    total_desbloqueado: String(desbloqueados.length),
+    itens_desbloqueados: desbloqueados.map(formatItem).join('\n\n'),
+    total_formalizados: String(formalizados.length),
+    total_formalizado: String(formalizados.length),
+    itens_formalizacao: formalizados.map(formatItem).join('\n\n'),
+    total_anuencia: String(anuencia.length),
+    itens_anuencia: anuencia.map(formatItem).join('\n\n'),
+    total_geral_finalizado: String(totalGeralFinalizado),
+    tma,
+    tma_medio: tma,
+    tentativas_contato: tentativas.map((t) => `${t.title.trim().toUpperCase()} ${t.start}`).join('\n'),
   };
 }
 
@@ -292,6 +488,8 @@ export function parseMarkdownTemplate(
     icon: metadata.icon || 'FileText',
     isBuiltin: false,
     expandable: isExplicitExpandable,
+    categories: metadata.categories,
+    itemLabel: metadata.itemLabel,
     rawContent,
   };
 
