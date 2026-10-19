@@ -337,6 +337,8 @@ export const ReportsHub: React.FC<Props> = ({
                   onFieldChange={onFieldChange}
                   onSubmit={onSubmitTask}
                   onCancelEdit={onCancelEditTask}
+                  templateCategories={parsedActiveTemplate.meta.categories}
+                  itemLabel={parsedActiveTemplate.meta.itemLabel}
                 />
 
                 <ReportPanel

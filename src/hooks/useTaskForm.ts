@@ -6,6 +6,7 @@ const INITIAL_FORM_DATA: TaskFormData = {
   end: '',
   title: '',
   description: '',
+  category: '',
 };
 
 export function useTaskForm() {
@@ -26,6 +27,7 @@ export function useTaskForm() {
       end: task.end,
       title: task.title.toUpperCase(),
       description: task.description,
+      category: task.category || '',
     });
   }, []);
 
@@ -34,17 +36,27 @@ export function useTaskForm() {
     setFormData(INITIAL_FORM_DATA);
   }, []);
 
-  const validate = useCallback((): { valid: boolean; error?: string } => {
-    if (!formData.start || !formData.end || !formData.title.trim()) {
-      return { valid: false, error: 'Preencha os campos obrigatórios.' };
-    }
+  const validate = useCallback(
+    (isOptionalEnd = false): { valid: boolean; error?: string } => {
+      if (!formData.start || !formData.title.trim()) {
+        return { valid: false, error: 'Preencha o horário inicial e o título / CPF.' };
+      }
 
-    if (formData.end < formData.start) {
-      return { valid: false, error: 'A hora final não pode ser anterior à hora inicial.' };
-    }
+      const isTentativa = (formData.category || '').toLowerCase().includes('tentativa');
+      const allowNoEnd = isOptionalEnd || isTentativa;
 
-    return { valid: true };
-  }, [formData]);
+      if (!allowNoEnd && !formData.end) {
+        return { valid: false, error: 'Preencha a hora final.' };
+      }
+
+      if (formData.end && formData.end < formData.start) {
+        return { valid: false, error: 'A hora final não pode ser anterior à hora inicial.' };
+      }
+
+      return { valid: true };
+    },
+    [formData]
+  );
 
   return {
     formData,
