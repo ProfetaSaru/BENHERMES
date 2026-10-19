@@ -1,6 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Task, SavedReport } from '../types/task';
-import { generateReport } from '../utils/formatReport';
+import { Task, SavedReport, SaveReportParams } from '../types/task';
 
 const STORAGE_SAVED_REPORTS_KEY = 'benhermes_saved_reports';
 
@@ -17,19 +16,47 @@ function getFormattedTime(d: Date): string {
 }
 
 function formatPeriodSummary(tasks: Task[]): string {
-  if (tasks.length === 0) return 'Sem atividades';
-  const first = tasks[0].start || '--:--';
-  const last = tasks[tasks.length - 1].end || '--:--';
+  if (!tasks || tasks.length === 0) return 'Sem tarefas';
+  const first = tasks[0]?.start || '--:--';
+  const last = tasks[tasks.length - 1]?.end || '--:--';
   return `${first} às ${last}`;
 }
 
-function loadStoredReports(): SavedReport[] {
+/**
+ * Lê e migra relatórios salvos retrocompativelmente para o novo esquema universal.
+ */
+function loadAndMigrateStoredReports(): SavedReport[] {
   try {
     const raw = localStorage.getItem(STORAGE_SAVED_REPORTS_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.map((item: any): SavedReport => {
+      const tasks = Array.isArray(item.tasks) ? item.tasks : [];
+      const isExpandable = item.isExpandable ?? (tasks.length > 0 || !item.templateId);
+
+      return {
+        id: item.id || crypto.randomUUID(),
+        title: item.title || 'Relatório sem título',
+        createdAt: item.createdAt || new Date().toISOString(),
+        displayDate: item.displayDate || getFormattedDate(new Date()),
+        displayTime: item.displayTime || getFormattedTime(new Date()),
+        templateId: item.templateId || 'atividades-padrao',
+        templateTitle: item.templateTitle || 'Relatório de Atividades',
+        templateCategory: item.templateCategory || 'geral',
+        isExpandable,
+        fieldValues: item.fieldValues && typeof item.fieldValues === 'object' ? item.fieldValues : {},
+        tasks,
+        reportText: item.reportText || '',
+        taskCount: typeof item.taskCount === 'number' ? item.taskCount : tasks.length,
+        periodSummary: item.periodSummary || formatPeriodSummary(tasks),
+        note: item.note || undefined,
+        rawTemplateContent: item.rawTemplateContent || undefined,
+      };
+    });
+  } catch (err) {
+    console.error('Erro ao ler relatórios arquivados do localStorage:', err);
     return [];
   }
 }
@@ -43,18 +70,24 @@ function persistReports(reports: SavedReport[]): void {
 }
 
 export function useSavedReports() {
-  const [savedReports, setSavedReports] = useState<SavedReport[]>(loadStoredReports);
+  const [savedReports, setSavedReports] = useState<SavedReport[]>(loadAndMigrateStoredReports);
 
   /**
-   * Salvamento rápido em 1 clique com data e hora atuais.
+   * Salvamento rápido (1 clique) com metadados estruturados.
    */
-  const saveReportQuick = useCallback((tasks: Task[], customText?: string): SavedReport => {
+  const saveReportQuick = useCallback((params: SaveReportParams): SavedReport => {
     const now = new Date();
     const dateStr = getFormattedDate(now);
     const timeStr = getFormattedTime(now);
-
     const [yyyy, mm, dd] = dateStr.split('-');
-    const defaultTitle = `Relatório de ${dd}/${mm}/${yyyy} às ${timeStr}`;
+
+    const defaultTitle = params.title?.trim()
+      ? params.title.trim()
+      : params.isExpandable
+      ? `${params.templateTitle || 'Relatório'} - ${dd}/${mm}/${yyyy} às ${timeStr}`
+      : `${params.templateTitle || 'Relatório'} - ${dd}/${mm} às ${timeStr}`;
+
+    const tasks = params.tasks || [];
 
     const newReport: SavedReport = {
       id: crypto.randomUUID(),
@@ -62,10 +95,16 @@ export function useSavedReports() {
       createdAt: now.toISOString(),
       displayDate: dateStr,
       displayTime: timeStr,
+      templateId: params.templateId,
+      templateTitle: params.templateTitle,
+      templateCategory: params.templateCategory,
+      isExpandable: params.isExpandable,
+      fieldValues: params.fieldValues ? { ...params.fieldValues } : {},
       tasks: [...tasks],
-      reportText: customText || generateReport(tasks),
+      reportText: params.reportText,
       taskCount: tasks.length,
       periodSummary: formatPeriodSummary(tasks),
+      note: params.note?.trim() || undefined,
     };
 
     setSavedReports((prev) => {
@@ -78,51 +117,50 @@ export function useSavedReports() {
   }, []);
 
   /**
-   * Salvamento customizado com título, data e horário editáveis.
+   * Salvamento customizado com título, data, horário e notas editáveis.
    */
-  const saveReportCustom = useCallback(
-    (params: {
-      tasks: Task[];
-      title: string;
-      date: string; // YYYY-MM-DD
-      time: string; // HH:mm
-      note?: string;
-      customText?: string;
-    }): SavedReport => {
-      const now = new Date();
-      const dateStr = params.date || getFormattedDate(now);
-      const timeStr = params.time || getFormattedTime(now);
+  const saveReportCustom = useCallback((params: SaveReportParams): SavedReport => {
+    const now = new Date();
+    const dateStr = params.date || getFormattedDate(now);
+    const timeStr = params.time || getFormattedTime(now);
+    const [yyyy, mm, dd] = dateStr.split('-');
 
-      const [yyyy, mm, dd] = dateStr.split('-');
-      const fallbackTitle = `Relatório de ${dd}/${mm}/${yyyy} às ${timeStr}`;
-      const finalTitle = params.title.trim() || fallbackTitle;
+    const fallbackTitle = params.isExpandable
+      ? `${params.templateTitle || 'Relatório'} - ${dd}/${mm}/${yyyy} às ${timeStr}`
+      : `${params.templateTitle || 'Relatório'} - ${dd}/${mm} às ${timeStr}`;
 
-      const newReport: SavedReport = {
-        id: crypto.randomUUID(),
-        title: finalTitle,
-        createdAt: now.toISOString(),
-        displayDate: dateStr,
-        displayTime: timeStr,
-        tasks: [...params.tasks],
-        reportText: params.customText || generateReport(params.tasks),
-        taskCount: params.tasks.length,
-        periodSummary: formatPeriodSummary(params.tasks),
-        note: params.note?.trim(),
-      };
+    const finalTitle = params.title?.trim() || fallbackTitle;
+    const tasks = params.tasks || [];
 
-      setSavedReports((prev) => {
-        const updated = [newReport, ...prev];
-        persistReports(updated);
-        return updated;
-      });
+    const newReport: SavedReport = {
+      id: crypto.randomUUID(),
+      title: finalTitle,
+      createdAt: now.toISOString(),
+      displayDate: dateStr,
+      displayTime: timeStr,
+      templateId: params.templateId,
+      templateTitle: params.templateTitle,
+      templateCategory: params.templateCategory,
+      isExpandable: params.isExpandable,
+      fieldValues: params.fieldValues ? { ...params.fieldValues } : {},
+      tasks: [...tasks],
+      reportText: params.reportText,
+      taskCount: tasks.length,
+      periodSummary: formatPeriodSummary(tasks),
+      note: params.note?.trim() || undefined,
+    };
 
-      return newReport;
-    },
-    []
-  );
+    setSavedReports((prev) => {
+      const updated = [newReport, ...prev];
+      persistReports(updated);
+      return updated;
+    });
+
+    return newReport;
+  }, []);
 
   /**
-   * Excluir relatório salvo por id.
+   * Excluir relatório arquivado por ID.
    */
   const deleteReport = useCallback((id: string) => {
     setSavedReports((prev) => {
@@ -133,7 +171,7 @@ export function useSavedReports() {
   }, []);
 
   /**
-   * Renomear título do relatório arquivado.
+   * Renomear título de relatório arquivado.
    */
   const renameReport = useCallback((id: string, newTitle: string) => {
     setSavedReports((prev) => {
@@ -153,47 +191,10 @@ export function useSavedReports() {
     persistReports([]);
   }, []);
 
-  /**
-   * Salvar relatório diretamente com texto fornecido (usado por modelos Markdown).
-   */
-  const saveDirectReport = useCallback(
-    (title: string, reportText: string, tasks: Task[] = []): SavedReport => {
-      const now = new Date();
-      const dateStr = getFormattedDate(now);
-      const timeStr = getFormattedTime(now);
-
-      const [yyyy, mm, dd] = dateStr.split('-');
-      const fallbackTitle = `Relatório de ${dd}/${mm}/${yyyy} às ${timeStr}`;
-      const finalTitle = title.trim() || fallbackTitle;
-
-      const newReport: SavedReport = {
-        id: crypto.randomUUID(),
-        title: finalTitle,
-        createdAt: now.toISOString(),
-        displayDate: dateStr,
-        displayTime: timeStr,
-        tasks: [...tasks],
-        reportText,
-        taskCount: tasks.length,
-        periodSummary: formatPeriodSummary(tasks),
-      };
-
-      setSavedReports((prev) => {
-        const updated = [newReport, ...prev];
-        persistReports(updated);
-        return updated;
-      });
-
-      return newReport;
-    },
-    []
-  );
-
   return {
     savedReports,
     saveReportQuick,
     saveReportCustom,
-    saveDirectReport,
     deleteReport,
     renameReport,
     clearAllReports,
