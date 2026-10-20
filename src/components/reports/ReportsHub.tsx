@@ -36,6 +36,7 @@ interface Props {
   notification: NotificationState;
   onNotify: (message: string, type?: NotificationType) => void;
   templateControls: ReturnType<typeof useMarkdownTemplates>;
+  getTemplateTaskCount?: (templateId: string) => number;
 }
 
 export const ReportsHub: React.FC<Props> = ({
@@ -53,6 +54,7 @@ export const ReportsHub: React.FC<Props> = ({
   notification,
   onNotify,
   templateControls,
+  getTemplateTaskCount,
 }) => {
   const {
     templates,
@@ -198,6 +200,7 @@ export const ReportsHub: React.FC<Props> = ({
               }}
               onDownloadExampleBase={downloadExampleBase}
               taskCount={tasks.length}
+              getTemplateTaskCount={getTemplateTaskCount}
             />
           </div>
         </div>

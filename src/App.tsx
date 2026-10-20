@@ -17,8 +17,16 @@ import { getNavigationItems } from './utils/navigationItems';
 
 export const App: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
-  const { tasks, addTask, updateTask, deleteTask, clearAllTasks, restoreTasks } = useTasks();
   const templateControls = useMarkdownTemplates();
+  const {
+    tasks,
+    addTask,
+    updateTask,
+    deleteTask,
+    clearAllTasks,
+    restoreTasks,
+    getTemplateTaskCount,
+  } = useTasks(templateControls.activeTemplateId);
   const {
     savedReports,
     saveReportQuick,
@@ -37,6 +45,11 @@ export const App: React.FC = () => {
     resetForm,
     validate,
   } = useTaskForm();
+
+  // Reseta o formulário de cadastro de tarefas ao mudar de modelo
+  useEffect(() => {
+    resetForm();
+  }, [templateControls.activeTemplateId, resetForm]);
 
   const { notification, notify } = useNotification();
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
@@ -92,7 +105,7 @@ export const App: React.FC = () => {
     }
 
     templateControls.restoreTemplateState(report.templateId, report.fieldValues || {});
-    restoreTasks(report.tasks || []);
+    restoreTasks(report.templateId, report.tasks || []);
     resetForm();
     setActiveToolId('relatorios');
     notify(`Relatório "${report.title}" restaurado com sucesso!`, 'success');
@@ -189,6 +202,7 @@ export const App: React.FC = () => {
                 notification={notification}
                 onNotify={notify}
                 templateControls={templateControls}
+                getTemplateTaskCount={getTemplateTaskCount}
               />
             </main>
           ) : activeToolId === 'historico' ? (
@@ -219,9 +233,9 @@ export const App: React.FC = () => {
       <Modal
         isOpen={isClearModalOpen}
         kicker="Atenção"
-        title="Excluir tarefas?"
-        message="Essa ação removerá todas as tarefas salvas neste navegador."
-        confirmLabel="Excluir tudo"
+        title={`Excluir tarefas de "${templateControls.activeTemplate.title}"?`}
+        message={`Essa ação removerá todas as tarefas salvas no rascunho de "${templateControls.activeTemplate.title}". Os rascunhos dos demais modelos serão mantidos.`}
+        confirmLabel="Excluir tarefas"
         cancelLabel="Cancelar"
         onConfirm={handleConfirmClear}
         onCancel={() => setIsClearModalOpen(false)}

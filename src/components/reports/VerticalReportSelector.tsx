@@ -29,6 +29,7 @@ interface Props {
   onImportTemplateFile: () => void;
   onDownloadExampleBase: () => void;
   taskCount?: number;
+  getTemplateTaskCount?: (templateId: string) => number;
 }
 
 function renderTemplateIcon(iconName?: string) {
@@ -64,6 +65,7 @@ export const VerticalReportSelector: React.FC<Props> = ({
   onImportTemplateFile,
   onDownloadExampleBase,
   taskCount = 0,
+  getTemplateTaskCount,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -196,6 +198,12 @@ export const VerticalReportSelector: React.FC<Props> = ({
             ) : (
               expandableTemplates.map((template) => {
                 const isActive = template.id === activeTemplateId;
+                const itemTaskCount = getTemplateTaskCount
+                  ? getTemplateTaskCount(template.id)
+                  : isActive
+                  ? taskCount
+                  : 0;
+
                 return (
                   <button
                     key={template.id}
@@ -215,7 +223,9 @@ export const VerticalReportSelector: React.FC<Props> = ({
                       <span className="item-card-desc">{template.description}</span>
                       <div className="item-card-footer">
                         <span className="item-badge-pill expandable">
-                          {taskCount > 0 ? `${taskCount} tarefas ativas` : 'Com tarefas'}
+                          {itemTaskCount > 0
+                            ? `${itemTaskCount} ${itemTaskCount === 1 ? 'tarefa ativa' : 'tarefas ativas'}`
+                            : 'Com tarefas'}
                         </span>
                         {!template.isBuiltin && (
                           <span className="item-badge-pill custom">Custom</span>
