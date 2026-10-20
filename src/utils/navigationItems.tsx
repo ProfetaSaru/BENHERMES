@@ -21,13 +21,13 @@ export const getNavigationItems = (taskCount: number, savedReportsCount = 0): Na
   },
   {
     id: 'formatador',
-    name: 'Formatador de Dados',
+    name: 'Formatador de Planilhas',
     shortName: 'Formatador',
-    description: 'Limpeza, conversão e padronização rápida de textos, CSV e tabelas.',
+    description: 'Conversão e padronização rápida de planilhas para o formato CSV estruturado.',
     category: 'automacoes',
-    badge: 'Em breve',
-    badgeVariant: 'warning',
-    isReady: false,
+    badge: 'Novo',
+    badgeVariant: 'success',
+    isReady: true,
     icon: <TableProperties size={20} />,
   },
   {

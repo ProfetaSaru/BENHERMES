@@ -10,6 +10,7 @@ import { TopNavbar } from './components/layout/TopNavbar';
 import { ToolPlaceholder } from './components/layout/ToolPlaceholder';
 import { ReportsHub } from './components/reports/ReportsHub';
 import { ReportsHistoryHub } from './components/history/ReportsHistoryHub';
+import { DataFormatterHub } from './components/formatter/DataFormatterHub';
 import { Modal } from './components/common/Modal';
 import { Task, SavedReport, SaveReportParams } from './types/task';
 import { getNavigationItems } from './utils/navigationItems';
@@ -201,6 +202,10 @@ export const App: React.FC = () => {
                 onNotify={notify}
                 onNavigateToGenerator={() => setActiveToolId('relatorios')}
               />
+            </main>
+          ) : activeToolId === 'formatador' ? (
+            <main className="container" style={{ maxWidth: '1480px', padding: '0 16px' }}>
+              <DataFormatterHub onNotify={notify} />
             </main>
           ) : (
             <ToolPlaceholder
