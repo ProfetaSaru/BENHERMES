@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, AlertCircle } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Info } from 'lucide-react';
 import { NotificationType } from '../../types/task';
 
 interface NotificationToastProps {
@@ -12,8 +12,7 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({ message, t
     return <p className="form-message" role="status" aria-live="polite" />;
   }
 
-  const isSuccess = type === 'success';
-  const Icon = isSuccess ? CheckCircle2 : AlertCircle;
+  const Icon = type === 'success' ? CheckCircle2 : type === 'info' ? Info : AlertCircle;
 
   return (
     <p className={`form-message ${type}`} role="status" aria-live="polite">

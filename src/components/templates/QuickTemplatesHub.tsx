@@ -12,7 +12,7 @@ import {
   Mail,
   AlertTriangle,
 } from 'lucide-react';
-import { Task, NotificationState } from '../../types/task';
+import { Task, NotificationState, NotificationType } from '../../types/task';
 import { NotificationToast } from '../common/NotificationToast';
 import { Button } from '../common/Button';
 import { NewCollaboratorTemplate } from './NewCollaboratorTemplate';
@@ -24,7 +24,7 @@ import { MarkdownTemplateMeta } from '../../types/markdownTemplate';
 
 interface Props {
   notification: NotificationState;
-  onNotify: (message: string, type?: 'success' | 'error' | '') => void;
+  onNotify: (message: string, type?: NotificationType) => void;
   tasks?: Task[];
   onSaveToHistory?: (title: string, reportText: string) => void;
 }

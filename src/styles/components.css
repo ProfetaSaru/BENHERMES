@@ -243,6 +243,10 @@ h3 {
   color: var(--red);
 }
 
+.form-message.info {
+  color: var(--blue);
+}
+
 /* Task List */
 .task-list {
   display: grid;

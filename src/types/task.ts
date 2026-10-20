@@ -9,7 +9,7 @@ export interface Task {
 
 export type TaskFormData = Omit<Task, 'id'>;
 
-export type NotificationType = 'success' | 'error' | '';
+export type NotificationType = 'success' | 'error' | 'info' | '';
 
 export interface NotificationState {
   message: string;
