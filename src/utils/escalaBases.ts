@@ -6,6 +6,8 @@ import {
   ImportacaoEscala,
   ResultadoSorteio,
 } from '../types/escala';
+import { celulaParaIso, diaDaSemana, ehFimDeSemana, feriadoNacional, isoParaBr, brParaIso, normalizarNome } from './calendario';
+import { escaparCsv } from './csvTexto';
 
 /**
  * Escala diária de bases do Ativo 2.
@@ -28,43 +30,9 @@ const TENTATIVAS = 1000;
 /** Cabeçalho do histórico em CSV, igual ao historico/historico_escalas.csv do BENZAITEN */
 const CABECALHO_HISTORICO = 'Data;Base;Responsavel';
 
-const DIAS_DA_SEMANA = [
-  'domingo',
-  'segunda-feira',
-  'terça-feira',
-  'quarta-feira',
-  'quinta-feira',
-  'sexta-feira',
-  'sábado',
-];
-
-const FERIADOS_FIXOS: [number, number, string][] = [
-  [1, 1, 'Confraternização Universal'],
-  [21, 4, 'Tiradentes'],
-  [1, 5, 'Dia do Trabalho'],
-  [7, 9, 'Independência do Brasil'],
-  [12, 10, 'Nossa Senhora Aparecida'],
-  [2, 11, 'Finados'],
-  [15, 11, 'Proclamação da República'],
-  [20, 11, 'Dia Nacional de Zumbi e da Consciência Negra'],
-  [25, 12, 'Natal'],
-];
-
 // ---------------------------------------------------------------------------
-// Textos e datas
+// Cadastro
 // ---------------------------------------------------------------------------
-
-/**
- * "  José   da Conceição " -> "JOSE DA CONCEICAO". Usado só para comparar nomes.
- */
-export const normalizarNome = (texto: unknown): string => {
-  return String(texto ?? '')
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toUpperCase()
-    .replace(/\s+/g, ' ')
-    .trim();
-};
 
 /**
  * Tira espaços extras, itens vazios e nomes repetidos, mantendo a ordem.
@@ -86,85 +54,6 @@ export const limparLista = (valores: unknown[]): string[] => {
 
 /** Texto de um campo "um item por linha" -> lista limpa */
 export const textoParaLista = (texto: string): string[] => limparLista(texto.split(/\r?\n/));
-
-const doisDigitos = (n: number): string => String(n).padStart(2, '0');
-
-const montarIso = (ano: number, mes: number, dia: number): string =>
-  `${ano}-${doisDigitos(mes)}-${doisDigitos(dia)}`;
-
-/** Data de hoje (fuso do computador) no formato AAAA-MM-DD */
-export const hojeIso = (): string => {
-  const agora = new Date();
-  return montarIso(agora.getFullYear(), agora.getMonth() + 1, agora.getDate());
-};
-
-/** "2026-10-21" -> "21/10/2026" */
-export const isoParaBr = (iso: string): string => {
-  const [ano, mes, dia] = iso.split('-');
-  return `${dia}/${mes}/${ano}`;
-};
-
-/** "21/10/2026" -> "2026-10-21" (ou null se não for uma data válida) */
-export const brParaIso = (texto: string): string | null => {
-  const partes = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(texto.trim());
-  if (!partes) return null;
-  const [dia, mes, ano] = [Number(partes[1]), Number(partes[2]), Number(partes[3])];
-  const data = new Date(ano, mes - 1, dia);
-  if (data.getMonth() !== mes - 1 || data.getDate() !== dia) return null;
-  return montarIso(ano, mes, dia);
-};
-
-const isoParaDate = (iso: string): Date => {
-  const [ano, mes, dia] = iso.split('-').map(Number);
-  return new Date(ano, mes - 1, dia);
-};
-
-export const diaDaSemana = (iso: string): string => DIAS_DA_SEMANA[isoParaDate(iso).getDay()];
-
-export const ehFimDeSemana = (iso: string): boolean => {
-  const dia = isoParaDate(iso).getDay();
-  return dia === 0 || dia === 6;
-};
-
-/**
- * Domingo de Páscoa no calendário gregoriano (algoritmo de Meeus/Jones/Butcher).
- * Exemplo: 2026 -> 2026-04-05
- */
-export const domingoDePascoa = (ano: number): string => {
-  const a = ano % 19;
-  const b = Math.floor(ano / 100);
-  const c = ano % 100;
-  const d = Math.floor(b / 4);
-  const e = b % 4;
-  const f = Math.floor((b + 8) / 25);
-  const g = Math.floor((b - f + 1) / 3);
-  const h = (19 * a + b - d - g + 15) % 30;
-  const i = Math.floor(c / 4);
-  const k = c % 4;
-  const l = (32 + 2 * e + 2 * i - h - k) % 7;
-  const m = Math.floor((a + 11 * h + 22 * l) / 451);
-  const mes = Math.floor((h + l - 7 * m + 114) / 31);
-  const dia = ((h + l - 7 * m + 114) % 31) + 1;
-  return montarIso(ano, mes, dia);
-};
-
-/**
- * Nome do feriado nacional da data (inclusive Sexta-feira Santa), ou null.
- * Feriados estaduais e municipais não entram aqui.
- */
-export const feriadoNacional = (iso: string): string | null => {
-  const data = isoParaDate(iso);
-  const ano = data.getFullYear();
-
-  const fixo = FERIADOS_FIXOS.find(([dia, mes]) => data.getDate() === dia && data.getMonth() + 1 === mes);
-  if (fixo) return fixo[2];
-
-  const sexta = isoParaDate(domingoDePascoa(ano));
-  sexta.setDate(sexta.getDate() - 2);
-  if (sexta.getTime() === data.getTime()) return 'Sexta-feira Santa';
-
-  return null;
-};
 
 // ---------------------------------------------------------------------------
 // Sorteio
@@ -352,29 +241,12 @@ export const textoDaEscala = (resultado: ResultadoSorteio): string => {
   return linhas.join('\n');
 };
 
-const escaparCsv = (valor: string): string => {
-  return /[;"\r\n]/.test(valor) ? `"${valor.replace(/"/g, '""')}"` : valor;
-};
-
 /** Histórico em CSV (Data;Base;Responsavel, datas dd/mm/aaaa), compatível com o BENZAITEN */
 export const historicoParaCsv = (historico: EscalaRegistro[]): string => {
   const linhas = ordenarHistorico(historico).map((r) =>
     [isoParaBr(r.data), r.base, r.responsavel].map(escaparCsv).join(';')
   );
   return [CABECALHO_HISTORICO, ...linhas].join('\r\n');
-};
-
-/** Dispara o download de um arquivo de texto com BOM UTF-8 (o Excel abre com acentos certos) */
-export const baixarTexto = (conteudo: string, nomeArquivo: string): void => {
-  const blob = new Blob(['﻿' + conteudo], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.setAttribute('download', nomeArquivo);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
 };
 
 /**
@@ -417,16 +289,6 @@ export const gerarPlanilhaEscala = (
 // ---------------------------------------------------------------------------
 // Importação
 // ---------------------------------------------------------------------------
-
-/** Célula de data do Excel (número de série ou texto dd/mm/aaaa) -> AAAA-MM-DD */
-const celulaParaIso = (valor: unknown): string | null => {
-  if (typeof valor === 'number' && valor > 0) {
-    const data = XLSX.SSF.parse_date_code(valor);
-    return data ? montarIso(data.y, data.m, data.d) : null;
-  }
-  if (typeof valor === 'string') return brParaIso(valor);
-  return null;
-};
 
 const linhasDaAba = (planilha: XLSX.WorkSheet): unknown[][] =>
   XLSX.utils.sheet_to_json<unknown[]>(planilha, { header: 1, defval: '', raw: true, blankrows: true });
@@ -507,7 +369,7 @@ export const importarPlanilhaEscala = (livro: XLSX.WorkBook): ImportacaoEscala =
  * Lê o historico_escalas.csv do BENZAITEN (ou um histórico exportado por aqui).
  */
 export const csvParaHistorico = (texto: string): EscalaRegistro[] => {
-  const linhas = texto.replace(/^﻿/, '').split(/\r?\n/).filter((l) => l.trim());
+  const linhas = texto.replace(/^\uFEFF/, '').split(/\r?\n/).filter((l) => l.trim());
   const cabecalho = (linhas[0] ?? '').split(';').map(normalizarNome);
   if (cabecalho[0] !== 'DATA' || cabecalho[1] !== 'BASE' || cabecalho[2] !== 'RESPONSAVEL') {
     throw new Error('CSV não reconhecido. O histórico precisa ter as colunas Data;Base;Responsavel.');

@@ -20,22 +20,17 @@ import { ImportacaoEscala, ResultadoSorteio } from '../../types/escala';
 import { useEscalaBases } from '../../hooks/useEscalaBases';
 import {
   JANELA_SORTEIOS,
-  hojeIso,
-  isoParaBr,
-  diaDaSemana,
-  ehFimDeSemana,
-  feriadoNacional,
-  normalizarNome,
   textoParaLista,
   realizarSorteio,
   ultimosSorteios,
   textoDaEscala,
   historicoParaCsv,
-  baixarTexto,
   gerarPlanilhaEscala,
   importarPlanilhaEscala,
   csvParaHistorico,
 } from '../../utils/escalaBases';
+import { hojeIso, isoParaBr, diaDaSemana, ehFimDeSemana, feriadoNacional, normalizarNome } from '../../utils/calendario';
+import { baixarTexto } from '../../utils/csvTexto';
 
 interface EscalaBasesHubProps {
   onNotify: (message: string, type?: NotificationType) => void;
