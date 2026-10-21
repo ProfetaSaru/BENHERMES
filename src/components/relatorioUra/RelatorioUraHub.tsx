@@ -12,8 +12,8 @@ import {
   AlertTriangle,
   TrendingUp,
   TrendingDown,
+  CloudDownload,
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import { NotificationType } from '../../types/task';
 import { ArquivoCarregado, ResultadoUra, TipoExportacao } from '../../types/relatorioUra';
 import { useRelatorioUra } from '../../hooks/useRelatorioUra';
@@ -32,6 +32,8 @@ import {
   tipoDoArquivo,
 } from '../../utils/uraLeitura';
 import { calcularRelatorio, metasAtivas } from '../../utils/uraCalculo';
+import { baixarDoArgus } from '../../utils/argusApi';
+import { baixarPlanilha } from '../../utils/planilhaColorida';
 import { gerarPlanilhaUra, historicoUraParaCsv, htmlDoRelatorio, textoDaCelula, textoDoRelatorio } from '../../utils/uraExportacao';
 import { UraTabela } from './UraTabela';
 import { UraConferencia } from './UraConferencia';
@@ -70,6 +72,7 @@ export const RelatorioUraHub: React.FC<RelatorioUraHubProps> = ({ onNotify }) =>
   const [isLoading, setIsLoading] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [regerar, setRegerar] = useState(false);
+  const [isBaixandoArgus, setIsBaixandoArgus] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const metas = metasAtivas(ura.metas);
@@ -146,6 +149,32 @@ export const RelatorioUraHub: React.FC<RelatorioUraHubProps> = ({ onNotify }) =>
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  // Desempenho, leads e operadores pela API (a tarifação e a esteira continuam manuais)
+  const handleBaixarArgus = async () => {
+    if (!ura.argus.token.trim()) {
+      onNotify('Cole o token da API do Argus em Configurações (mais abaixo) para baixar direto.', 'error');
+      return;
+    }
+    setIsBaixandoArgus(true);
+    try {
+      const baixados = await baixarDoArgus(dia, ura.argus);
+      // Substitui downloads anteriores da API e exportações manuais dos mesmos tipos
+      const tipos = new Set(baixados.map((a) => a.tipo));
+      setArquivos((atuais) => [...atuais.filter((a) => !tipos.has(a.tipo)), ...baixados]);
+      const operadores = baixados.find((a) => a.tipo === 'operadores');
+      if (operadores) ura.atualizarCadastro(cadastroDaExportacao(operadores.linhas));
+      const [desempenho, leads] = baixados;
+      onNotify(
+        `Argus: ${desempenho.linhas.length} operador(es) no desempenho e ${leads.linhas.length} nos leads de ${isoParaBr(dia)}.`,
+        'success'
+      );
+    } catch (err: any) {
+      onNotify(err.message || 'Não foi possível baixar do Argus.', 'error');
+    } finally {
+      setIsBaixandoArgus(false);
+    }
+  };
+
   const handleRemoverArquivo = (id: string) => {
     setArquivos((atuais) => atuais.filter((a) => a.id !== id));
   };
@@ -206,10 +235,14 @@ export const RelatorioUraHub: React.FC<RelatorioUraHubProps> = ({ onNotify }) =>
     }
   };
 
-  const handleBaixar = () => {
+  const handleBaixar = async () => {
     if (!resultado) return;
-    XLSX.writeFile(gerarPlanilhaUra(resultado, metas), `relatorio_produtividade_${resultado.data}.xlsx`);
-    onNotify('Download da planilha iniciado!', 'success');
+    try {
+      await baixarPlanilha(await gerarPlanilhaUra(resultado, metas), `relatorio_produtividade_${resultado.data}.xlsx`);
+      onNotify('Download da planilha iniciado!', 'success');
+    } catch (err: any) {
+      onNotify(`Erro ao gerar a planilha: ${err.message}`, 'error');
+    }
   };
 
   const handleExportarHistorico = () => {
@@ -388,7 +421,17 @@ export const RelatorioUraHub: React.FC<RelatorioUraHubProps> = ({ onNotify }) =>
           </div>
         )}
 
-        <div className="formatter-actions-buttons">
+        <div className="formatter-actions-buttons ura-acoes-gerar">
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={handleBaixarArgus}
+            disabled={!dia || isBaixandoArgus}
+            title="Baixa desempenho (TMA/TME), leads da URA e operadores pela API do Argus"
+          >
+            <CloudDownload size={16} />
+            {isBaixandoArgus ? 'Baixando do Argus...' : `Baixar do Argus (${dia ? isoParaBr(dia) : '...'})`}
+          </button>
           <button type="button" className="btn btn-primary" onClick={handleGerar} disabled={!dia || arquivos.length === 0}>
             <Play size={16} />
             Gerar relatório de {dia ? isoParaBr(dia) : '...'}
@@ -453,6 +496,8 @@ export const RelatorioUraHub: React.FC<RelatorioUraHubProps> = ({ onNotify }) =>
         apelidos={ura.apelidos}
         metas={ura.metas}
         historico={ura.historico}
+        argus={ura.argus}
+        onArgusChange={ura.atualizarArgus}
         onApelidosChange={ura.atualizarApelidos}
         onMetasChange={ura.atualizarMetas}
         onExportarHistorico={handleExportarHistorico}

@@ -8,6 +8,8 @@ import {
 } from '../types/escala';
 import { celulaParaIso, diaDaSemana, ehFimDeSemana, feriadoNacional, isoParaBr, brParaIso, normalizarNome } from './calendario';
 import { escaparCsv } from './csvTexto';
+import { bordaFina, novaPlanilha, pintar } from './planilhaColorida';
+import type { Workbook } from 'exceljs';
 
 /**
  * Escala diária de bases do Ativo 2.
@@ -249,40 +251,62 @@ export const historicoParaCsv = (historico: EscalaRegistro[]): string => {
   return [CABECALHO_HISTORICO, ...linhas].join('\r\n');
 };
 
+/** Cores da empresa (as mesmas da planilha Escala_Bases_Ativo2.xlsm) */
+const CORES_ESCALA = { azul: '#0A2F6B', amarelo: '#FFC20E', amareloClaro: '#FFF4CC', branco: '#FFFFFF' };
+
 /**
  * Planilha da escala do dia (aba Escala) com os últimos 10 sorteios (aba Últimos sorteios),
- * no mesmo layout do saida/escala_AAAA-MM-DD.xlsx do BENZAITEN.
+ * no mesmo layout e nas mesmas cores do saida/escala_AAAA-MM-DD.xlsx do BENZAITEN.
  */
-export const gerarPlanilhaEscala = (
+export const gerarPlanilhaEscala = async (
   resultado: ResultadoSorteio,
   historico: EscalaRegistro[],
   bases: string[]
-): XLSX.WorkBook => {
-  const escala = XLSX.utils.aoa_to_sheet([
-    ['ESCALA DE BASES — ATIVO 2'],
-    [`${isoParaBr(resultado.data)} (${diaDaSemana(resultado.data)})`],
-    [],
-    ['Base', 'Responsável'],
-    ...resultado.atribuicoes.map((a) => [a.base, a.responsavel]),
-    [],
-    [`Ausentes: ${resultado.ausentes.length > 0 ? resultado.ausentes.join(', ') : 'nenhum'}`],
-    [`Regra: ninguém repetiu a base dos últimos ${resultado.janelaUsada} sorteio(s).`],
-  ]);
-  escala['!cols'] = [{ wch: 38 }, { wch: 22 }];
-  escala['!merges'] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 1 } },
-    { s: { r: 1, c: 0 }, e: { r: 1, c: 1 } },
-  ];
+): Promise<Workbook> => {
+  const { azul, amarelo, amareloClaro, branco } = CORES_ESCALA;
+  const livro = await novaPlanilha();
 
-  const ultimos = XLSX.utils.aoa_to_sheet([
-    ['Data', ...bases],
-    ...ultimosSorteios(historico, bases).map((linha) => [isoParaBr(linha.data), ...linha.responsaveis]),
-  ]);
-  ultimos['!cols'] = [{ wch: 12 }, ...bases.map(() => ({ wch: 32 }))];
+  // --- Aba 1: escala do dia ---
+  const ws = livro.addWorksheet('Escala');
+  ws.mergeCells('A1:B1');
+  ws.getCell('A1').value = 'ESCALA DE BASES — ATIVO 2';
+  pintar(ws.getCell('A1'), azul, branco, true, 14);
+  ws.getCell('A1').alignment = { horizontal: 'center' };
+  ws.mergeCells('A2:B2');
+  ws.getCell('A2').value = `${isoParaBr(resultado.data)} (${diaDaSemana(resultado.data)})`;
+  pintar(ws.getCell('A2'), null, azul, true);
+  ws.getCell('A2').alignment = { horizontal: 'center' };
 
-  const livro = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(livro, escala, 'Escala');
-  XLSX.utils.book_append_sheet(livro, ultimos, 'Últimos sorteios');
+  const cabecalho = ws.getRow(4);
+  cabecalho.values = ['Base', 'Responsável'];
+  [1, 2].forEach((c) => {
+    pintar(cabecalho.getCell(c), amarelo, azul, true);
+    bordaFina(cabecalho.getCell(c), azul);
+  });
+  resultado.atribuicoes.forEach((a, i) => {
+    const linha = ws.getRow(5 + i);
+    linha.values = [a.base, a.responsavel];
+    [1, 2].forEach((c) => bordaFina(linha.getCell(c), azul));
+  });
+  const depois = 5 + resultado.atribuicoes.length + 1;
+  ws.getCell(depois, 1).value = `Ausentes: ${resultado.ausentes.length > 0 ? resultado.ausentes.join(', ') : 'nenhum'}`;
+  ws.getCell(depois + 1, 1).value = `Regra: ninguém repetiu a base dos últimos ${resultado.janelaUsada} sorteio(s).`;
+  ws.getColumn(1).width = 38;
+  ws.getColumn(2).width = 22;
+
+  // --- Aba 2: últimos 10 sorteios, uma coluna por base (como na .xlsm) ---
+  const wh = livro.addWorksheet('Últimos sorteios');
+  const topo = wh.addRow(['Data', ...bases]);
+  topo.eachCell((celula) => pintar(celula, azul, branco, true));
+  ultimosSorteios(historico, bases).forEach((linha) => {
+    const row = wh.addRow([isoParaBr(linha.data), ...linha.responsaveis]);
+    if (linha.data === resultado.data) {
+      for (let c = 1; c <= bases.length + 1; c++) pintar(row.getCell(c), amareloClaro);
+    }
+  });
+  wh.getColumn(1).width = 12;
+  bases.forEach((_, i) => (wh.getColumn(i + 2).width = 32));
+
   return livro;
 };
 

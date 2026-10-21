@@ -21,6 +21,8 @@ Construída com **React 18**, **TypeScript**, **Vite** e estilização modular, 
 - **⚡ Rascunhos Temporários em Tempo Real**: Cada modelo mantém automaticamente seus dados preenchidos no navegador, lembrando o último modelo utilizado mesmo após recarregar a página (F5).
 - **🎲 Escala de Bases (Ativo 2)**: Sorteio diário das bases entre os grupos dos supervisores, sem repetir a base dos últimos 2 sorteios, com marcação de ausentes, avisos de fim de semana e feriados nacionais, cópia em texto e download em `.xlsx`. Importa a antiga `Escala_Bases_Ativo2.xlsm` e o histórico do BENZAITEN (`historico_escalas.csv`), e exporta no mesmo formato. Tudo fica salvo no `localStorage` (chave `'benhermes_escala_bases'`).
 - **📞 Relatório de Produtividade URA**: Arraste as exportações do dia (desempenho e leads do Argus, tarifações VENDITORE e 4NET, esteira do Vanguard e operadores) e gere o relatório com TMA, TMO, leads, custo (com rateio dos robôs da URA), vendas, clientes efetivados, custo por CPF e produção por lead, por operador e por equipe. Os arquivos são reconhecidos pelas colunas, nomes diferentes entre sistemas são ligados por apelidos, as metas pintam um semáforo e cada dia é comparado com o dia útil anterior. Copia a tabela colorida (cola no Excel e no Outlook) e baixa o `.xlsx` com a aba de conferência. Mesmas contas do `relatorio_ura.py` do BENZAITEN; importa o `operadores.xlsx`, o `metas.xlsx` e o `relatorio_ura.csv` dele. As exportações ficam só na memória da página; o `localStorage` (chave `'benhermes_relatorio_ura'`) guarda apenas cadastro, apelidos, metas e os totais de cada dia.
+- **🔌 API do Argus**: No Relatório URA, o botão **Baixar do Argus** traz o desempenho (TMA/TME), os leads da URA e o cadastro de operadores direto da API (a tarifação continua manual, pois não existe na API). As chamadas passam por uma ponte local no servidor do Vite ([`server/argusProxy.ts`](server/argusProxy.ts)), por isso só funciona com `npm run dev` ou `npm run preview`: ela resolve o bloqueio de CORS do navegador, tenta o modo TLS compatível quando o servidor do Argus usa configuração antiga (com o certificado sempre verificado), repassa só os 3 endereços que o relatório usa e descarta CPF, e-mail, login, RE e ramal antes de chegar ao navegador. O token fica só no `localStorage` (chave `'benhermes_argus'`).
+- **🎨 Planilhas coloridas**: O `.xlsx` do Relatório URA e o da Escala de Bases saem com as cores, bordas e formatos das planilhas modelo (via [`exceljs`](https://github.com/exceljs/exceljs), carregado só na hora do download).
 
 ---
 
@@ -305,6 +307,8 @@ npm run dev
 ```
 
 A aplicação estará disponível em `http://localhost:5173/`.
+
+> 🔌 O botão **Baixar do Argus** do Relatório URA usa a ponte local do servidor do Vite: ele funciona com `npm run dev` e `npm run preview`, mas não em uma hospedagem só de arquivos estáticos.
 
 ### Build de Produção
 

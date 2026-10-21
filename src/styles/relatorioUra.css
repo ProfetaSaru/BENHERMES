@@ -334,3 +334,20 @@
   padding: 6px 8px;
   min-width: 90px;
 }
+
+.ura-argus-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 760px) {
+  .ura-argus-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Os dois botões lado a lado: baixar do Argus e gerar */
+.ura-acoes-gerar .btn {
+  flex: 1;
+}

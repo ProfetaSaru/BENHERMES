@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Settings2, Users, Link2, Target, History, FileDown, Trash2 } from 'lucide-react';
+import { Settings2, Users, Link2, Target, History, FileDown, Trash2, KeyRound } from 'lucide-react';
 import { Apelido, ChaveIndicador, Meta, Metas, OperadorCadastro, RegistroHistoricoUra } from '../../types/relatorioUra';
 import { isoParaBr, normalizarNome } from '../../utils/calendario';
 import { INDICADORES } from '../../utils/uraLeitura';
+import { ConfigArgus, URL_PADRAO_ARGUS } from '../../utils/argusApi';
 
 interface UraConfiguracoesProps {
   cadastro: OperadorCadastro[];
   apelidos: Apelido[];
   metas: Metas;
   historico: RegistroHistoricoUra[];
+  argus: ConfigArgus;
+  onArgusChange: (argus: ConfigArgus) => void;
   onApelidosChange: (apelidos: Apelido[]) => void;
   onMetasChange: (metas: Metas) => void;
   onExportarHistorico: () => void;
@@ -33,6 +36,8 @@ export const UraConfiguracoes: React.FC<UraConfiguracoesProps> = ({
   apelidos,
   metas,
   historico,
+  argus,
+  onArgusChange,
   onApelidosChange,
   onMetasChange,
   onExportarHistorico,
@@ -101,6 +106,36 @@ export const UraConfiguracoes: React.FC<UraConfiguracoesProps> = ({
           <div className="formatter-field-sample ura-quebra">
             Um por linha: <span>nome no sistema = nome oficial do cadastro</span>
           </div>
+        </div>
+      </div>
+
+      {/* API do Argus */}
+      <div className="formatter-mapping-field mapped">
+        <div className="formatter-field-label">
+          <KeyRound size={14} style={{ display: 'inline', marginRight: 6 }} />
+          API do Argus
+        </div>
+        <div className="ura-argus-grid">
+          <input
+            type="password"
+            className="formatter-select"
+            value={argus.token}
+            onChange={(e) => onArgusChange({ ...argus, token: e.target.value })}
+            placeholder="Token (Argus > Configurações > Desenvolvedor > Acesso API)"
+            aria-label="Token da API do Argus"
+            autoComplete="off"
+          />
+          <input
+            className="formatter-select"
+            value={argus.url}
+            onChange={(e) => onArgusChange({ ...argus, url: e.target.value })}
+            onBlur={() => !argus.url.trim() && onArgusChange({ ...argus, url: URL_PADRAO_ARGUS })}
+            aria-label="Endereço da API do Argus"
+          />
+        </div>
+        <div className="formatter-field-sample ura-quebra">
+          O token fica só neste navegador e vai direto do seu computador para o Argus (pela ponte local do{' '}
+          <span>npm run dev</span>). Não compartilhe a tela com ele visível. A tarifação não existe na API: continua manual.
         </div>
       </div>
 

@@ -2,8 +2,20 @@ import { useState, useEffect, useCallback } from 'react';
 import { Apelido, Metas, OperadorCadastro, RegistroHistoricoUra, ResultadoUra } from '../types/relatorioUra';
 import { normalizarNome } from '../utils/calendario';
 import { registrarNoHistorico } from '../utils/uraCalculo';
+import { ConfigArgus, URL_PADRAO_ARGUS } from '../utils/argusApi';
 
 export const STORAGE_RELATORIO_URA_KEY = 'benhermes_relatorio_ura';
+/** Token e endereço da API do Argus: chave separada, só neste navegador */
+export const STORAGE_ARGUS_KEY = 'benhermes_argus';
+
+const carregarArgus = (): ConfigArgus => {
+  try {
+    const dados = JSON.parse(localStorage.getItem(STORAGE_ARGUS_KEY) ?? '{}');
+    return { token: String(dados.token ?? ''), url: String(dados.url ?? '') || URL_PADRAO_ARGUS };
+  } catch {
+    return { token: '', url: URL_PADRAO_ARGUS };
+  }
+};
 
 /**
  * O que fica guardado no navegador: só cadastro (nome, supervisor, equipe, status),
@@ -38,6 +50,15 @@ const carregar = (): RelatorioUraArmazenado => {
 
 export function useRelatorioUra() {
   const [dados, setDados] = useState<RelatorioUraArmazenado>(carregar);
+  const [argus, setArgus] = useState<ConfigArgus>(carregarArgus);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_ARGUS_KEY, JSON.stringify(argus));
+    } catch (error) {
+      console.error('Falha ao salvar a configuração do Argus no localStorage:', error);
+    }
+  }, [argus]);
 
   useEffect(() => {
     try {
@@ -97,6 +118,8 @@ export function useRelatorioUra() {
 
   return {
     ...dados,
+    argus,
+    atualizarArgus: setArgus,
     atualizarCadastro,
     atualizarApelidos,
     adicionarApelido,

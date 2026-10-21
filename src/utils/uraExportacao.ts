@@ -1,9 +1,10 @@
-import * as XLSX from 'xlsx';
+import type { Workbook } from 'exceljs';
 import { ChaveIndicador, CorMeta, LinhaRelatorio, Metas, RegistroHistoricoUra, ResultadoUra, TipoLinha } from '../types/relatorioUra';
 import { isoParaBr } from './calendario';
 import { escaparCsv } from './csvTexto';
 import { corDaMeta, metasAtivas } from './uraCalculo';
 import { INDICADORES } from './uraLeitura';
+import { novaPlanilha, pintar } from './planilhaColorida';
 
 /**
  * Saídas do Relatório da URA: planilha .xlsx, tabela colorida para colar no Excel ou
@@ -147,82 +148,110 @@ export const estiloDaCelula = (
 };
 
 // ---------------------------------------------------------------------------
-// Planilha .xlsx
+// Planilha .xlsx (com as cores da planilha modelo)
 // ---------------------------------------------------------------------------
 
 /**
- * Planilha com as abas Relatório e Conferência, no layout do BENZAITEN
- * (título em B2, cabeçalho na linha 3, valores com formato de hora e de reais).
+ * Planilha com as abas Relatório e Conferência, no layout e nas cores do BENZAITEN:
+ * faixa azul em volta, título em B2, cabeçalho azul na linha 3, separador amarelo,
+ * totais em cinza e azul, zebra, semáforo das metas e setas de comparação coloridas.
  */
-export const gerarPlanilhaUra = (resultado: ResultadoUra, metas: Metas): XLSX.WorkBook => {
+export const gerarPlanilhaUra = async (resultado: ResultadoUra, metas: Metas): Promise<Workbook> => {
+  const livro = await novaPlanilha();
   const colunas = colunasDoRelatorio(resultado.dataAnterior);
-  const relatorio = XLSX.utils.aoa_to_sheet([
-    [],
-    ['', `RELATORIO DE PRODUTIVIDADE URA ${isoParaBr(resultado.data)}`],
-    ['', 'OPERADORES', ...colunas.map((c) => c.titulo)],
-  ]);
+  const ws = livro.addWorksheet('Relatório', {
+    views: [{ state: 'frozen', xSplit: 2, ySplit: 3 }],
+    pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
+  });
+  const ultimaColuna = 3 + colunas.length; // A = faixa azul, B = nomes, C.. = valores, última = faixa azul
 
+  // Título e cabeçalho
+  ws.mergeCells(2, 2, 2, ultimaColuna - 1);
+  const titulo = ws.getCell(2, 2);
+  titulo.value = `RELATORIO DE PRODUTIVIDADE URA ${isoParaBr(resultado.data)}`;
+  pintar(titulo, null, CORES.azul, true, 14);
+  titulo.alignment = { horizontal: 'center' };
+  ['OPERADORES', ...colunas.map((c) => c.titulo)].forEach((texto, i) => {
+    const celula = ws.getCell(3, 2 + i);
+    celula.value = texto;
+    pintar(celula, CORES.azul, CORES.branco, true);
+    celula.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  });
+  ws.getRow(3).height = 45;
+
+  // Linhas
   resultado.linhas.forEach((linha, i) => {
-    const r = 3 + i;
-    XLSX.utils.sheet_add_aoa(relatorio, [[linha.nome]], { origin: { r, c: 1 } });
+    const r = 4 + i;
+    const estiloLinha = estiloDaCelula(linha, i, null, metas);
+    for (let c = 2; c < ultimaColuna; c++) pintar(ws.getCell(r, c), estiloLinha.fundo, estiloLinha.fonte, estiloLinha.negrito);
+    ws.getCell(r, 2).value = linha.nome;
     colunas.forEach((coluna, j) => {
+      const celula = ws.getCell(r, 3 + j);
       const valor = linha[coluna.chave];
-      if (valor === null || valor === undefined) return;
-      // Tempos vão como fração do dia, que é como o Excel guarda horas
-      const v = coluna.formato === 'tempo' ? valor / 86400 : valor;
-      relatorio[XLSX.utils.encode_cell({ r, c: 2 + j })] = { t: 'n', v, z: FORMATOS_EXCEL[coluna.formato] };
+      if (valor !== null && valor !== undefined) {
+        // Tempos vão como fração do dia, que é como o Excel guarda horas
+        celula.value = coluna.formato === 'tempo' ? valor / 86400 : valor;
+        celula.numFmt = FORMATOS_EXCEL[coluna.formato];
+      }
+      const estilo = estiloDaCelula(linha, i, coluna, metas);
+      pintar(celula, estilo.fundo, estilo.fonte, estilo.negrito);
     });
   });
-  relatorio['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 3 + resultado.linhas.length, c: 2 + colunas.length } });
-  relatorio['!merges'] = [{ s: { r: 1, c: 1 }, e: { r: 1, c: 1 + colunas.length } }];
-  relatorio['!cols'] = [{ wch: 2 }, { wch: 44 }, ...colunas.map((c) => ({ wch: c.chave === 'leads' ? 19 : 15 })), { wch: 2 }];
 
-  const metasUsadas = metasAtivas(metas);
-  const linhasConferencia: unknown[][] = [
-    [`Conferência do relatório de ${isoParaBr(resultado.data)}`],
-    [],
-    ['Arquivos lidos'],
-    ...resultado.arquivos.map((a) => [a.nome, a.tipo, a.observacao]),
-    [],
-    ['Custos'],
-    ['Custo importado da tarifação (sem linhas de total)', resultado.custoImportado],
-    ['Custo no relatório (operadores + sem derivação)', resultado.custoNoRelatorio],
-    ['Custo de quem está fora do cadastro (ignorado)', resultado.custoIgnorado],
-    ['Diferença (importado - relatório - ignorado)', resultado.custoImportado - resultado.custoNoRelatorio - resultado.custoIgnorado],
-    ['Custo dos robôs da URA (rateado pelos leads)', resultado.custoRobos],
-    ['Ligações sem derivação p/ operador', resultado.semDerivacao],
-    ['Vendas de agentes fora do cadastro (ignoradas)', resultado.vendasIgnoradas],
-    [],
-    ['Nomes sem vínculo (cadastre em Apelidos se for grafia diferente)'],
-    ...Object.entries(resultado.semVinculo).sort().map(([nome, origens]) => [nome, origens.join(', ')]),
-    [],
-    ['Ex-colaboradores ignorados (inativos no Argus)'],
-    ...Object.entries(resultado.exColaboradores).sort().map(([nome, origens]) => [nome, origens.join(', ')]),
-    [],
-    ['Metas aplicadas'],
-    ...(Object.keys(metasUsadas).length === 0
-      ? [['Nenhuma meta preenchida.']]
-      : INDICADORES.filter((i) => metasUsadas[i.chave]).map((i) => {
-          const meta = metasUsadas[i.chave]!;
-          return [i.titulo, `melhor quando ${meta.sentido}`, `verde: ${meta.verde || '-'} | vermelho: ${meta.vermelho || '-'}`];
-        })),
-    [],
-    ['Avisos'],
-    ...resultado.avisos.map((a) => [a]),
-  ];
-  const conferencia = XLSX.utils.aoa_to_sheet(linhasConferencia);
-  linhasConferencia.forEach((linha, r) => {
-    if (typeof linha[1] === 'number') {
-      const celula = conferencia[XLSX.utils.encode_cell({ r, c: 1 })];
-      celula.v = Math.round(celula.v * 100) / 100;
-      celula.z = FORMATOS_EXCEL.reais;
-    }
+  // Faixa azul de fechamento e laterais (como no modelo)
+  const linhaFinal = 4 + resultado.linhas.length;
+  for (let c = 1; c <= ultimaColuna; c++) pintar(ws.getCell(linhaFinal, c), CORES.azul);
+  for (let r = 3; r <= linhaFinal; r++) {
+    pintar(ws.getCell(r, 1), CORES.azul);
+    pintar(ws.getCell(r, ultimaColuna), CORES.azul);
+  }
+  ws.getColumn(1).width = 2;
+  ws.getColumn(2).width = 44;
+  colunas.forEach((c, j) => (ws.getColumn(3 + j).width = c.chave === 'leads' ? 19 : 15));
+  ws.getColumn(ultimaColuna).width = 2;
+
+  // --- Aba de conferência ---
+  const wc = livro.addWorksheet('Conferência');
+  wc.getColumn(1).width = 55;
+  wc.getColumn(2).width = 40;
+  wc.getColumn(3).width = 40;
+  const adicionar = (valores: unknown[]) => wc.addRow(valores);
+  const tituloSecao = (texto: string) => {
+    adicionar([]);
+    pintar(adicionar([texto]).getCell(1), CORES.azul, CORES.branco, true);
+  };
+
+  pintar(adicionar([`Conferência do relatório de ${isoParaBr(resultado.data)}`]).getCell(1), null, CORES.azul, true, 13);
+  tituloSecao('Arquivos lidos');
+  resultado.arquivos.forEach((a) => adicionar([a.nome, a.tipo, a.observacao]));
+  tituloSecao('Custos');
+  (
+    [
+      ['Custo importado da tarifação (sem linhas de total)', resultado.custoImportado],
+      ['Custo no relatório (operadores + sem derivação)', resultado.custoNoRelatorio],
+      ['Custo de quem está fora do cadastro (ignorado)', resultado.custoIgnorado],
+      ['Diferença (importado - relatório - ignorado)', resultado.custoImportado - resultado.custoNoRelatorio - resultado.custoIgnorado],
+      ['Custo dos robôs da URA (rateado pelos leads)', resultado.custoRobos],
+      ['Ligações sem derivação p/ operador', resultado.semDerivacao],
+      ['Vendas de agentes fora do cadastro (ignoradas)', resultado.vendasIgnoradas],
+    ] as [string, number][]
+  ).forEach(([rotulo, valor]) => {
+    adicionar([rotulo, Math.round(valor * 100) / 100]).getCell(2).numFmt = FORMATOS_EXCEL.reais;
   });
-  conferencia['!cols'] = [{ wch: 55 }, { wch: 40 }, { wch: 40 }];
+  tituloSecao('Nomes sem vínculo (cadastre em Apelidos se for grafia diferente)');
+  Object.entries(resultado.semVinculo).sort().forEach(([nome, origens]) => adicionar([nome, origens.join(', ')]));
+  tituloSecao('Ex-colaboradores ignorados (inativos no Argus)');
+  Object.entries(resultado.exColaboradores).sort().forEach(([nome, origens]) => adicionar([nome, origens.join(', ')]));
+  tituloSecao('Metas aplicadas');
+  const metasUsadas = metasAtivas(metas);
+  if (Object.keys(metasUsadas).length === 0) adicionar(['Nenhuma meta preenchida.']);
+  INDICADORES.filter((i) => metasUsadas[i.chave]).forEach((i) => {
+    const meta = metasUsadas[i.chave]!;
+    adicionar([i.titulo, `melhor quando ${meta.sentido}`, `verde: ${meta.verde || '-'} | vermelho: ${meta.vermelho || '-'}`]);
+  });
+  tituloSecao('Avisos');
+  resultado.avisos.forEach((a) => adicionar([a]));
 
-  const livro = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(livro, relatorio, 'Relatório');
-  XLSX.utils.book_append_sheet(livro, conferencia, 'Conferência');
   return livro;
 };
 
