@@ -4,8 +4,8 @@ import { comoDicionarios } from './uraLeitura';
 
 /**
  * Download do desempenho, dos leads da URA e do cadastro de operadores pela API do Argus.
- * Mesmas regras do argus_api.py do BENZAITEN. As chamadas passam pela ponte local
- * /api/argus (server/argusProxy.ts), que roda no servidor do Vite no seu computador.
+ * Mesmas regras do argus_api.py do BENZAITEN. As chamadas passam pela ponte /api/argus
+ * (server/argusProxy.ts): no npm run dev, pelo servidor do Vite; no site, pela função da Vercel.
  *
  * As linhas saem com as mesmas colunas das exportações manuais, então o relatório
  * funciona igual com os dois. A TARIFAÇÃO não existe na API: continua manual.
@@ -45,7 +45,7 @@ const CAMPOS_DESEMPENHO: Record<string, { exatos: string[]; contem: string[]; ev
 const chamar = async (caminho: string, corpo: unknown, config: ConfigArgus): Promise<any> => {
   let resposta: Response;
   try {
-    resposta = await fetch(`/api/argus/${caminho}`, {
+    resposta = await fetch(`/api/argus?caminho=${encodeURIComponent(caminho)}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -55,11 +55,11 @@ const chamar = async (caminho: string, corpo: unknown, config: ConfigArgus): Pro
       body: JSON.stringify(corpo),
     });
   } catch {
-    throw new Error('A ponte com o Argus não respondeu. Abra o BENHERMES com "npm run dev" ou "npm run preview".');
+    throw new Error('A ponte com o Argus não respondeu. Confira a internet e tente de novo.');
   }
   const dados = await resposta.json().catch(() => null);
   if (!dados) {
-    throw new Error('A ponte com o Argus não está ativa neste endereço. Abra o BENHERMES com "npm run dev" ou "npm run preview".');
+    throw new Error('A ponte com o Argus não está ativa neste endereço (resposta inesperada do servidor).');
   }
   if (!resposta.ok) throw new Error(dados.erro ?? `Erro ${resposta.status} ao falar com o Argus.`);
   return dados;

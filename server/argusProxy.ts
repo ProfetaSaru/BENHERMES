@@ -8,10 +8,12 @@ import type { Plugin } from 'vite';
  * Ponte local entre o BENHERMES e a API do Argus.
  *
  * O navegador não consegue chamar o Argus direto (o Argus não libera CORS e alguns
- * servidores dele usam TLS antigo, recusado pelos navegadores). Então o próprio
- * servidor do Vite (npm run dev / npm run preview), que roda NO SEU COMPUTADOR,
- * recebe a chamada em /api/argus/... e repassa ao Argus — igual ao argus_api.py
- * do BENZAITEN:
+ * servidores dele usam TLS antigo, recusado pelos navegadores). Então quem chama é
+ * um servidor, que recebe o pedido em /api/argus?caminho=... e repassa ao Argus —
+ * igual ao argus_api.py do BENZAITEN. O mesmo código atende:
+ *  - o servidor do Vite (npm run dev / npm run preview), no seu computador;
+ *  - a função da Vercel em api/argus.ts, no site publicado.
+ * Regras da ponte:
  *  - primeiro tenta a conexão segura padrão; se o servidor recusar, tenta de novo no
  *    modo compatível (cifras e TLS antigos liberados), com o certificado SEMPRE verificado;
  *  - só os 3 endereços que o relatório usa são repassados (não é um proxy aberto);
@@ -19,7 +21,7 @@ import type { Plugin } from 'vite';
  *    antes de chegar ao navegador.
  *
  * O token vai no cabeçalho X-Argus-Token e é repassado como Token-Signature.
- * Nada é gravado em disco.
+ * Nada é gravado nem registrado em log.
  */
 
 const URL_PADRAO = 'https://argus.app.br/apiargus';
@@ -69,7 +71,8 @@ const enviar = (endereco: URL, corpo: string, token: string, agente?: https.Agen
       {
         method: 'POST',
         headers: { 'Token-Signature': token, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(corpo) },
-        timeout: 120_000,
+        // Na Vercel a função tem no máximo 60 s; no computador, o mesmo limite do argus_api.py
+        timeout: process.env.VERCEL ? 55_000 : 120_000,
         ...(agente && endereco.protocol === 'https:' ? { agent: agente } : {}),
       },
       (resposta) => {
@@ -78,7 +81,7 @@ const enviar = (endereco: URL, corpo: string, token: string, agente?: https.Agen
         resposta.on('end', () => resolver({ status: resposta.statusCode ?? 0, texto: Buffer.concat(partes).toString('utf-8') }));
       }
     );
-    requisicao.on('timeout', () => requisicao.destroy(new Error('tempo esgotado (120 s)')));
+    requisicao.on('timeout', () => requisicao.destroy(new Error('o Argus demorou demais para responder')));
     requisicao.on('error', rejeitar);
     requisicao.end(corpo);
   });
@@ -150,13 +153,20 @@ const responder = (res: ServerResponse, status: number, corpo: unknown) => {
   res.end(JSON.stringify(corpo));
 };
 
-const atender = async (req: IncomingMessage, res: ServerResponse) => {
+/** Corpo do pedido: a Vercel já entrega lido em req.body; o Vite entrega o fluxo bruto */
+const corpoDoPedido = async (req: IncomingMessage & { body?: unknown }): Promise<unknown> => {
+  if (req.body !== undefined) return typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body;
+  return JSON.parse((await lerCorpo(req)) || '{}');
+};
+
+/** Atende um pedido da ponte: POST /api/argus?caminho=report/desempenhoresumido */
+export const atenderArgus = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
   try {
     if (req.method !== 'POST') throw new ErroArgus('Use POST.', 405);
-    const caminho = (req.url ?? '').replace(/^\//, '').split('?')[0];
+    const caminho = new URL(req.url ?? '/', 'http://local').searchParams.get('caminho') ?? '';
     const token = String(req.headers['x-argus-token'] ?? '').trim();
     const base = String(req.headers['x-argus-url'] ?? '').trim() || URL_PADRAO;
-    const corpo = JSON.parse((await lerCorpo(req)) || '{}');
+    const corpo = await corpoDoPedido(req);
 
     const dados = await chamarArgus(base, caminho, corpo, token);
     responder(res, 200, caminho === 'cmd/listarusuarios' ? limparUsuarios(dados) : dados);
@@ -165,13 +175,13 @@ const atender = async (req: IncomingMessage, res: ServerResponse) => {
   }
 };
 
-/** Plugin do Vite: atende /api/argus/* no npm run dev e no npm run preview */
+/** Plugin do Vite: atende /api/argus no npm run dev e no npm run preview */
 export const argusProxy = (): Plugin => ({
   name: 'benhermes-argus-proxy',
   configureServer(server) {
-    server.middlewares.use('/api/argus', (req, res) => void atender(req, res));
+    server.middlewares.use('/api/argus', (req, res) => void atenderArgus(req, res));
   },
   configurePreviewServer(server) {
-    server.middlewares.use('/api/argus', (req, res) => void atender(req, res));
+    server.middlewares.use('/api/argus', (req, res) => void atenderArgus(req, res));
   },
 });
