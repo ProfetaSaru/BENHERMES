@@ -8,6 +8,7 @@ import './styles/navigation.css';
 import './styles/templates.css';
 import './styles/history.css';
 import './styles/formatter.css';
+import './styles/escala.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

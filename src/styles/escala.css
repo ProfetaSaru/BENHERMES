@@ -1,0 +1,65 @@
+/* ==========================================================================
+   ESCALA DE BASES — ATIVO 2
+   Reaproveita os cards, tabelas e botões do formatador (formatter.css);
+   aqui ficam só os detalhes próprios da escala.
+   ========================================================================== */
+
+.escala-sorteio-grid {
+  display: grid;
+  grid-template-columns: minmax(200px, 260px) 1fr;
+  gap: 16px;
+}
+
+.escala-cadastro-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 760px) {
+  .escala-sorteio-grid,
+  .escala-cadastro-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.escala-textarea {
+  min-height: 180px;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+/* Pessoa marcada como ausente: riscada e em vermelho */
+.escala-pessoa-pill.ausente {
+  background: var(--red-soft);
+  border-color: var(--red);
+  color: var(--red);
+  text-decoration: line-through;
+}
+
+.escala-aviso {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--amber-soft);
+  border: 1px solid var(--amber);
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+
+.escala-aviso svg {
+  color: var(--amber);
+  flex-shrink: 0;
+}
+
+.escala-linha-destaque td {
+  background: var(--yellow-soft);
+}
+
+/* Botões lado a lado nos cabeçalhos (o .btn-primary do app ocupa a largura toda) */
+.escala-acoes .btn {
+  width: auto;
+}
