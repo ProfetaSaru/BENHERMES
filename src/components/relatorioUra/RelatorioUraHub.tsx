@@ -15,7 +15,7 @@ import {
   CloudDownload,
 } from 'lucide-react';
 import { NotificationType } from '../../types/task';
-import { ArquivoCarregado, ResultadoUra, TipoExportacao } from '../../types/relatorioUra';
+import { ArquivoCarregado, RegistroHistoricoUra, ResultadoUra, TipoExportacao } from '../../types/relatorioUra';
 import { useRelatorioUra } from '../../hooks/useRelatorioUra';
 import { diaDaSemana, diaUtilAnterior, hojeIso, isoParaBr, normalizarNome } from '../../utils/calendario';
 import { baixarTexto } from '../../utils/csvTexto';
@@ -31,7 +31,7 @@ import {
   tipoDeConfiguracao,
   tipoDoArquivo,
 } from '../../utils/uraLeitura';
-import { calcularRelatorio, metasAtivas } from '../../utils/uraCalculo';
+import { calcularRelatorio, metasAtivas, metasAutomaticas, registrarNoHistorico } from '../../utils/uraCalculo';
 import { baixarDoArgus, diagnosticoLeads } from '../../utils/argusApi';
 import { baixarPlanilha } from '../../utils/planilhaColorida';
 import { gerarPlanilhaUra, historicoUraParaCsv, htmlDoRelatorio, textoDaCelula, textoDoRelatorio } from '../../utils/uraExportacao';
@@ -75,7 +75,10 @@ export const RelatorioUraHub: React.FC<RelatorioUraHubProps> = ({ onNotify }) =>
   const [isBaixandoArgus, setIsBaixandoArgus] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const metas = metasAtivas(ura.metas);
+  // Metas preenchidas valem; sem nenhuma, as cores são automáticas (terços do dia)
+  const metasPreenchidas = metasAtivas(ura.metas);
+  const coresAutomaticas = Object.keys(metasPreenchidas).length === 0;
+  const metas = coresAutomaticas ? (resultado ? metasAutomaticas(resultado.linhas) : {}) : metasPreenchidas;
 
   // Arquivos ou data mudaram: o relatório na tela não vale mais
   useEffect(() => setResultado(null), [arquivos, dia]);
@@ -197,19 +200,70 @@ export const RelatorioUraHub: React.FC<RelatorioUraHubProps> = ({ onNotify }) =>
     setArquivos((atuais) => atuais.filter((a) => a.id !== id));
   };
 
-  const handleGerar = () => {
+  /**
+   * Se o dia útil anterior não estiver no histórico, monta a comparação sozinho:
+   * leads pela API do Argus (se houver token) e vendas/clientes pela esteira carregada,
+   * que traz vários dias. O custo fica sem comparação (a tarifação é só do dia).
+   * Esses números servem só para as setas: não são gravados no histórico.
+   */
+  const montarDiaAnterior = async (): Promise<{ registros: RegistroHistoricoUra[]; aviso: string } | null> => {
+    const anterior = diaUtilAnterior(dia);
+    if (ura.historico.some((r) => r.data === anterior)) return null;
+
+    const esteiras = arquivos.filter(
+      (a) => a.tipo === 'esteira' && a.linhas.some((l) => converterData(l['DATA/HORA']) === anterior)
+    );
+    let daApi: ArquivoCarregado[] = [];
+    if (ura.argus.token.trim()) {
+      try {
+        daApi = (await baixarDoArgus(anterior, ura.argus)).filter((a) => a.tipo !== 'operadores');
+      } catch {
+        daApi = [];
+      }
+    }
+    if (esteiras.length === 0 && daApi.length === 0) return null;
+
+    const parcial = calcularRelatorio({
+      dia: anterior,
+      arquivos: [...esteiras, ...daApi],
+      cadastro: ura.cadastro,
+      apelidos: ura.apelidos,
+      historico: [],
+      diaAnterior: diaUtilAnterior(anterior),
+    });
+    const registros = registrarNoHistorico([], parcial).map((r) => ({
+      ...r,
+      leads: daApi.length > 0 ? r.leads : NaN,
+      vendas: esteiras.length > 0 ? r.vendas : NaN,
+      custo: NaN,
+    }));
+    const partes = [daApi.length > 0 ? 'leads da API do Argus' : '', esteiras.length > 0 ? 'vendas da esteira' : ''].filter(Boolean);
+    return {
+      registros,
+      aviso: `Comparação com ${isoParaBr(anterior)} montada automaticamente (${partes.join(' e ')}), porque esse dia não está no histórico. O custo fica sem comparação; para ter tudo, gere também o relatório de ${isoParaBr(anterior)}.`,
+    };
+  };
+
+  const handleGerar = async () => {
     if (ura.cadastro.length === 0) {
       onNotify('Carregue a exportação de OPERADORES do Argus: ela forma o cadastro das equipes.', 'error');
       return;
     }
+    const diaAnterior = await montarDiaAnterior();
     const novo = calcularRelatorio({
       dia,
       arquivos,
       cadastro: ura.cadastro,
       apelidos: ura.apelidos,
-      historico: ura.historico,
+      historico: [...ura.historico, ...(diaAnterior?.registros ?? [])],
       diaAnterior: diaUtilAnterior(dia),
     });
+    if (diaAnterior) novo.avisos.unshift(diaAnterior.aviso);
+    if (coresAutomaticas) {
+      novo.avisos.push(
+        'Cores automáticas: cada indicador foi dividido em terços entre os operadores do dia (verde = melhor terço, vermelho = pior). Preencha as Metas em Configurações para usar limites fixos.'
+      );
+    }
     ura.salvarRelatorio(novo);
     setResultado(novo);
     onNotify(`Relatório de ${isoParaBr(dia)} gerado e salvo no histórico.`, 'success');
@@ -505,6 +559,11 @@ export const RelatorioUraHub: React.FC<RelatorioUraHubProps> = ({ onNotify }) =>
               vendas, menos custo); vermelho é ruim.
             </p>
           )}
+          <p className="ura-ajuda">
+            {coresAutomaticas
+              ? 'Cores automáticas: cada indicador dividido em terços entre os operadores do dia (verde = melhor terço, amarelo = meio, vermelho = pior). Para usar limites fixos, preencha as Metas em Configurações.'
+              : 'Cores pelas Metas preenchidas em Configurações: verde atingiu, amarelo no meio, vermelho abaixo do limite.'}
+          </p>
           <UraConferencia resultado={resultado} cadastro={ura.cadastro} onVincular={handleVincular} />
         </>
       )}

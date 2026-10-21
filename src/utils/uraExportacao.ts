@@ -31,16 +31,20 @@ export const COLUNAS: ColunaRelatorio[] = [
   { titulo: 'PRODUÇÃO/LEAD', chave: 'prod_lead', formato: 'reais' },
 ];
 
-/** Colunas de comparação (só quando há relatório anterior no histórico) */
-export const colunasDoRelatorio = (dataAnterior: string | null): ColunaRelatorio[] => {
+/**
+ * Colunas do relatório. As de comparação só aparecem quando há relatório anterior, e cada
+ * uma só se tiver algum número (ex.: sem a tarifação do dia anterior, não há "CUSTO vs").
+ */
+export const colunasDoRelatorio = (resultado: ResultadoUra): ColunaRelatorio[] => {
+  const { dataAnterior, linhas } = resultado;
   if (!dataAnterior) return COLUNAS;
   const rotulo = isoParaBr(dataAnterior).slice(0, 5);
-  return [
-    ...COLUNAS,
+  const comparacao: ColunaRelatorio[] = [
     { titulo: `LEADS vs ${rotulo}`, chave: 'd_leads', formato: 'dif_inteiro' },
     { titulo: `VENDAS vs ${rotulo}`, chave: 'd_vendas', formato: 'dif_reais' },
     { titulo: `CUSTO vs ${rotulo}`, chave: 'd_custo', formato: 'dif_reais' },
   ];
+  return [...COLUNAS, ...comparacao.filter((c) => linhas.some((l) => l[c.chave] !== undefined))];
 };
 
 /** Leads e vendas subindo é bom; custo subindo é ruim */
@@ -141,7 +145,9 @@ export const estiloDaCelula = (
   if (subirEBom !== undefined && valor && linha.tipo !== 'total_geral') {
     fonte = valor > 0 === subirEBom ? CORES.verdeTexto : CORES.vermelhoTexto;
   }
-  if (linha.tipo === 'operador' && coluna.chave in metas) {
+  // TMA, TMO e custo por CPF zerados: não houve o que medir, então não recebem cor
+  const semMedida = !valor && ['tma', 'tmo', 'custo_cpf'].includes(coluna.chave);
+  if (linha.tipo === 'operador' && coluna.chave in metas && !semMedida) {
     const cor = corDaMeta(valor, coluna.chave as ChaveIndicador, metas[coluna.chave as ChaveIndicador]);
     if (cor) [fundo, fonte, negrito] = [...SEMAFORO[cor], true];
   }
@@ -159,7 +165,7 @@ export const estiloDaCelula = (
  */
 export const gerarPlanilhaUra = async (resultado: ResultadoUra, metas: Metas): Promise<Workbook> => {
   const livro = await novaPlanilha();
-  const colunas = colunasDoRelatorio(resultado.dataAnterior);
+  const colunas = colunasDoRelatorio(resultado);
   const ws = livro.addWorksheet('Relatório', {
     views: [{ state: 'frozen', xSplit: 2, ySplit: 3, showGridLines: false }],
     pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
@@ -319,7 +325,7 @@ const estiloHtml = ({ fundo, fonte, negrito }: EstiloCelula, extra = ''): string
 
 /** HTML do relatório com as cores da planilha modelo (o Excel e o Outlook mantêm as cores ao colar) */
 export const htmlDoRelatorio = (resultado: ResultadoUra, metas: Metas): string => {
-  const colunas = colunasDoRelatorio(resultado.dataAnterior);
+  const colunas = colunasDoRelatorio(resultado);
   const cabecalho = { fundo: CORES.azul, fonte: CORES.branco, negrito: true };
   const linhas = resultado.linhas.map((linha, i) => {
     const celulas = [
@@ -343,7 +349,7 @@ export const htmlDoRelatorio = (resultado: ResultadoUra, metas: Metas): string =
 
 /** Mesmo conteúdo em texto, separado por tabulação (cola em colunas no Excel) */
 export const textoDoRelatorio = (resultado: ResultadoUra): string => {
-  const colunas = colunasDoRelatorio(resultado.dataAnterior);
+  const colunas = colunasDoRelatorio(resultado);
   return [
     ['OPERADORES', ...colunas.map((c) => c.titulo)],
     ...resultado.linhas.map((l) => [l.nome, ...colunas.map((c) => textoDaCelula(l[c.chave], c.formato))]),
