@@ -12,6 +12,8 @@ interface UraConfiguracoesProps {
   historico: RegistroHistoricoUra[];
   argus: ConfigArgus;
   onArgusChange: (argus: ConfigArgus) => void;
+  onDiagnosticoLeads: () => void;
+  diaDoRelatorio: string;
   onApelidosChange: (apelidos: Apelido[]) => void;
   onMetasChange: (metas: Metas) => void;
   onExportarHistorico: () => void;
@@ -38,6 +40,8 @@ export const UraConfiguracoes: React.FC<UraConfiguracoesProps> = ({
   historico,
   argus,
   onArgusChange,
+  onDiagnosticoLeads,
+  diaDoRelatorio,
   onApelidosChange,
   onMetasChange,
   onExportarHistorico,
@@ -134,8 +138,20 @@ export const UraConfiguracoes: React.FC<UraConfiguracoesProps> = ({
           />
         </div>
         <div className="formatter-field-sample ura-quebra">
-          O token fica só neste navegador e vai direto do seu computador para o Argus (pela ponte local do{' '}
-          <span>npm run dev</span>). Não compartilhe a tela com ele visível. A tarifação não existe na API: continua manual.
+          O token fica só neste navegador; a consulta passa pela ponte do BENHERMES (no site, a função da Vercel),
+          que não grava nada. Não compartilhe a tela com ele visível. A tarifação não existe na API: continua manual.
+        </div>
+        <div className="formatter-actions-buttons escala-acoes" style={{ marginTop: 8 }}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={onDiagnosticoLeads}
+            disabled={!argus.token.trim() || !diaDoRelatorio}
+            title="Baixa um CSV com os leads de cada operador em cada filtro da API, para comparar com a exportação manual"
+          >
+            <FileDown size={16} />
+            Diagnóstico dos leads ({diaDoRelatorio ? isoParaBr(diaDoRelatorio) : '...'})
+          </button>
         </div>
       </div>
 

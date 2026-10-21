@@ -158,62 +158,99 @@
   color: var(--red) !important;
 }
 
-/* Tabela no visual da planilha modelo (cores fixas da empresa) */
+/* Tabela no visual da planilha modelo (cores fixas da empresa, iguais no tema claro e escuro) */
 .ura-tabela-moldura {
-  background: #ffffff;
-  border: 6px solid #0b2a5b;
+  background: #0b2a5b;
+  padding: 6px 10px 12px;
   border-radius: var(--radius-md);
-  overflow: hidden;
   box-shadow: var(--shadow-sm);
+  overflow: hidden;
 }
 
+.ura-tabela-moldura .formatter-table-scroll {
+  background: #ffffff;
+}
+
+/* Título: Arial grande, azul sobre amarelo */
 .ura-tabela-titulo {
   text-align: center;
-  font-weight: 800;
-  font-size: 1.05rem;
+  font-family: Arial, Helvetica, sans-serif;
+  font-weight: 700;
+  font-size: 1.45rem;
+  letter-spacing: 0;
   color: #0b2a5b;
-  padding: 10px;
-  background: #ffffff;
+  background: #ffe600;
+  padding: 10px 12px;
 }
 
 .ura-tabela {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.8rem;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 13px;
   color: #000000;
 }
 
+/* Cabeçalho: branco sobre azul */
 .ura-tabela th {
   background: #0b2a5b;
   color: #ffffff;
+  font-family: Arial, Helvetica, sans-serif;
   font-weight: 700;
-  padding: 10px 8px;
+  font-size: 13px;
+  padding: 8px 10px;
+  height: 46px;
   text-align: center;
-  font-size: 0.75rem;
   line-height: 1.2;
-  border: 1px solid #1d3f7a;
   white-space: normal;
+  border: 0;
 }
 
 .ura-tabela th:first-child {
-  text-align: left;
-  min-width: 200px;
+  min-width: 260px;
 }
 
 .ura-tabela td {
-  padding: 5px 8px;
-  border-bottom: 1px solid #e3e8f0;
+  height: 25px;
+  padding: 3px 10px;
+  border-bottom: 1px solid #bfbfbf;
   white-space: nowrap;
-}
-
-.ura-tabela td.ura-numero {
-  text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
+/* Nomes com recuo; tempos e quantidades no centro; reais à direita */
+.ura-tabela td:first-child {
+  text-align: left;
+  padding-left: 14px;
+}
+
+.ura-tabela td.ura-centro {
+  text-align: center;
+}
+
+.ura-tabela td.ura-reais {
+  text-align: right;
+}
+
+/* Separador amarelo entre os operadores e as equipes */
 .ura-linha-separador td {
-  height: 8px;
-  padding: 0;
+  height: 22px;
+  border-bottom: 0;
+}
+
+/* Total dos operadores: borda azul; total geral: borda amarela; sem derivação: itálico */
+.ura-linha-total_operadores td {
+  border-top: 2px solid #0b2a5b;
+  border-bottom: 2px solid #0b2a5b;
+}
+
+.ura-linha-total_geral td {
+  border-top: 2px solid #ffe600;
+  border-bottom: 2px solid #ffe600;
+}
+
+.ura-linha-sem_derivacao td {
+  font-style: italic;
 }
 
 /* Conferência */

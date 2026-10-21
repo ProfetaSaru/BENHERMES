@@ -15,7 +15,8 @@ const paraCss = ({ fundo, fonte, negrito }: EstiloCelula): React.CSSProperties =
 });
 
 /**
- * O relatório como na planilha modelo: mesmas cores, zebra, semáforo das metas
+ * O relatório com o mesmo visual da planilha modelo (Relatorio_Produtividade_URA_Automatico.xlsx):
+ * moldura azul, título amarelo, Arial, zebra, linhas finas, bordas dos totais, semáforo das metas
  * e setas de comparação. As cores são as da empresa, então não mudam com o tema.
  */
 export const UraTabela: React.FC<UraTabelaProps> = ({ resultado, metas }) => {
@@ -39,7 +40,11 @@ export const UraTabela: React.FC<UraTabelaProps> = ({ resultado, metas }) => {
               <tr key={`${linha.tipo}-${linha.nome}-${i}`} className={`ura-linha-${linha.tipo}`}>
                 <td style={paraCss(estiloDaCelula(linha, i, null, metas))}>{linha.nome}</td>
                 {colunas.map((coluna) => (
-                  <td key={coluna.chave} className="ura-numero" style={paraCss(estiloDaCelula(linha, i, coluna, metas))}>
+                  <td
+                    key={coluna.chave}
+                    className={coluna.formato === 'reais' || coluna.formato === 'dif_reais' ? 'ura-reais' : 'ura-centro'}
+                    style={paraCss(estiloDaCelula(linha, i, coluna, metas))}
+                  >
                     {textoDaCelula(linha[coluna.chave], coluna.formato)}
                   </td>
                 ))}

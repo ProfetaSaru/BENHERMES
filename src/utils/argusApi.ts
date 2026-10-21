@@ -67,8 +67,17 @@ const chamar = async (caminho: string, corpo: unknown, config: ConfigArgus): Pro
 
 const periodoDoDia = (dia: string) => ({ periodoInicial: `${dia}T00:00:00${FUSO}`, periodoFinal: `${dia}T23:59:59${FUSO}` });
 
-const buscarDesempenho = async (dia: string, config: ConfigArgus, idGrupo?: number): Promise<Registro[]> => {
-  const corpo = { ...periodoDoDia(dia), ...(idGrupo !== undefined ? { idGrupoUsuario: idGrupo } : {}) };
+const buscarDesempenho = async (
+  dia: string,
+  config: ConfigArgus,
+  idGrupo?: number,
+  idCampanha?: number
+): Promise<Registro[]> => {
+  const corpo = {
+    ...periodoDoDia(dia),
+    ...(idGrupo !== undefined ? { idGrupoUsuario: idGrupo } : {}),
+    ...(idCampanha !== undefined ? { idCampanha } : {}),
+  };
   const dados = await chamar('report/desempenhoresumido', corpo, config);
   return dados.desempenhosResumidos ?? [];
 };
@@ -236,4 +245,72 @@ export const baixarDoArgus = async (dia: string, config: ConfigArgus): Promise<A
     arquivo(`Argus API — leads URA ${isoParaBr(dia)}`, 'leads', ['Data', 'Operador', 'Supervisor', 'Leads. Atend.'], linhasLeads(leads, dia, supervisores)),
     arquivo('Argus API — operadores', 'operadores', ['Cód. Usuário', 'Nome', '[Campanha] Grupo Associado', 'Supervisor(es)', 'Status'], linhasOperadores(usuarios)),
   ];
+};
+
+// ---------------------------------------------------------------------------
+// Diagnóstico dos leads
+// ---------------------------------------------------------------------------
+
+const escaparCampo = (valor: unknown): string => {
+  const texto = String(valor ?? '');
+  return /[;"\r\n]/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto;
+};
+
+/**
+ * CSV para descobrir qual filtro da API bate com a exportação manual de leads da URA.
+ * Para cada operador: atendimentos filtrando pelo GRUPO da URA (regra atual), pela
+ * CAMPANHA do grupo da URA e sem filtro (geral). No fim, os nomes dos campos que a API
+ * devolve e quantas linhas vieram em cada consulta. Só nomes de operadores e números:
+ * nada de clientes nem CPF.
+ */
+export const diagnosticoLeads = async (dia: string, config: ConfigArgus): Promise<string> => {
+  if (!config.token.trim()) throw new Error('Cole o token da API do Argus nas configurações.');
+
+  const grupos = await buscarGrupos(config);
+  const gruposUra = grupos.filter((g) => normalizarNome(g.grupoUsuarioDesc).includes(normalizarNome(GRUPO_URA)));
+  if (gruposUra.length === 0) throw new Error(`Não encontrei o grupo operacional '${GRUPO_URA}' no Argus.`);
+  const campanhas = [...new Set(gruposUra.map((g) => Number(g.idCampanha)).filter((id) => !Number.isNaN(id)))];
+
+  const geral = await buscarDesempenho(dia, config);
+  const porGrupo = await Promise.all(gruposUra.map((g) => buscarDesempenho(dia, config, Number(g.idGrupoUsuario))));
+  const porCampanha = await Promise.all(campanhas.map((id) => buscarDesempenho(dia, config, undefined, id)));
+
+  const todos = [...geral, ...porGrupo.flat(), ...porCampanha.flat()];
+  const chaves = todos.length > 0 ? Object.keys(todos[0]) : [];
+  const campoNome = acharCampo(chaves, 'operador');
+  const campoQtde = acharCampo(chaves, 'leads');
+  if (!campoNome || !campoQtde) throw new Error(`A API não trouxe nome e atendimentos. Campos: ${chaves.join(', ')}`);
+
+  // Soma os atendimentos por operador em cada consulta
+  const soma = (registros: Registro[]) => {
+    const mapa = new Map<string, number>();
+    registros.forEach((r) => {
+      const nome = String(r[campoNome] ?? '').trim();
+      mapa.set(nome, (mapa.get(nome) ?? 0) + numero(r[campoQtde]));
+    });
+    return mapa;
+  };
+  const [mGrupo, mCampanha, mGeral] = [soma(porGrupo.flat()), soma(porCampanha.flat()), soma(geral)];
+  // Se cada linha do geral disser em que grupo foi o atendimento, soma só as linhas da URA
+  const campoGrupo = chaves.find((k) => /grupo/i.test(k) && /desc|nome/i.test(k));
+  const mLinhasUra = campoGrupo
+    ? soma(geral.filter((r) => normalizarNome(r[campoGrupo]).includes(normalizarNome(GRUPO_URA))))
+    : null;
+  const nomes = [...new Set([...mGeral.keys(), ...mGrupo.keys(), ...mCampanha.keys()])].sort();
+  const mapas = [mGrupo, mCampanha, mGeral, ...(mLinhasUra ? [mLinhasUra] : [])];
+
+  const linhas = [
+    `Diagnóstico dos leads da URA — ${isoParaBr(dia)}`,
+    `Campo de atendimentos usado: ${campoQtde}`,
+    `Grupo(s) da URA: ${gruposUra.map((g) => `${g.grupoUsuarioDesc} (grupo ${g.idGrupoUsuario}, campanha ${g.idCampanha} ${g.campanhaDesc ?? ''})`).join(' | ')}`,
+    '',
+    'Operador;Filtro por grupo URA (atual);Filtro por campanha;Sem filtro (geral)' +
+      (mLinhasUra ? `;Geral só nas linhas do grupo URA (campo ${campoGrupo})` : ''),
+    ...nomes.map((n) => [n, ...mapas.map((m) => m.get(n) ?? 0)].map(escaparCampo).join(';')),
+    ['TOTAL', ...mapas.map((m) => [...m.values()].reduce((s, v) => s + v, 0))].join(';'),
+    '',
+    `Linhas devolvidas: grupo ${porGrupo.flat().length}; campanha ${porCampanha.flat().length}; geral ${geral.length}`,
+    `Campos de cada linha do desempenho: ${chaves.join(', ')}`,
+  ];
+  return linhas.join('\r\n');
 };
