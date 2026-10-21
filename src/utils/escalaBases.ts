@@ -12,22 +12,20 @@ import { bordaFina, novaPlanilha, pintar } from './planilhaColorida';
 import type { Workbook } from 'exceljs';
 
 /**
- * Escala diária de bases do Ativo 2.
+ * Escala diária de bases do Ativo 2, em RODÍZIO.
  *
- * Mesmas regras do escala_bases.py do BENZAITEN (e da antiga planilha Escala_Bases_Ativo2.xlsm):
- *  - cada base recebe um responsável;
- *  - com menos pessoas que bases, algumas pessoas ficam com uma base a mais (nunca duas a mais);
- *  - com mais pessoas que bases, algumas ficam sem base (aviso);
- *  - ninguém repete a mesma base dos últimos JANELA_SORTEIOS sorteios; se não houver
- *    combinação possível, a janela diminui e um aviso aparece;
- *  - ausentes ficam fora do sorteio.
+ * Mesmas regras do escala_bases.py do BENZAITEN e da macro da Escala_Bases_Ativo2.xlsm:
+ *  - a cada sorteio, cada pessoa anda UMA base para frente, na ordem do cadastro
+ *    (NOTA 0 -> NOTA 1 -> ... -> volta para a primeira): ninguém repete uma base
+ *    antes de passar por todas;
+ *  - o ponto de partida é o último sorteio completo do histórico (todas as bases
+ *    preenchidas, ninguém repetido); sem histórico, começa pela ordem do cadastro;
+ *  - ausentes ficam fora; a base deles vai para quem está com menos bases (de preferência
+ *    quem não teve essa base no sorteio anterior) e, quando voltam, retomam sua posição;
+ *  - com menos pessoas que bases, algumas ficam com uma base a mais (nunca duas a mais);
+ *  - com mais pessoas que bases, quem fica sem base também entra no rodízio;
+ *  - pessoa nova no cadastro entra no fim da roda.
  */
-
-/** Quantos sorteios anteriores são olhados para evitar repetir a mesma base */
-export const JANELA_SORTEIOS = 2;
-
-/** Quantas vezes embaralhar antes de desistir de uma janela (igual à macro) */
-const TENTATIVAS = 1000;
 
 /** Cabeçalho do histórico em CSV, igual ao historico/historico_escalas.csv do BENZAITEN */
 const CABECALHO_HISTORICO = 'Data;Base;Responsavel';
@@ -61,107 +59,120 @@ export const textoParaLista = (texto: string): string[] => limparLista(texto.spl
 // Sorteio
 // ---------------------------------------------------------------------------
 
-/** Embaralhamento de Fisher-Yates. `aleatorio` permite repetir o resultado nos testes. */
-const embaralhar = <T,>(lista: T[], aleatorio: () => number): T[] => {
-  const copia = [...lista];
-  for (let i = copia.length - 1; i > 0; i--) {
-    const j = Math.floor(aleatorio() * (i + 1));
-    [copia[i], copia[j]] = [copia[j], copia[i]];
-  }
-  return copia;
-};
+/** Resto da divisão sempre positivo (o % do JavaScript devolve negativo para números negativos) */
+const modulo = (a: number, b: number): number => ((a % b) + b) % b;
 
 /**
- * Os últimos `quantidade` sorteios ANTES da data, como mapas {base: pessoa} normalizados.
- * Conta sorteios registrados (não dias do calendário): o fim de semana não "apaga" a sexta.
+ * Ordem do rodízio (roda) e quantos passos andar até a data.
+ *
+ * Procura, do mais recente para o mais antigo, o último sorteio ANTES da data que esteja
+ * completo: todas as bases preenchidas e ninguém repetido (quando há pessoas suficientes).
+ * Dias com ausência não servem de partida, porque alguém cobriu outra base.
+ * Sem sorteio de partida: roda = ordem do cadastro e passos = 0.
  */
-export const sorteiosAnteriores = (
+export const pontoDePartida = (
   historico: EscalaRegistro[],
-  data: string,
-  quantidade: number
-): Map<string, string>[] => {
-  const datas = [...new Set(historico.filter((r) => r.data < data).map((r) => r.data))]
-    .sort()
-    .reverse()
-    .slice(0, quantidade);
+  bases: string[],
+  pessoas: string[],
+  data: string
+): { roda: string[]; passos: number } => {
+  const oficiais = new Map(pessoas.map((p) => [normalizarNome(p), p]));
+  const datas = [...new Set(historico.filter((r) => r.data < data).map((r) => r.data))].sort().reverse();
 
-  return datas.map(
-    (d) =>
-      new Map(
-        historico
-          .filter((r) => r.data === d)
-          .map((r) => [normalizarNome(r.base), normalizarNome(r.responsavel)] as [string, string])
-      )
-  );
-};
+  for (let i = 0; i < datas.length; i++) {
+    const doDia = new Map(
+      historico
+        .filter((r) => r.data === datas[i])
+        .map((r) => [normalizarNome(r.base), normalizarNome(r.responsavel)] as [string, string])
+    );
+    const nomes = bases.map((b) => doDia.get(normalizarNome(b)) ?? '');
+    const completo = nomes.every(Boolean) && (new Set(nomes).size === nomes.length || pessoas.length < bases.length);
+    if (!completo) continue;
 
-const repeteBase = (atribuicoes: EscalaAtribuicao[], anteriores: Map<string, string>[]): boolean => {
-  return atribuicoes.some(({ base, responsavel }) =>
-    anteriores.some((sorteio) => sorteio.get(normalizarNome(base)) === normalizarNome(responsavel))
-  );
+    // Quem saiu do cadastro sai da roda; quem entrou vai para o fim dela
+    const roda = [...new Set(nomes.filter((n) => oficiais.has(n)).map((n) => oficiais.get(n)!))];
+    roda.push(...pessoas.filter((p) => !roda.includes(p)));
+    return { roda, passos: i + 1 };
+  }
+  return { roda: [...pessoas], passos: 0 };
 };
 
 /**
- * Faz o sorteio e devolve as atribuições (na ordem das bases) e a janela respeitada.
+ * Monta a escala do dia em rodízio. O histórico informado não deve conter a própria data.
  */
-export const sortear = (
+export const rodizio = (
   bases: string[],
   pessoas: string[],
   historico: EscalaRegistro[],
   data: string,
-  janela = JANELA_SORTEIOS,
-  aleatorio: () => number = Math.random
-): { atribuicoes: EscalaAtribuicao[]; janelaUsada: number } => {
+  ausentes: string[] = []
+): { atribuicoes: EscalaAtribuicao[]; avisos: string[] } => {
   if (bases.length === 0) throw new Error('Nenhuma base cadastrada.');
-  if (pessoas.length === 0) throw new Error('Nenhuma pessoa disponível para o sorteio.');
+  const fora = new Set(ausentes.map(normalizarNome));
+  const presentes = pessoas.filter((p) => !fora.has(normalizarNome(p)));
+  if (presentes.length === 0) throw new Error('Nenhuma pessoa disponível para o sorteio.');
 
-  // Tenta com a janela completa; se não der, diminui até 0 (sem restrição)
-  for (let janelaAtual = janela; janelaAtual >= 0; janelaAtual--) {
-    const anteriores = sorteiosAnteriores(historico, data, janelaAtual);
+  const { roda, passos } = pontoDePartida(historico, bases, pessoas, data);
+  const m = roda.length;
+  // Cada passo leva cada pessoa para a base seguinte
+  const plano = bases.map((_, j) => roda[modulo(j - passos, m)]);
 
-    for (let tentativa = 0; tentativa < TENTATIVAS; tentativa++) {
-      const embaralhadas = embaralhar(pessoas, aleatorio);
-      // Uma vaga por base. Se faltar gente, volta para o começo da lista,
-      // então ninguém fica com mais de 1 base a mais que outra pessoa.
-      const fila = bases.map((_, i) => embaralhadas[i % embaralhadas.length]);
-      // Embaralha de novo para quem tem 2 bases não pegar sempre as mesmas posições
-      const ordem = embaralhar(fila, aleatorio);
-      const atribuicoes = bases.map((base, i) => ({ base, responsavel: ordem[i] }));
+  // Sorteio anterior, para evitar dar ao substituto a base que ele acabou de ter
+  const anteriores = [...new Set(historico.filter((r) => r.data < data).map((r) => r.data))].sort();
+  const ultimo = anteriores[anteriores.length - 1];
+  const ontem = new Map(
+    historico
+      .filter((r) => r.data === ultimo)
+      .map((r) => [normalizarNome(r.base), normalizarNome(r.responsavel)] as [string, string])
+  );
 
-      if (!repeteBase(atribuicoes, anteriores)) {
-        return { atribuicoes, janelaUsada: janelaAtual };
-      }
-    }
+  const escolha: (string | null)[] = plano.map((p) => (presentes.includes(p) ? p : null));
+  const contagem = new Map(presentes.map((p) => [p, escolha.filter((e) => e === p).length]));
+  const avisos: string[] = [];
+
+  // Base de quem faltou: para quem está com menos bases; de preferência quem não teve
+  // essa base no sorteio anterior; depois, quem vem logo atrás no rodízio
+  bases.forEach((base, j) => {
+    if (escolha[j]) return;
+    const posicao = roda.indexOf(plano[j]);
+    const nota = (p: string) => [
+      contagem.get(p)!,
+      ontem.get(normalizarNome(base)) === normalizarNome(p) ? 1 : 0,
+      modulo(roda.indexOf(p) - posicao, m),
+    ];
+    const substituto = [...presentes].sort((a, b) => {
+      const [na, nb] = [nota(a), nota(b)];
+      return na[0] - nb[0] || na[1] - nb[1] || na[2] - nb[2];
+    })[0];
+    escolha[j] = substituto;
+    contagem.set(substituto, contagem.get(substituto)! + 1);
+    avisos.push(`${plano[j]} está ausente: ${base} ficou com ${substituto}.`);
+  });
+
+  const atribuicoes = bases.map((base, j) => ({ base, responsavel: escolha[j]! }));
+  const repetidos = atribuicoes
+    .filter((a) => ontem.get(normalizarNome(a.base)) === normalizarNome(a.responsavel))
+    .map((a) => `${a.responsavel} (${a.base})`);
+  if (repetidos.length > 0) {
+    avisos.push(`Por causa das ausências, repetiu a base do sorteio anterior: ${repetidos.join(', ')}.`);
   }
-
-  // Só chega aqui se nem sem restrição funcionar, o que não deve acontecer
-  throw new Error('Não foi possível fazer o sorteio.');
+  return { atribuicoes, avisos };
 };
 
 /**
- * Sorteio completo do dia: tira os ausentes, sorteia e monta os avisos.
- * O histórico informado não deve conter a própria data (quem chama decide se substitui).
+ * Escala completa do dia: rodízio, ausentes e avisos.
+ * O histórico pode conter a própria data (ela é ignorada: sortear de novo dá o mesmo resultado).
  */
 export const realizarSorteio = (
   cadastro: EscalaCadastro,
   historico: EscalaRegistro[],
   data: string,
-  ausentes: string[],
-  aleatorio: () => number = Math.random
+  ausentes: string[]
 ): ResultadoSorteio => {
   const fora = new Set(ausentes.map(normalizarNome));
   const disponiveis = cadastro.pessoas.filter((p) => !fora.has(normalizarNome(p)));
   const ausentesCadastrados = cadastro.pessoas.filter((p) => fora.has(normalizarNome(p)));
   const historicoSemData = historico.filter((r) => r.data !== data);
-
-  const { atribuicoes, janelaUsada } = sortear(
-    cadastro.bases,
-    disponiveis,
-    historicoSemData,
-    data,
-    JANELA_SORTEIOS,
-    aleatorio
-  );
 
   const avisos: string[] = [];
   const feriado = feriadoNacional(data);
@@ -172,21 +183,23 @@ export const realizarSorteio = (
       `${disponiveis.length} pessoa(s) para ${cadastro.bases.length} base(s): alguém fica com mais de uma base.`
     );
   }
-  if (janelaUsada === 0) {
-    avisos.push('Não havia como evitar que alguém repetisse a base do sorteio anterior.');
-  } else if (janelaUsada < JANELA_SORTEIOS) {
-    avisos.push(
-      `Não havia combinação sem repetir base nos últimos ${JANELA_SORTEIOS} sorteios; só o último foi respeitado.`
-    );
-  }
+
+  const { atribuicoes, avisos: avisosRodizio } = rodizio(
+    cadastro.bases,
+    cadastro.pessoas,
+    historicoSemData,
+    data,
+    ausentesCadastrados
+  );
+  avisos.push(...avisosRodizio);
 
   const comBase = new Set(atribuicoes.map((a) => a.responsavel));
   const semBase = disponiveis.filter((p) => !comBase.has(p));
   if (semBase.length > 0) {
-    avisos.push(`Mais pessoas que bases; sem base hoje: ${semBase.join(', ')}.`);
+    avisos.push(`Mais pessoas que bases; sem base hoje: ${semBase.join(', ')} (é a vez dele(s) no rodízio).`);
   }
 
-  return { data, atribuicoes, ausentes: ausentesCadastrados, semBase, janelaUsada, avisos };
+  return { data, atribuicoes, ausentes: ausentesCadastrados, semBase, avisos };
 };
 
 /** Histórico com o sorteio do dia (substitui o que já existia na mesma data), ordenado por data */
@@ -290,7 +303,7 @@ export const gerarPlanilhaEscala = async (
   });
   const depois = 5 + resultado.atribuicoes.length + 1;
   ws.getCell(depois, 1).value = `Ausentes: ${resultado.ausentes.length > 0 ? resultado.ausentes.join(', ') : 'nenhum'}`;
-  ws.getCell(depois + 1, 1).value = `Regra: ninguém repetiu a base dos últimos ${resultado.janelaUsada} sorteio(s).`;
+  ws.getCell(depois + 1, 1).value = 'Regra: rodízio — cada pessoa anda uma base para frente a cada sorteio.';
   ws.getColumn(1).width = 38;
   ws.getColumn(2).width = 22;
 

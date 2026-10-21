@@ -30,7 +30,6 @@ export interface ResultadoSorteio {
   atribuicoes: EscalaAtribuicao[];
   ausentes: string[];
   semBase: string[];
-  janelaUsada: number;
   avisos: string[];
 }
 

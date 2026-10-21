@@ -19,7 +19,6 @@ import { NotificationType } from '../../types/task';
 import { ImportacaoEscala, ResultadoSorteio } from '../../types/escala';
 import { useEscalaBases } from '../../hooks/useEscalaBases';
 import {
-  JANELA_SORTEIOS,
   textoParaLista,
   realizarSorteio,
   ultimosSorteios,
@@ -85,7 +84,6 @@ export const EscalaBasesHub: React.FC<EscalaBasesHubProps> = ({ onNotify }) => {
           atribuicoes: historico.filter((r) => r.data === data).map(({ base, responsavel }) => ({ base, responsavel })),
           ausentes: [],
           semBase: [],
-          janelaUsada: JANELA_SORTEIOS,
           avisos: [],
         }
       : null);
@@ -104,7 +102,7 @@ export const EscalaBasesHub: React.FC<EscalaBasesHubProps> = ({ onNotify }) => {
 
     if (jaSorteado) {
       const confirmado = window.confirm(
-        `Já existe sorteio para ${isoParaBr(data)}. Deseja sortear de novo e substituir o resultado?`
+        `Já existe escala para ${isoParaBr(data)}. Deseja refazer (por exemplo, depois de marcar um ausente) e substituir?`
       );
       if (!confirmado) return;
     }
@@ -158,7 +156,7 @@ export const EscalaBasesHub: React.FC<EscalaBasesHubProps> = ({ onNotify }) => {
   const handleLimparHistorico = () => {
     if (historico.length === 0) return;
     const confirmado = window.confirm(
-      'Apagar TODO o histórico de sorteios? Sem ele, a regra de não repetir base recomeça do zero.\n\nDica: exporte o histórico antes.'
+      'Apagar TODO o histórico? Sem ele, o rodízio recomeça pela ordem do cadastro.\n\nDica: exporte o histórico antes.'
     );
     if (!confirmado) return;
     limparHistorico();
@@ -209,9 +207,9 @@ export const EscalaBasesHub: React.FC<EscalaBasesHubProps> = ({ onNotify }) => {
             Escala de Bases — Ativo 2
           </h1>
           <p>
-            Sorteio diário das bases entre os grupos dos supervisores, sem repetir a base dos últimos{' '}
-            {JANELA_SORTEIOS} sorteios. Mesmas regras do BENZAITEN e da antiga planilha de escala, com tudo
-            salvo apenas no seu navegador.
+            Rodízio diário das bases entre os grupos dos supervisores: a cada dia, cada pessoa anda uma base para
+            frente, então ninguém repete uma base antes de passar por todas. Mesmas regras do BENZAITEN e da
+            planilha de escala, com tudo salvo apenas no seu navegador.
           </p>
         </div>
 
@@ -314,7 +312,7 @@ export const EscalaBasesHub: React.FC<EscalaBasesHubProps> = ({ onNotify }) => {
         <div className="formatter-actions-buttons">
           <button type="button" className="btn btn-primary" onClick={handleSortear} disabled={!podeSortear}>
             <Shuffle size={16} />
-            {jaSorteado ? 'Sortear de novo' : 'Sortear bases'}
+            {jaSorteado ? 'Refazer a escala' : 'Gerar escala do dia'}
           </button>
         </div>
       </div>
