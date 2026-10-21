@@ -101,11 +101,14 @@ export const extractSheetData = (
   const rawRows: any[][] = XLSX.utils.sheet_to_json(sheet, {
     header: 1,
     defval: '',
-    blankrows: false,
+    blankrows: true, // mantém as linhas vazias para "Cabeçalho na linha N" bater com a planilha
     raw: false,
   });
 
-  if (rawRows.length === 0) {
+  const hasData = (row: any[]): boolean =>
+    Array.isArray(row) && row.some((cell) => cell !== '' && cell !== null && cell !== undefined);
+
+  if (!rawRows.some(hasData)) {
     return {
       fileName,
       fileSizeBytes,
@@ -129,9 +132,7 @@ export const extractSheetData = (
   });
 
   // Filtra linhas de dados posteriores à linha de cabeçalho
-  const rows = rawRows.slice(headerRowIndex + 1).filter((row) => {
-    return Array.isArray(row) && row.some((cell) => cell !== '' && cell !== null && cell !== undefined);
-  });
+  const rows = rawRows.slice(headerRowIndex + 1).filter(hasData);
 
   return {
     fileName,
@@ -173,7 +174,10 @@ export const parseSpreadsheetFile = async (
 };
 
 /**
- * Detecta automaticamente colunas candidatas para CPF, BENEFICIO e NOME
+ * Detecta automaticamente colunas candidatas para CPF, BENEFICIO e NOME.
+ * Primeiro procura o nome EXATO ("cpf", "beneficio", "nome"...), depois um cabeçalho
+ * que CONTENHA o padrão — assim "Beneficio" ganha de "Desbloqueio NB".
+ * Uma coluna já escolhida não é usada para outro campo.
  */
 export const autoDetectColumns = (headers: string[]): AutoDetectedMapping => {
   const mapping: AutoDetectedMapping = {
@@ -187,31 +191,35 @@ export const autoDetectColumns = (headers: string[]): AutoDetectedMapping => {
     normalized: normalizeText(h),
   }));
 
-  // Busca exata ou por substring para CPF
-  for (const item of normalizedHeaders) {
-    if (PATTERNS.cpf.some((p) => item.normalized === p || item.normalized.includes(p))) {
-      mapping.cpf = item.original;
-      break;
-    }
-  }
+  const fields: (keyof AutoDetectedMapping)[] = ['cpf', 'beneficio', 'nome'];
 
-  // Busca exata ou por substring para Benefício
-  for (const item of normalizedHeaders) {
-    if (PATTERNS.beneficio.some((p) => item.normalized === p || item.normalized.includes(p))) {
-      mapping.beneficio = item.original;
-      break;
-    }
-  }
+  for (const field of fields) {
+    const used = Object.values(mapping);
+    const candidates = normalizedHeaders.filter((item) => !used.includes(item.original));
+    const patterns = PATTERNS[field];
 
-  // Busca exata ou por substring para Nome
-  for (const item of normalizedHeaders) {
-    if (PATTERNS.nome.some((p) => item.normalized === p || item.normalized.includes(p))) {
-      mapping.nome = item.original;
-      break;
-    }
+    const exact = candidates.find((item) => patterns.includes(item.normalized));
+    const partial = candidates.find((item) => patterns.some((p) => item.normalized.includes(p)));
+
+    mapping[field] = (exact ?? partial)?.original ?? '';
   }
 
   return mapping;
+};
+
+/**
+ * Completa com zeros à esquerda o CPF que o Excel salvou como número
+ * (ex.: 1234567890 -> 01234567890). Só altera valores com 9 ou 10 dígitos.
+ */
+export const padCpf = (value: string): string => {
+  return /^\d{9,10}$/.test(value) ? value.padStart(11, '0') : value;
+};
+
+/**
+ * Lê o valor de uma célula como texto (vazio se a coluna não existir na linha)
+ */
+const cellText = (row: any[], index: number): string => {
+  return index >= 0 && row[index] !== undefined && row[index] !== null ? String(row[index]) : '';
 };
 
 /**
@@ -251,9 +259,9 @@ export const getFormattedRows = (
   const targetRows = typeof limit === 'number' && limit > 0 ? rows.slice(0, limit) : rows;
 
   return targetRows.map((row) => ({
-    cpf: cpfIndex >= 0 && row[cpfIndex] !== undefined ? String(row[cpfIndex]) : '',
-    beneficio: beneficioIndex >= 0 && row[beneficioIndex] !== undefined ? String(row[beneficioIndex]) : '',
-    nome: nomeIndex >= 0 && row[nomeIndex] !== undefined ? String(row[nomeIndex]) : '',
+    cpf: padCpf(cellText(row, cpfIndex)),
+    beneficio: cellText(row, beneficioIndex),
+    nome: cellText(row, nomeIndex),
     telefone1: '',
     telefone2: '',
     telefone3: '',
@@ -281,9 +289,9 @@ export const generateFormattedCsv = (
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
-    const cpfVal = cpfIndex >= 0 && row[cpfIndex] !== undefined ? escapeCsvValue(row[cpfIndex]) : '';
-    const beneficioVal = beneficioIndex >= 0 && row[beneficioIndex] !== undefined ? escapeCsvValue(row[beneficioIndex]) : '';
-    const nomeVal = nomeIndex >= 0 && row[nomeIndex] !== undefined ? escapeCsvValue(row[nomeIndex]) : '';
+    const cpfVal = escapeCsvValue(padCpf(cellText(row, cpfIndex)));
+    const beneficioVal = escapeCsvValue(cellText(row, beneficioIndex));
+    const nomeVal = escapeCsvValue(cellText(row, nomeIndex));
 
     // As 5 colunas de telefones são deixadas vazias (5 pontos-e-vírgula ao final)
     lines.push(`${cpfVal};${beneficioVal};${nomeVal};;;;;`);
