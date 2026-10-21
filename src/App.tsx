@@ -13,6 +13,7 @@ import { ReportsHistoryHub } from './components/history/ReportsHistoryHub';
 import { DataFormatterHub } from './components/formatter/DataFormatterHub';
 import { EscalaBasesHub } from './components/escala/EscalaBasesHub';
 import { RelatorioUraHub } from './components/relatorioUra/RelatorioUraHub';
+import { ConfiguracoesHub } from './components/configuracoes/ConfiguracoesHub';
 import { Modal } from './components/common/Modal';
 import { Task, SavedReport, SaveReportParams } from './types/task';
 import { getNavigationItems } from './utils/navigationItems';
@@ -222,6 +223,10 @@ export const App: React.FC = () => {
           ) : activeToolId === 'formatador' ? (
             <main className="container" style={{ maxWidth: '1480px', padding: '0 16px' }}>
               <DataFormatterHub onNotify={notify} />
+            </main>
+          ) : activeToolId === 'configuracoes' ? (
+            <main className="container" style={{ maxWidth: '1100px', padding: '0 16px' }}>
+              <ConfiguracoesHub onNotify={notify} />
             </main>
           ) : activeToolId === 'escala' ? (
             <main className="container" style={{ maxWidth: '1200px', padding: '0 16px' }}>

@@ -17,6 +17,7 @@ import {
 import { NotificationType } from '../../types/task';
 import { ArquivoCarregado, RegistroHistoricoUra, ResultadoUra, TipoExportacao } from '../../types/relatorioUra';
 import { useRelatorioUra } from '../../hooks/useRelatorioUra';
+import { useFeriados } from '../../hooks/useFeriados';
 import { diaDaSemana, diaUtilAnterior, hojeIso, isoParaBr, normalizarNome } from '../../utils/calendario';
 import { baixarTexto } from '../../utils/csvTexto';
 import {
@@ -64,9 +65,10 @@ const Diferenca: React.FC<{ valor?: number; formato: 'dif_inteiro' | 'dif_reais'
 
 export const RelatorioUraHub: React.FC<RelatorioUraHubProps> = ({ onNotify }) => {
   const ura = useRelatorioUra();
+  const { feriados } = useFeriados();
   const [arquivos, setArquivos] = useState<ArquivoCarregado[]>([]);
   // O relatório é sempre do dia útil anterior (feito em 20/10 -> relatório de 19/10)
-  const [dia, setDia] = useState<string>(() => diaUtilAnterior(hojeIso()));
+  const [dia, setDia] = useState<string>(() => diaUtilAnterior(hojeIso(), feriados));
   const [resultado, setResultado] = useState<ResultadoUra | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -207,7 +209,7 @@ export const RelatorioUraHub: React.FC<RelatorioUraHubProps> = ({ onNotify }) =>
    * Esses números servem só para as setas: não são gravados no histórico.
    */
   const montarDiaAnterior = async (): Promise<{ registros: RegistroHistoricoUra[]; aviso: string } | null> => {
-    const anterior = diaUtilAnterior(dia);
+    const anterior = diaUtilAnterior(dia, feriados);
     if (ura.historico.some((r) => r.data === anterior)) return null;
 
     const esteiras = arquivos.filter(
@@ -229,7 +231,7 @@ export const RelatorioUraHub: React.FC<RelatorioUraHubProps> = ({ onNotify }) =>
       cadastro: ura.cadastro,
       apelidos: ura.apelidos,
       historico: [],
-      diaAnterior: diaUtilAnterior(anterior),
+      diaAnterior: diaUtilAnterior(anterior, feriados),
     });
     const registros = registrarNoHistorico([], parcial).map((r) => ({
       ...r,
@@ -256,7 +258,7 @@ export const RelatorioUraHub: React.FC<RelatorioUraHubProps> = ({ onNotify }) =>
       cadastro: ura.cadastro,
       apelidos: ura.apelidos,
       historico: [...ura.historico, ...(diaAnterior?.registros ?? [])],
-      diaAnterior: diaUtilAnterior(dia),
+      diaAnterior: diaUtilAnterior(dia, feriados),
     });
     if (diaAnterior) novo.avisos.unshift(diaAnterior.aviso);
     if (coresAutomaticas) {
@@ -454,7 +456,7 @@ export const RelatorioUraHub: React.FC<RelatorioUraHubProps> = ({ onNotify }) =>
             <input id="ura-dia" type="date" className="formatter-select" value={dia} onChange={(e) => setDia(e.target.value)} />
             {dia && (
               <div className="formatter-field-sample ura-quebra">
-                <span>{diaDaSemana(dia)}</span> • compara com {isoParaBr(diaUtilAnterior(dia))}
+                <span>{diaDaSemana(dia)}</span> • compara com {isoParaBr(diaUtilAnterior(dia, feriados))}
               </div>
             )}
           </div>

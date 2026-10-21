@@ -63,3 +63,28 @@
 .escala-acoes .btn {
   width: auto;
 }
+
+/* Configurações: formulário de feriado e separador da lista */
+.config-feriado-form {
+  display: grid;
+  grid-template-columns: 200px 1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.config-feriado-form .btn {
+  width: auto;
+}
+
+@media (max-width: 760px) {
+  .config-feriado-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+.config-feriado-separador {
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}

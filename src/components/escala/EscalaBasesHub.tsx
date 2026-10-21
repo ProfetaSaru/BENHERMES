@@ -28,7 +28,8 @@ import {
   importarPlanilhaEscala,
   csvParaHistorico,
 } from '../../utils/escalaBases';
-import { hojeIso, isoParaBr, diaDaSemana, ehFimDeSemana, feriadoNacional, normalizarNome } from '../../utils/calendario';
+import { hojeIso, isoParaBr, diaDaSemana, ehFimDeSemana, feriado as feriadoDoDia, normalizarNome } from '../../utils/calendario';
+import { useFeriados } from '../../hooks/useFeriados';
 import { baixarTexto } from '../../utils/csvTexto';
 import { baixarPlanilha } from '../../utils/planilhaColorida';
 
@@ -71,7 +72,8 @@ export const EscalaBasesHub: React.FC<EscalaBasesHubProps> = ({ onNotify }) => {
   }, [cadastro.pessoas]);
 
   const jaSorteado = historico.some((r) => r.data === data);
-  const feriado = data ? feriadoNacional(data) : null;
+  const { feriados } = useFeriados();
+  const feriado = data ? feriadoDoDia(data, feriados) : null;
   const disponiveis = cadastro.pessoas.length - ausentes.length;
   const podeSortear = Boolean(data) && cadastro.bases.length > 0 && disponiveis > 0;
 
@@ -108,7 +110,7 @@ export const EscalaBasesHub: React.FC<EscalaBasesHubProps> = ({ onNotify }) => {
     }
 
     try {
-      const novo = realizarSorteio(cadastro, historico, data, ausentes);
+      const novo = realizarSorteio(cadastro, historico, data, ausentes, feriados);
       salvarSorteio(novo);
       onNotify(`Bases sorteadas para ${isoParaBr(data)}!`, 'success');
     } catch (err: any) {

@@ -1,0 +1,21 @@
+# Checagem automática: em cada pull request (e em cada push na main), roda os
+# testes e o build. Se algo quebrar, o PR fica vermelho antes de chegar ao site.
+name: Testes e build
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
