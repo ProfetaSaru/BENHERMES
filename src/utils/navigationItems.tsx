@@ -1,6 +1,7 @@
 import {
   FileText,
   TableProperties,
+  Shuffle,
   BarChart3,
   History,
   Settings,
@@ -29,6 +30,17 @@ export const getNavigationItems = (taskCount: number, savedReportsCount = 0): Na
     badgeVariant: 'success',
     isReady: true,
     icon: <TableProperties size={20} />,
+  },
+  {
+    id: 'escala',
+    name: 'Escala de Bases',
+    shortName: 'Escala',
+    description: 'Sorteio diário das bases do Ativo 2 entre os grupos dos supervisores.',
+    category: 'automacoes',
+    badge: 'Novo',
+    badgeVariant: 'success',
+    isReady: true,
+    icon: <Shuffle size={20} />,
   },
   {
     id: 'metricas',

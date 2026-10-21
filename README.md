@@ -19,6 +19,7 @@ Construída com **React 18**, **TypeScript**, **Vite** e estilização modular, 
 - **📱 Design Responsivo & Acessível**: Layout em duas colunas para desktop e empilhado em dispositivos móveis, com micro-animações e ícones [`lucide-react`](https://lucide.dev/).
 - **💾 Histórico Universal com Restauração Fiel**: Qualquer relatório salvo no histórico (seja de atividades ou baseado em modelo) é restaurado completamente com todos os campos e modelo ativo pronto para edição.
 - **⚡ Rascunhos Temporários em Tempo Real**: Cada modelo mantém automaticamente seus dados preenchidos no navegador, lembrando o último modelo utilizado mesmo após recarregar a página (F5).
+- **🎲 Escala de Bases (Ativo 2)**: Sorteio diário das bases entre os grupos dos supervisores, sem repetir a base dos últimos 2 sorteios, com marcação de ausentes, avisos de fim de semana e feriados nacionais, cópia em texto e download em `.xlsx`. Importa a antiga `Escala_Bases_Ativo2.xlsm` e o histórico do BENZAITEN (`historico_escalas.csv`), e exporta no mesmo formato. Tudo fica salvo no `localStorage` (chave `'benhermes_escala_bases'`).
 
 ---
 
