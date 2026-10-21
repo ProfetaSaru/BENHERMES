@@ -32,7 +32,7 @@ import {
   tipoDoArquivo,
 } from '../../utils/uraLeitura';
 import { calcularRelatorio, metasAtivas } from '../../utils/uraCalculo';
-import { baixarDoArgus } from '../../utils/argusApi';
+import { baixarDoArgus, diagnosticoLeads } from '../../utils/argusApi';
 import { baixarPlanilha } from '../../utils/planilhaColorida';
 import { gerarPlanilhaUra, historicoUraParaCsv, htmlDoRelatorio, textoDaCelula, textoDoRelatorio } from '../../utils/uraExportacao';
 import { UraTabela } from './UraTabela';
@@ -138,7 +138,14 @@ export const RelatorioUraHub: React.FC<RelatorioUraHubProps> = ({ onNotify }) =>
 
     if (novos.length > 0) {
       // Um arquivo com o mesmo nome substitui o anterior
-      setArquivos((atuais) => [...atuais.filter((a) => !novos.some((n) => n.nome === a.nome)), ...novos]);
+      // Um arquivo com o mesmo nome substitui o anterior; uma exportação manual substitui o
+      // download da API do mesmo tipo (e vice-versa), para os números não serem somados duas vezes
+      setArquivos((atuais) => [
+        ...atuais.filter(
+          (a) => !novos.some((n) => n.nome === a.nome || (a.id.startsWith('argus-') && n.tipo === a.tipo))
+        ),
+        ...novos,
+      ]);
       mensagens.unshift(`${novos.length} exportação(ões) carregada(s)`);
     }
     if (mensagens.length > 0) onNotify(`${mensagens.join('; ')}.`, 'success');
@@ -172,6 +179,17 @@ export const RelatorioUraHub: React.FC<RelatorioUraHubProps> = ({ onNotify }) =>
       onNotify(err.message || 'Não foi possível baixar do Argus.', 'error');
     } finally {
       setIsBaixandoArgus(false);
+    }
+  };
+
+  // CSV com os leads por operador em cada filtro da API, para comparar com a exportação manual
+  const handleDiagnosticoLeads = async () => {
+    try {
+      onNotify('Consultando o Argus para o diagnóstico dos leads...', 'info');
+      baixarTexto(await diagnosticoLeads(dia, ura.argus), `diagnostico_leads_${dia}.csv`);
+      onNotify('Diagnóstico baixado.', 'success');
+    } catch (err: any) {
+      onNotify(err.message || 'Não foi possível gerar o diagnóstico.', 'error');
     }
   };
 
@@ -498,6 +516,8 @@ export const RelatorioUraHub: React.FC<RelatorioUraHubProps> = ({ onNotify }) =>
         historico={ura.historico}
         argus={ura.argus}
         onArgusChange={ura.atualizarArgus}
+        onDiagnosticoLeads={handleDiagnosticoLeads}
+        diaDoRelatorio={dia}
         onApelidosChange={ura.atualizarApelidos}
         onMetasChange={ura.atualizarMetas}
         onExportarHistorico={handleExportarHistorico}
