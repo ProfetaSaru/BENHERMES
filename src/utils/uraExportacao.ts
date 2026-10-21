@@ -1,4 +1,4 @@
-import type { Workbook } from 'exceljs';
+import type { Cell, Workbook } from 'exceljs';
 import { ChaveIndicador, CorMeta, LinhaRelatorio, Metas, RegistroHistoricoUra, ResultadoUra, TipoLinha } from '../types/relatorioUra';
 import { isoParaBr } from './calendario';
 import { escaparCsv } from './csvTexto';
@@ -50,7 +50,8 @@ const SUBIR_E_BOM: Partial<Record<ChaveColuna, boolean>> = { d_leads: true, d_ve
 const FORMATOS_EXCEL: Record<Formato, string> = {
   tempo: '[h]:mm:ss',
   inteiro: '0',
-  reais: '"R$ "#,##0.00',
+  // Zero aparece como "R$ -", como na planilha modelo
+  reais: '"R$ "#,##0.00;"-R$ "#,##0.00;"R$ -"',
   dif_inteiro: '"▲ "#,##0;"▼ "#,##0;"="',
   dif_reais: '"▲ R$ "#,##0.00;"▼ R$ "#,##0.00;"="',
 };
@@ -107,7 +108,7 @@ export const textoDaCelula = (valor: number | null | undefined, formato: Formato
     case 'inteiro':
       return valor.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
     case 'reais':
-      return reais(valor);
+      return Math.abs(valor) < 0.005 ? 'R$ -' : reais(valor);
     case 'dif_inteiro':
       return valor === 0 ? '=' : `${valor > 0 ? '▲' : '▼'} ${Math.abs(valor).toLocaleString('pt-BR')}`;
     case 'dif_reais':
@@ -160,31 +161,60 @@ export const gerarPlanilhaUra = async (resultado: ResultadoUra, metas: Metas): P
   const livro = await novaPlanilha();
   const colunas = colunasDoRelatorio(resultado.dataAnterior);
   const ws = livro.addWorksheet('Relatório', {
-    views: [{ state: 'frozen', xSplit: 2, ySplit: 3 }],
+    views: [{ state: 'frozen', xSplit: 2, ySplit: 3, showGridLines: false }],
     pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
   });
   const ultimaColuna = 3 + colunas.length; // A = faixa azul, B = nomes, C.. = valores, última = faixa azul
+  const linhaFinal = 4 + resultado.linhas.length; // faixa azul de fechamento
 
-  // Título e cabeçalho
+  /** Mesmo visual da planilha modelo: Arial em tudo */
+  const estilizar = (celula: Cell, fundo: string | null, fonte: string | null, negrito: boolean, tamanho = 10, italico = false) => {
+    pintar(celula, fundo, fonte, negrito, tamanho);
+    celula.font = { ...celula.font, name: 'Arial', italic: italico };
+  };
+  const borda = (celula: Cell, estilo: 'hair' | 'medium', cor: string, ladoDeCima = false) => {
+    const lado = { style: estilo, color: { argb: `FF${cor.replace('#', '')}` } };
+    celula.border = ladoDeCima ? { top: lado, bottom: lado } : { bottom: lado };
+  };
+
+  // Faixa azul em volta (topo, laterais e fechamento), como no modelo
+  for (let c = 1; c <= ultimaColuna; c++) {
+    estilizar(ws.getCell(1, c), CORES.azul, null, false);
+    estilizar(ws.getCell(linhaFinal, c), CORES.azul, null, false);
+  }
+  for (let r = 2; r < linhaFinal; r++) {
+    estilizar(ws.getCell(r, 1), CORES.azul, null, false);
+    estilizar(ws.getCell(r, ultimaColuna), CORES.azul, null, false);
+  }
+
+  // Título: Arial 20, azul sobre amarelo
   ws.mergeCells(2, 2, 2, ultimaColuna - 1);
   const titulo = ws.getCell(2, 2);
   titulo.value = `RELATORIO DE PRODUTIVIDADE URA ${isoParaBr(resultado.data)}`;
-  pintar(titulo, null, CORES.azul, true, 14);
-  titulo.alignment = { horizontal: 'center' };
+  estilizar(titulo, CORES.amarelo, CORES.azul, true, 20);
+  titulo.alignment = { horizontal: 'center', vertical: 'middle' };
+
+  // Cabeçalho: Arial 11, branco sobre azul
   ['OPERADORES', ...colunas.map((c) => c.titulo)].forEach((texto, i) => {
     const celula = ws.getCell(3, 2 + i);
     celula.value = texto;
-    pintar(celula, CORES.azul, CORES.branco, true);
+    estilizar(celula, CORES.azul, CORES.branco, true, 11);
     celula.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
   });
-  ws.getRow(3).height = 45;
 
-  // Linhas
+  // Alinhamento de cada coluna, como no modelo: tempos e quantidades no centro, reais à direita
+  const alinhamento = (coluna: ColunaRelatorio): 'center' | 'right' =>
+    coluna.formato === 'reais' || coluna.formato === 'dif_reais' ? 'right' : 'center';
+
   resultado.linhas.forEach((linha, i) => {
     const r = 4 + i;
+    const italico = linha.tipo === 'sem_derivacao';
+    const nome = ws.getCell(r, 2);
     const estiloLinha = estiloDaCelula(linha, i, null, metas);
-    for (let c = 2; c < ultimaColuna; c++) pintar(ws.getCell(r, c), estiloLinha.fundo, estiloLinha.fonte, estiloLinha.negrito);
-    ws.getCell(r, 2).value = linha.nome;
+    nome.value = linha.nome || null;
+    estilizar(nome, estiloLinha.fundo ?? CORES.branco, estiloLinha.fonte, estiloLinha.negrito, 10, italico);
+    nome.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+
     colunas.forEach((coluna, j) => {
       const celula = ws.getCell(r, 3 + j);
       const valor = linha[coluna.chave];
@@ -194,21 +224,32 @@ export const gerarPlanilhaUra = async (resultado: ResultadoUra, metas: Metas): P
         celula.numFmt = FORMATOS_EXCEL[coluna.formato];
       }
       const estilo = estiloDaCelula(linha, i, coluna, metas);
-      pintar(celula, estilo.fundo, estilo.fonte, estilo.negrito);
+      estilizar(celula, estilo.fundo ?? CORES.branco, estilo.fonte, estilo.negrito, 10, italico);
+      celula.alignment = { horizontal: alinhamento(coluna), vertical: 'middle' };
     });
+
+    // Bordas: linha fina cinza entre os operadores; azul no total dos operadores; amarela no total geral
+    for (let c = 2; c < ultimaColuna; c++) {
+      const celula = ws.getCell(r, c);
+      if (linha.tipo === 'total_operadores') borda(celula, 'medium', CORES.azul, true);
+      else if (linha.tipo === 'total_geral') borda(celula, 'medium', CORES.amarelo, true);
+      else if (linha.tipo !== 'separador') borda(celula, 'hair', '#BFBFBF');
+    }
+    ws.getRow(r).height = 18.75;
   });
 
-  // Faixa azul de fechamento e laterais (como no modelo)
-  const linhaFinal = 4 + resultado.linhas.length;
-  for (let c = 1; c <= ultimaColuna; c++) pintar(ws.getCell(linhaFinal, c), CORES.azul);
-  for (let r = 3; r <= linhaFinal; r++) {
-    pintar(ws.getCell(r, 1), CORES.azul);
-    pintar(ws.getCell(r, ultimaColuna), CORES.azul);
-  }
-  ws.getColumn(1).width = 2;
+  // Larguras e alturas do modelo
+  const LARGURAS: Partial<Record<ColunaRelatorio['chave'], number>> = {
+    tma: 12, tmo: 13, leads: 21, custo: 16, vendas: 20, clientes: 18, custo_cpf: 13, prod_lead: 20,
+  };
+  ws.getColumn(1).width = 3;
   ws.getColumn(2).width = 44;
-  colunas.forEach((c, j) => (ws.getColumn(3 + j).width = c.chave === 'leads' ? 19 : 15));
-  ws.getColumn(ultimaColuna).width = 2;
+  colunas.forEach((c, j) => (ws.getColumn(3 + j).width = LARGURAS[c.chave] ?? 17));
+  ws.getColumn(ultimaColuna).width = 3;
+  ws.getRow(1).height = 7.5;
+  ws.getRow(2).height = 33.75;
+  ws.getRow(3).height = 36;
+  ws.getRow(linhaFinal).height = 18.75;
 
   // --- Aba de conferência ---
   const wc = livro.addWorksheet('Conferência');
