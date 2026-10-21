@@ -1,0 +1,353 @@
+/* ==========================================================================
+   RELATÓRIO DE PRODUTIVIDADE URA
+   Reaproveita os cards e botões do formatador (formatter.css) e os avisos da
+   escala (escala.css); aqui ficam só os detalhes próprios do relatório.
+   ========================================================================== */
+
+.ura-dropzone-compacta {
+  padding: 20px 24px;
+  flex-direction: row;
+  gap: 16px;
+}
+
+.ura-dropzone-compacta .formatter-dropzone-icon-box {
+  width: 48px;
+  height: 48px;
+  margin: 0;
+}
+
+.ura-dropzone-compacta .formatter-dropzone-tags {
+  margin: 0;
+}
+
+@media (max-width: 760px) {
+  .ura-dropzone-compacta {
+    flex-direction: column;
+  }
+}
+
+/* Lista de arquivos carregados */
+.ura-arquivos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.ura-arquivo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  min-width: 0;
+}
+
+.ura-arquivo > svg {
+  color: var(--blue);
+  flex-shrink: 0;
+}
+
+.ura-arquivo > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.ura-arquivo strong {
+  color: var(--ink);
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ura-arquivo span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.ura-arquivo-remover {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+}
+
+.ura-arquivo-remover:hover {
+  color: var(--red);
+  background: var(--red-soft);
+}
+
+/* Exportações presentes / faltando */
+.ura-check {
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: 1px solid var(--line);
+}
+
+.ura-check.ok {
+  color: var(--green);
+  background: var(--green-soft);
+  border-color: var(--green);
+}
+
+.ura-check.falta {
+  color: var(--amber);
+  background: var(--amber-soft);
+  border-color: var(--amber);
+}
+
+.ura-check.opcional {
+  color: var(--muted);
+}
+
+.ura-botao-inline {
+  width: auto;
+  margin-left: auto;
+  padding: 6px 12px;
+}
+
+/* Resumo do dia */
+.ura-resumo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+
+.ura-resumo > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ura-resumo span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ura-resumo strong {
+  color: var(--ink);
+  font-size: 1.2rem;
+}
+
+.ura-dif {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  font-weight: 600;
+}
+
+.ura-dif.bom {
+  color: var(--green) !important;
+}
+
+.ura-dif.ruim {
+  color: var(--red) !important;
+}
+
+/* Tabela no visual da planilha modelo (cores fixas da empresa) */
+.ura-tabela-moldura {
+  background: #ffffff;
+  border: 6px solid #0b2a5b;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.ura-tabela-titulo {
+  text-align: center;
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: #0b2a5b;
+  padding: 10px;
+  background: #ffffff;
+}
+
+.ura-tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  color: #000000;
+}
+
+.ura-tabela th {
+  background: #0b2a5b;
+  color: #ffffff;
+  font-weight: 700;
+  padding: 10px 8px;
+  text-align: center;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  border: 1px solid #1d3f7a;
+  white-space: normal;
+}
+
+.ura-tabela th:first-child {
+  text-align: left;
+  min-width: 200px;
+}
+
+.ura-tabela td {
+  padding: 5px 8px;
+  border-bottom: 1px solid #e3e8f0;
+  white-space: nowrap;
+}
+
+.ura-tabela td.ura-numero {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.ura-linha-separador td {
+  height: 8px;
+  padding: 0;
+}
+
+/* Conferência */
+.ura-conferencia-grid,
+.ura-config-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 860px) {
+  .ura-conferencia-grid,
+  .ura-config-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ura-conferencia-grid > *,
+.ura-config-grid > * {
+  min-width: 0;
+}
+
+.ura-config-grid textarea {
+  box-sizing: border-box;
+}
+
+/* Textos de ajuda que podem quebrar linha (o padrão do formatador corta com "...") */
+.ura-quebra {
+  white-space: normal;
+}
+
+.ura-subtitulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0 0 8px 0;
+}
+
+.ura-ajuda {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0 0 10px 0;
+  line-height: 1.5;
+}
+
+.ura-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ura-lista li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+
+.ura-lista li span {
+  color: var(--muted);
+}
+
+.ura-lista li.ura-ignorado strong {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.ura-lista li.ura-vinculo {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.ura-select-vinculo {
+  max-width: 280px;
+}
+
+.ura-custos {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 16px;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.ura-custos dt {
+  color: var(--muted);
+}
+
+.ura-custos dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.ura-textarea-apelidos {
+  min-height: 110px;
+}
+
+.ura-metas td {
+  padding: 6px 8px;
+}
+
+.ura-metas .formatter-select {
+  padding: 6px 8px;
+  min-width: 90px;
+}
+
+.ura-argus-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 760px) {
+  .ura-argus-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Os dois botões lado a lado: baixar do Argus e gerar */
+.ura-acoes-gerar .btn {
+  flex: 1;
+}

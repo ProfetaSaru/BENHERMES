@@ -20,22 +20,18 @@ import { ImportacaoEscala, ResultadoSorteio } from '../../types/escala';
 import { useEscalaBases } from '../../hooks/useEscalaBases';
 import {
   JANELA_SORTEIOS,
-  hojeIso,
-  isoParaBr,
-  diaDaSemana,
-  ehFimDeSemana,
-  feriadoNacional,
-  normalizarNome,
   textoParaLista,
   realizarSorteio,
   ultimosSorteios,
   textoDaEscala,
   historicoParaCsv,
-  baixarTexto,
   gerarPlanilhaEscala,
   importarPlanilhaEscala,
   csvParaHistorico,
 } from '../../utils/escalaBases';
+import { hojeIso, isoParaBr, diaDaSemana, ehFimDeSemana, feriadoNacional, normalizarNome } from '../../utils/calendario';
+import { baixarTexto } from '../../utils/csvTexto';
+import { baixarPlanilha } from '../../utils/planilhaColorida';
 
 interface EscalaBasesHubProps {
   onNotify: (message: string, type?: NotificationType) => void;
@@ -134,11 +130,15 @@ export const EscalaBasesHub: React.FC<EscalaBasesHubProps> = ({ onNotify }) => {
     }
   };
 
-  const handleBaixarPlanilha = () => {
+  const handleBaixarPlanilha = async () => {
     if (!resultado) return;
-    const livro = gerarPlanilhaEscala(resultado, historico, basesDaTabela);
-    XLSX.writeFile(livro, `escala_${resultado.data}.xlsx`);
-    onNotify('Download da planilha iniciado!', 'success');
+    try {
+      const livro = await gerarPlanilhaEscala(resultado, historico, basesDaTabela);
+      await baixarPlanilha(livro, `escala_${resultado.data}.xlsx`);
+      onNotify('Download da planilha iniciado!', 'success');
+    } catch (err: any) {
+      onNotify(`Erro ao gerar a planilha: ${err.message}`, 'error');
+    }
   };
 
   const handleExportarHistorico = () => {
