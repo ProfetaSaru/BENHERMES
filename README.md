@@ -1,32 +1,219 @@
-# 📋 Gerador de Relatório de Atividades
+<div align="center">
 
-Aplicação web moderna para registro e organização cronológica de atividades diárias, com geração e cópia instantânea de relatórios formatados para a área de transferência.
+# ⚡ BenHermes
 
-Construída com **React 18**, **TypeScript**, **Vite** e estilização modular, estruturada rigorosamente sob o conceito **Nevernester** (zero duplicação de marcação visual, guard clauses e hooks desacoplados).
+### Hub de automações e relatórios da operação
+
+Escala de bases, relatório de produtividade da URA, formatador de planilhas e relatórios de atividades,<br>
+tudo no navegador, sem instalar nada.
+
+[![Testes e build](https://github.com/ProfetaSaru/BENHERMES/actions/workflows/ci.yml/badge.svg)](https://github.com/ProfetaSaru/BENHERMES/actions/workflows/ci.yml)
+![React 18](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-6-646CFF?logo=vite&logoColor=white)
+![Vitest](https://img.shields.io/badge/testes-Vitest-6E9F18?logo=vitest&logoColor=white)
+[![Vercel](https://img.shields.io/badge/no_ar-benhermes.vercel.app-000000?logo=vercel&logoColor=white)](https://benhermes.vercel.app)
+
+**[🌐 Abrir o BenHermes](https://benhermes.vercel.app)**
+
+</div>
+
+> [!IMPORTANT]
+> **O BenHermes é o sistema principal da operação.** A escala de bases e o relatório da URA, que antes rodavam no
+> **BENZAITEN** (Python), agora vivem aqui. O BENZAITEN fica **congelado como reserva**: não recebe mudanças novas.
+> Veja [BenHermes × BENZAITEN](#-benhermes--benzaiten).
 
 ---
 
-## ✨ Funcionalidades
+## 📑 Sumário
 
-- **⏱️ Registro de Tarefas**: Cadastro com horário inicial, horário final, título da atividade e descrição detalhada opcional.
-- **🔠 Títulos Padronizados em Maiúsculo**: Conversão automática em tempo real para letras maiúsculas (UPPERCASE) durante a digitação e no relatório final.
-- **📅 Ordenação Cronológica Automática**: As atividades são organizadas automaticamente pelo horário de início.
-- **🛡️ Validação de Horários**: Bloqueio de horários inconsistentes (hora final anterior à hora inicial) com feedback visual imediato.
-- **✏️ Edição & Exclusão**: Modificação ágil de tarefas cadastradas e exclusão individual com confirmação.
-- **🗑️ Limpeza em Lote**: Modal acessível para remoção de todos os registros salvos com suporte à tecla `ESC`.
-- **📋 Geração de Relatório com 1 Clique**: Preview do relatório formatado e botão de cópia direta para a área de transferência (`navigator.clipboard`).
-- **💾 Persistência Local**: Sincronização automática e segura no `localStorage` do navegador sob a chave `'relatorio-atividades'`.
-- **📱 Design Responsivo & Acessível**: Layout em duas colunas para desktop e empilhado em dispositivos móveis, com micro-animações e ícones [`lucide-react`](https://lucide.dev/).
-- **💾 Histórico Universal com Restauração Fiel**: Qualquer relatório salvo no histórico (seja de atividades ou baseado em modelo) é restaurado completamente com todos os campos e modelo ativo pronto para edição.
-- **⚡ Rascunhos Temporários em Tempo Real**: Cada modelo mantém automaticamente seus dados preenchidos no navegador, lembrando o último modelo utilizado mesmo após recarregar a página (F5).
-- **🎲 Escala de Bases (Ativo 2)**: Rodízio diário das bases entre os grupos dos supervisores (a cada dia, cada pessoa anda uma base para frente, então ninguém repete uma base antes de passar por todas; ausentes retomam a posição quando voltam), com marcação de ausentes, avisos de fim de semana e feriados nacionais, cópia em texto e download em `.xlsx`. Importa a antiga `Escala_Bases_Ativo2.xlsm` e o histórico do BENZAITEN (`historico_escalas.csv`), e exporta no mesmo formato. Tudo fica salvo no `localStorage` (chave `'benhermes_escala_bases'`).
-- **📞 Relatório de Produtividade URA**: Arraste as exportações do dia (desempenho e leads do Argus, tarifações VENDITORE e 4NET, esteira do Vanguard e operadores) e gere o relatório com TMA, TMO, leads, custo (com rateio dos robôs da URA), vendas, clientes efetivados, custo por CPF e produção por lead, por operador e por equipe. Os arquivos são reconhecidos pelas colunas, nomes diferentes entre sistemas são ligados por apelidos, as metas pintam um semáforo e cada dia é comparado com o dia útil anterior. Copia a tabela colorida (cola no Excel e no Outlook) e baixa o `.xlsx` com a aba de conferência. Mesmas contas do `relatorio_ura.py` do BENZAITEN; importa o `operadores.xlsx`, o `metas.xlsx` e o `relatorio_ura.csv` dele. As exportações ficam só na memória da página; o `localStorage` (chave `'benhermes_relatorio_ura'`) guarda apenas cadastro, apelidos, metas e os totais de cada dia.
-- **🔌 API do Argus**: No Relatório URA, o botão **Baixar do Argus** traz o desempenho (TMA/TME), os leads da URA e o cadastro de operadores direto da API (a tarifação continua manual, pois não existe na API). O navegador não consegue chamar o Argus direto (CORS e TLS antigo), então as chamadas passam por uma ponte, [`server/argusProxy.ts`](server/argusProxy.ts): no `npm run dev`/`npm run preview` ela roda no servidor do Vite, e no site publicado na função da Vercel [`api/argus.ts`](api/argus.ts). A ponte tenta o modo TLS compatível quando o servidor do Argus usa configuração antiga (com o certificado sempre verificado), repassa só os 3 endereços que o relatório usa, descarta CPF, e-mail, login, RE e ramal antes de responder e não grava nem registra nada. O token fica só no `localStorage` (chave `'benhermes_argus'`).
-- **🎨 Planilhas coloridas**: O `.xlsx` do Relatório URA e o da Escala de Bases saem com as cores, bordas e formatos das planilhas modelo (via [`exceljs`](https://github.com/exceljs/exceljs), carregado só na hora do download).
+| | |
+|---|---|
+| 🧭 [Ferramentas](#-ferramentas) | 🔒 [Onde ficam os dados](#-onde-ficam-os-dados) |
+| ☀️ [Rotina diária](#️-rotina-diária) | 🧪 [Testes e checagem automática](#-testes-e-checagem-automática) |
+| 🎲 [Escala de Bases](#-escala-de-bases-ativo-2) | 🚀 [Como executar localmente](#-como-executar-localmente) |
+| 📞 [Relatório URA](#-relatório-de-produtividade-ura) | 🏗️ [Arquitetura](#️-arquitetura) |
+| 🔌 [API do Argus](#-api-do-argus) | 🐉 [BenHermes × BENZAITEN](#-benhermes--benzaiten) |
+| ⚙️ [Configurações (feriados)](#️-configurações-do-hub) | 🛠️ [Tecnologias](#️-tecnologias) |
+| 📋 [Central de Relatórios](#-central-de-relatórios) | 📊 [Formatador de Planilhas](#-formatador-de-planilhas) |
 
 ---
 
-## 📑 Como Criar Novos Relatórios (Expansíveis e Não Expansíveis)
+## 🧭 Ferramentas
+
+| | Ferramenta | Para que serve | Quando usar |
+|:-:|---|---|---|
+| 🎲 | **Escala de Bases** | Rodízio diário das bases do INSS entre os grupos dos supervisores do Ativo 2 | Todo dia útil, de manhã |
+| 📞 | **Relatório URA** | TMA, TMO, leads, custo, vendas e clientes por operador e equipe, com setas e cores | Todo dia útil (relatório do dia anterior) |
+| 📊 | **Formatador de Planilhas** | Converte qualquer planilha no CSV de mailing `CPF;BENEFICIO;NOME;TELEFONE1..5` | Quando chega uma base nova |
+| 📋 | **Central de Relatórios** | Relatórios de atividades e formulários a partir de modelos Markdown | No fim do expediente |
+| 🗂️ | **Histórico & Arquivos** | Relatórios de atividades salvos, com restauração completa | Quando precisar rever um dia |
+| ⚙️ | **Configurações do Hub** | Feriados locais (Carnaval, municipais...) que valem para todas as ferramentas | Uma vez por ano, ou quando surgir feriado |
+
+---
+
+## ☀️ Rotina diária
+
+```mermaid
+flowchart LR
+    A([☀️ Início do dia]) --> B[🎲 Escala de Bases<br/>marcar ausentes → Gerar escala do dia]
+    B --> C[📋 Copiar texto<br/>e mandar no chat]
+    A --> D[📞 Relatório URA]
+    D --> E[🔌 Baixar do Argus<br/>desempenho, leads e operadores]
+    D --> F[📂 Arrastar tarifação<br/>VENDITORE + 4NET e esteira]
+    E --> G[▶️ Gerar relatório]
+    F --> G
+    G --> H[📋 Copiar tabela<br/>ou ⬇️ Baixar planilha]
+```
+
+- [ ] **Escala:** abrir **Escala de Bases**, clicar nos nomes de quem faltou e em **Gerar escala do dia**. Depois, **Copiar texto** para o chat.
+- [ ] **Relatório:** abrir **Relatório URA** (a data já vem como o dia útil anterior), clicar em **Baixar do Argus**, arrastar a tarifação e a esteira e clicar em **Gerar relatório**.
+- [ ] **Entregar:** **Copiar tabela** (cola com as cores no Excel e no Outlook) ou **Baixar planilha**.
+
+> [!TIP]
+> Os arquivos são reconhecidos **pelas colunas**: o nome do arquivo não importa, e dá para arrastar todos de uma vez.
+
+---
+
+## 🎲 Escala de Bases (Ativo 2)
+
+A escala é um **rodízio**: a cada dia, cada pessoa anda **uma base para frente** e volta para a primeira depois da
+última. Assim **ninguém repete uma base antes de passar por todas**.
+
+```
+              NOTA 0     NOTA 1     NOTA 2     NOTA 3
+  21/10       ANA        BRUNO      CARLA      DIEGO
+  22/10       DIEGO      ANA        BRUNO      CARLA      ← cada um andou uma base
+  23/10       CARLA      DIEGO      ANA        BRUNO
+```
+
+<details>
+<summary><b>📐 Regras completas do rodízio</b></summary>
+
+| Regra | Como funciona |
+|---|---|
+| 🔁 Ponto de partida | O último dia **completo** do histórico (todas as bases preenchidas, ninguém repetido). Sem histórico, começa pela ordem do cadastro |
+| 📅 Dias | Conta escalas, não dias do calendário: de sexta para segunda é um passo só |
+| 🚫 Ausentes | A base de quem faltou vai para quem está com **menos bases** (de preferência quem não teve essa base no dia anterior). Quando a pessoa volta, ela **retoma a posição dela**, como se não tivesse faltado |
+| ➖ Menos pessoas que bases | Algumas pessoas ficam com uma base a mais (nunca duas a mais) |
+| ➕ Mais pessoas que bases | Quem fica sem base também entra no rodízio: cada dia é a vez de um |
+| 🆕 Pessoa nova | Entra no fim da roda |
+| 🔄 Refazer o dia | Dá o mesmo resultado (o rodízio não é aleatório), a não ser que os ausentes mudem |
+| 🎉 Feriados | Aviso de fim de semana, feriado nacional e feriado local cadastrado em [Configurações](#️-configurações-do-hub) |
+
+</details>
+
+<details>
+<summary><b>📥 Importar e exportar</b></summary>
+
+- **Importar:** a planilha antiga `Escala_Bases_Ativo2.xlsm` (cadastro + histórico), o `bases.xlsx` ou o `historico_escalas.csv` do BENZAITEN. Dias que já existem não são sobrescritos.
+- **Exportar histórico:** CSV `Data;Base;Responsavel`, o mesmo formato do BENZAITEN. **Faça de vez em quando, como backup.**
+- **Baixar planilha:** `.xlsx` colorido com a escala do dia e os últimos 10 dias.
+
+</details>
+
+---
+
+## 📞 Relatório de Produtividade URA
+
+| Coluna | De onde vem |
+|---|---|
+| **TMA / TMO** | Argus › Desempenho (TMA e TME), média ponderada pelos atendimentos de cada sessão |
+| **Leads atendidos/URA** | Argus › Desempenho do dia: atendimentos de cada operador, sem os robôs |
+| **Custo total** | Tarifação VENDITORE + 4NET: custo do operador + **rateio do custo dos robôs da URA** pelos leads |
+| **Vendas geral** | Esteira Vanguard: soma do Valor Contrato nas etapas Andamento, Pendente e Pago |
+| **Clientes efetivados** | Esteira Vanguard: CPFs únicos nas etapas Andamento e Pago |
+| **Custo por CPF / Produção por lead** | Custo ÷ clientes / vendas ÷ leads |
+
+Ordem: quem mais vendeu primeiro (empate: mais leads), depois o total de cada equipe (a equipe é o primeiro nome do
+supervisor), o total dos operadores, as ligações sem derivação e o total geral.
+
+<details>
+<summary><b>🎨 Setas e cores (o que muda sozinho)</b></summary>
+
+| | Com o histórico/metas | Sem nada configurado |
+|---|---|---|
+| **▲▼ Setas** | Comparação com o relatório do dia útil anterior salvo no histórico | A comparação é **montada sozinha**: leads do dia anterior pela API do Argus e vendas pela esteira. O custo fica sem comparação, e a coluna some |
+| **🟩🟨🟥 Cores** | Metas preenchidas em Configurações do relatório (verde atingiu, vermelho abaixo do limite) | **Automáticas por terços**: o melhor terço do dia fica verde, o do meio amarelo e o pior vermelho |
+
+Setas: **verde é bom** (mais leads e vendas, menos custo); vermelho é ruim. TMA, TMO e custo por CPF zerados ficam sem cor.
+
+</details>
+
+<details>
+<summary><b>🧾 Conferência, apelidos e metas</b></summary>
+
+- **Conferência:** de onde veio cada número, arquivos ignorados (de outro dia), custos que batem com a tarifação, nomes sem vínculo e ex-colaboradores.
+- **Apelidos:** quando um nome aparece diferente em algum sistema (ex.: `KARLA CRUZ` × `CARLA CRUZ`), escolha "É a mesma pessoa que..." na conferência e o relatório é gerado de novo.
+- **Metas:** em Configurações do relatório, por indicador, com sentido (maior/menor é melhor) e limites verde e vermelho.
+- **Histórico:** guarda só os totais de cada dia. Pode importar o `relatorio_ura.csv`, o `operadores.xlsx` e o `metas.xlsx` do BENZAITEN.
+- **Exportações manuais têm prioridade:** se você arrastar uma exportação do Argus do mesmo tipo de um download da API (ex.: leads), ela **substitui** a da API, em vez de somar.
+
+</details>
+
+---
+
+## 🔌 API do Argus
+
+O botão **Baixar do Argus** traz o desempenho (TMA/TME), os leads e o cadastro de operadores do dia. A **tarifação
+continua manual**, porque não existe na API.
+
+```mermaid
+sequenceDiagram
+    participant N as 🌐 Navegador
+    participant P as 🌉 Ponte /api/argus<br/>(Vercel ou npm run dev)
+    participant A as 📡 API do Argus
+    N->>P: POST /api/argus?caminho=... (token no cabeçalho)
+    P->>P: só 3 endereços permitidos
+    P->>A: Token-Signature (TLS normal → TLS compatível se preciso)
+    A-->>P: resposta
+    P->>P: descarta CPF, e-mail, login, RE e ramal
+    P-->>N: só o que o relatório usa
+```
+
+<details>
+<summary><b>🛡️ Regras da ponte e diagnóstico</b></summary>
+
+- O navegador não consegue chamar o Argus direto (CORS e TLS antigo). A ponte, [`server/argusProxy.ts`](server/argusProxy.ts), roda no servidor do Vite (`npm run dev`/`preview`) e na função da Vercel [`api/argus.ts`](api/argus.ts).
+- Se o servidor do Argus recusar a conexão normal, ela tenta o **modo compatível** (TLS antigo), com o **certificado sempre verificado**.
+- Repassa só `report/desempenhoresumido`, `cmd/listargrupos` e `cmd/listarusuarios`, e **não grava nem registra nada**.
+- **Leads:** desempenho geral do dia, sem os robôs (`OPER VIRTUAL`). O filtro pelo grupo RECEPTIVO - URA trazia só quem **está** no grupo (346 de 2.985 leads em 20/10/2026).
+- **Diagnóstico dos leads** (Configurações do relatório): CSV com os leads de cada operador por filtro, sessões e datas. Serve para comparar com a exportação manual. Sem dados de clientes.
+
+</details>
+
+---
+
+## ⚙️ Configurações do Hub
+
+**Feriados locais** (Carnaval, Corpus Christi, feriados municipais): cadastre à mão ou importe o `feriados.xlsx` do
+BENZAITEN. Eles são pulados no **dia útil anterior** do Relatório URA (data e comparação) e aparecem como aviso na
+Escala. Os **feriados nacionais**, inclusive a Sexta-feira Santa, já são calculados sozinhos.
+
+---
+
+## 📋 Central de Relatórios
+
+Relatórios de atividades com registro de tarefas (horário, título e descrição), ordenação cronológica, cópia com um
+clique e histórico com restauração completa. Os modelos são arquivos **Markdown com Frontmatter YAML**.
+
+<details>
+<summary><b>✨ Funcionalidades</b></summary>
+
+- **⏱️ Registro de tarefas** com horário inicial, final, título e descrição opcional.
+- **🔠 Títulos em maiúsculo**, automaticamente.
+- **📅 Ordenação cronológica** pelo horário de início.
+- **🛡️ Validação de horários** (hora final antes da inicial é bloqueada).
+- **✏️ Edição e exclusão**, com **🗑️ limpeza em lote** (modal com `ESC`).
+- **📋 Relatório com 1 clique** para a área de transferência.
+- **💾 Histórico universal**: qualquer relatório salvo é restaurado com todos os campos e o modelo ativo.
+- **⚡ Rascunhos em tempo real**: cada modelo lembra o que foi preenchido, mesmo após recarregar a página.
+
+</details>
+
+<details>
+<summary><b>📑 Como criar novos modelos de relatório (expansíveis e não expansíveis)</b></summary>
+
 
 A aplicação utiliza um motor dinâmico baseado em arquivos **Markdown (.md)** com metadados **YAML Frontmatter** no topo. Existem dois tipos de relatórios:
 
@@ -37,7 +224,7 @@ A aplicação utiliza um motor dinâmico baseado em arquivos **Markdown (.md)** 
 
 ---
 
-### 1. Anatomia e Sintaxe de um Arquivo de Modelo (.md)
+#### 1. Anatomia e Sintaxe de um Arquivo de Modelo (.md)
 
 Todo modelo possui um bloco **Frontmatter** no topo (entre `---`) seguido pelo corpo do documento em Markdown:
 
@@ -80,7 +267,7 @@ expandable: true     # true para expansível (com tarefas) ou false para não ex
 
 ---
 
-### 2. Exemplo: Criando um Relatório EXPANSÍVEL
+#### 2. Exemplo: Criando um Relatório EXPANSÍVEL
 
 Um relatório expansível permite que o usuário adicione quantas atividades quiser ao longo do dia, podendo também solicitar campos extras (como número da sprint, squad ou colaborador):
 
@@ -119,7 +306,7 @@ expandable: true
 
 ---
 
-### 2.1 Exemplo: Relatório de Produtividade com Categorias por CPF e TMA
+#### 2.1 Exemplo: Relatório de Produtividade com Categorias por CPF e TMA
 
 Para relatórios operacionais divididos em etapas (ex.: Desbloqueados, Formalização, Anuência e Tentativas de contato) com cálculo de Tempo Médio de Atendimento:
 
@@ -147,7 +334,7 @@ RELATÓRIO DE PRODUTIVIDADE - {{nome_colaborador}}
 
 ---
 
-### 3. Exemplo: Criando um Relatório NÃO EXPANSÍVEL
+#### 3. Exemplo: Criando um Relatório NÃO EXPANSÍVEL
 
 Um relatório não expansível gera uma interface de formulário direto, ideal para checklists, registros pontuais, comunicados ou incidentes:
 
@@ -183,7 +370,7 @@ expandable: false
 
 ---
 
-### 4. Como Registrar Novos Modelos no Código-Fonte
+#### 4. Como Registrar Novos Modelos no Código-Fonte
 
 Após criar seu arquivo `.md` na pasta `src/templates/reports/`:
 
@@ -204,7 +391,7 @@ Pronto! Ao salvar, o novo modelo aparecerá automaticamente no catálogo **"Muda
 
 ---
 
-### 5. Como Adicionar pela Própria Interface Web (Sem Alterar Código)
+#### 5. Como Adicionar pela Própria Interface Web (Sem Alterar Código)
 
 Você também pode adicionar modelos diretamente pelo navegador:
 
@@ -214,9 +401,104 @@ Você também pode adicionar modelos diretamente pelo navegador:
    - **"Importar .md"**: Selecione qualquer arquivo `.md` do seu computador.
    - **"Gerar Prompt para IA"**: Copia um prompt estruturado para que o ChatGPT, Claude ou Gemini gere o modelo Markdown exato pronto para você colar no sistema.
 
+</details>
+
+<details>
+<summary><b>📄 Exemplo do relatório gerado</b></summary>
+
+
+```text
+RELATÓRIO DE CONCLUSÃO DE ATIVIDADES
+08:00 – 09:00 *ALINHAMENTO DIÁRIO:* - Daily meeting com o time;
+09:00 – 12:00 *REFATORAÇÃO DE CÓDIGO:* - Migração para React e TypeScript;
+13:30 – 15:00 *CODE REVIEW*;
+```
+
+</details>
+
 ---
 
-## 🏗️ Arquitetura & Conceito Nevernester
+## 📊 Formatador de Planilhas
+
+Converte `.xlsx`, `.xls`, `.csv`, `.tsv` e `.txt` no CSV de mailing `CPF;BENEFICIO;NOME;TELEFONE1..5`:
+acha o cabeçalho nas 10 primeiras linhas, identifica as colunas pelo nome (o nome exato tem preferência, sem
+repetir coluna), completa o CPF que perdeu o zero à esquerda e gera UTF-8 com BOM, que abre direto no Excel.
+
+---
+
+## 🔒 Onde ficam os dados
+
+> [!NOTE]
+> As exportações do dia (que têm **CPFs de clientes**) ficam **só na memória da página** e somem ao fechá-la.
+> O navegador guarda apenas o necessário, **no computador de quem usa**.
+
+| Chave no navegador (`localStorage`) | O que guarda |
+|---|---|
+| `benhermes_escala_bases` | Cadastro de bases e pessoas, histórico e últimas escalas |
+| `benhermes_relatorio_ura` | Cadastro de operadores (sem CPF/e-mail), apelidos, metas e **totais** de cada dia |
+| `benhermes_argus` | Token e endereço da API do Argus |
+| `benhermes_feriados` | Feriados locais |
+| `benhermes_template_tasks` e outras | Central de Relatórios (tarefas, rascunhos e histórico) |
+
+> [!WARNING]
+> Como tudo fica no navegador, **outro computador ou outro navegador começa vazio**, e limpar os dados do navegador
+> apaga o histórico. Use sempre o mesmo computador e **exporte os históricos** (escala e relatório) de vez em quando.
+
+---
+
+## 🧪 Testes e checagem automática
+
+```bash
+npm test          # roda todos os testes (Vitest)
+npm run build     # confere os tipos (TypeScript) e gera o site
+```
+
+A cada **pull request** e a cada push na `main`, o GitHub Actions ([`ci.yml`](.github/workflows/ci.yml)) roda os
+testes e o build. **PR vermelho não deve ir para a `main`.**
+
+<details>
+<summary><b>🧾 O que os testes cobrem</b></summary>
+
+| Arquivo | O que testa |
+|---|---|
+| [`calendario.test.ts`](src/utils/calendario.test.ts) | Páscoa, feriados nacionais e locais, dia útil anterior |
+| [`escalaBases.test.ts`](src/utils/escalaBases.test.ts) | Rodízio (ciclo completo, ausentes que retomam a posição, pessoa nova, menos pessoas), feriados, importação da `.xlsm`, CSV |
+| [`uraLeitura.test.ts`](src/utils/uraLeitura.test.ts) | Valores em R$, tempos, datas, reconhecimento das exportações, CSV |
+| [`uraCalculo.test.ts`](src/utils/uraCalculo.test.ts) | Relatório completo com **os mesmos números esperados do BENZAITEN**, comparação, cores automáticas e metas |
+| [`argusApi.test.ts`](src/utils/argusApi.test.ts) | API simulada: leads do dia sem robôs, média ponderada, token, diagnóstico |
+| [`argusProxy.test.ts`](server/argusProxy.test.ts) | A ponte descarta CPF/e-mail, só aceita os 3 endereços e exige https e token |
+
+</details>
+
+---
+
+## 🚀 Como executar localmente
+
+> **Pré-requisitos:** [Node.js](https://nodejs.org/) 18 ou superior (recomendado 22) e `npm`.
+
+```bash
+git clone https://github.com/ProfetaSaru/BENHERMES.git
+cd BENHERMES
+npm install
+npm run dev        # http://localhost:5173/
+```
+
+| Comando | O que faz |
+|---|---|
+| `npm run dev` | Servidor de desenvolvimento (com a ponte do Argus) |
+| `npm test` | Testes |
+| `npm run build` | Confere os tipos e gera o site em `dist/` |
+| `npm run preview` | Abre o site gerado (também com a ponte do Argus) |
+
+A cada merge na `main`, a **Vercel publica sozinha** em [benhermes.vercel.app](https://benhermes.vercel.app).
+
+---
+
+## 🏗️ Arquitetura
+
+<details>
+<summary><b>🧱 Conceito Nevernester</b></summary>
+
 
 O projeto adota o princípio **Nevernester** para manter o código limpo, legível e altamente sustentável:
 
@@ -232,116 +514,69 @@ O projeto adota o princípio **Nevernester** para manter o código limpo, legív
    - [`useTaskForm`](src/hooks/useTaskForm.ts): Gestão do estado do formulário e validações com retornos antecipados.
    - [`useNotification`](src/hooks/useNotification.ts): Sistema de toasts com gerenciamento de tempo sem vazamento de memória.
 
----
+</details>
 
-## 📂 Estrutura de Pastas
+<details>
+<summary><b>📂 Estrutura de pastas</b></summary>
 
 ```
-Gerador-de-Relatorio/
-├── legacy_backup/             # Arquivos originais (Vanilla HTML/JS/CSS) preservados
+BENHERMES/
+├── api/argus.ts                  # função da Vercel: ponte com o Argus no site
+├── server/argusProxy.ts          # ponte com o Argus (mesmo código no Vite e na Vercel)
+├── .github/workflows/ci.yml      # testes e build em cada PR
 ├── src/
-│   ├── types/
-│   │   └── task.ts            # Interfaces TypeScript tipadas estritamente
-│   ├── hooks/
-│   │   ├── useTasks.ts        # Hook para CRUD e persistência no localStorage
-│   │   ├── useTaskForm.ts     # Hook para formulário e validações
-│   │   └── useNotification.ts # Hook para alertas temporários
-│   ├── utils/
-│   │   ├── formatReport.ts    # Formatação do texto do relatório
-│   │   └── storage.ts         # Leitura e escrita segura no localStorage
-│   ├── styles/
-│   │   ├── variables.css      # Design tokens e variáveis de tema
-│   │   ├── global.css         # Reset global e layout
-│   │   └── components.css     # Estilos modulares e responsivos
 │   ├── components/
-│   │   ├── common/            # Componentes atômicos reutilizáveis
-│   │   │   ├── Button.tsx
-│   │   │   ├── FormField.tsx
-│   │   │   ├── Input.tsx
-│   │   │   ├── Textarea.tsx
-│   │   │   ├── Badge.tsx
-│   │   │   ├── Panel.tsx
-│   │   │   ├── SectionHeading.tsx
-│   │   │   ├── Modal.tsx
-│   │   │   └── NotificationToast.tsx
-│   │   ├── layout/
-│   │   │   └── Header.tsx
-│   │   └── task/
-│   │       ├── TaskItem.tsx
-│   │       ├── TaskList.tsx
-│   │       ├── TaskForm.tsx
-│   │       ├── ReportPreview.tsx
-│   │       └── ReportPanel.tsx
-│   ├── App.tsx                # Composição principal da aplicação
-│   └── main.tsx               # Ponto de entrada React
-├── index.html                 # HTML raiz do Vite
-├── package.json
-├── tsconfig.json
-└── vite.config.ts
+│   │   ├── escala/               # Escala de Bases
+│   │   ├── relatorioUra/         # Relatório URA (tabela, conferência, configurações)
+│   │   ├── configuracoes/        # Configurações do Hub (feriados)
+│   │   ├── formatter/            # Formatador de Planilhas
+│   │   ├── reports/ templates/   # Central de Relatórios
+│   │   ├── history/              # Histórico & Arquivos
+│   │   ├── layout/ common/ task/ # menu, componentes comuns e tarefas
+│   ├── hooks/                    # estado e localStorage (useEscalaBases, useRelatorioUra, useFeriados...)
+│   ├── utils/                    # regras, sem tela (e os *.test.ts ao lado)
+│   │   ├── calendario.ts         # datas, feriados, dia útil anterior
+│   │   ├── escalaBases.ts        # rodízio, importação e planilha da escala
+│   │   ├── uraLeitura.ts         # leitura das exportações (CSV/Excel, R$, tempos)
+│   │   ├── uraCalculo.ts         # contas do relatório, comparação, metas e cores
+│   │   ├── uraExportacao.ts      # planilha, tabela colorida e CSV do histórico
+│   │   ├── argusApi.ts           # download e diagnóstico pela API do Argus
+│   │   └── planilhaColorida.ts   # .xlsx com cores (exceljs, sob demanda)
+│   ├── templates/reports/        # modelos Markdown da Central de Relatórios
+│   ├── styles/                   # CSS modular
+│   └── App.tsx · main.tsx
+├── legacy_backup/                # versão original em HTML/JS
+└── vite.config.ts · package.json · tsconfig.json
 ```
+
+</details>
 
 ---
 
-## 🚀 Como Executar Localmente
+## 🐉 BenHermes × BENZAITEN
 
-### Pré-requisitos
-- [Node.js](https://nodejs.org/) (versão 18 ou superior recomendada)
-- Gerenciador de pacotes `npm`
+O **[BENZAITEN](https://github.com/nanzinx/Benzaiten)** é a versão em Python (terminal) das mesmas automações. As regras
+do BenHermes foram portadas dele e conferidas número a número (285 células do relatório sem nenhuma diferença,
+500 cenários de rodízio iguais).
 
-### Instalação
+| | BenHermes | BENZAITEN |
+|---|---|---|
+| Situação | ✅ **Sistema principal** | 🧊 **Reserva, congelado** |
+| Onde roda | Navegador ([benhermes.vercel.app](https://benhermes.vercel.app)) | Terminal (Python), no computador |
+| Mudanças novas | Entram aqui | Não entram mais |
+| Quando usar | Sempre | Só se o BenHermes ficar fora do ar |
 
-1. Clone o repositório:
-```bash
-git clone https://github.com/ProfetaSaru/Gerador-de-Relatorio.git
-cd Gerador-de-Relatorio
-```
-
-2. Instale as dependências:
-```bash
-npm install
-```
-
-3. Inicie o servidor de desenvolvimento:
-```bash
-npm run dev
-```
-
-A aplicação estará disponível em `http://localhost:5173/`.
-
-> 🔌 O botão **Baixar do Argus** do Relatório URA funciona com `npm run dev`, `npm run preview` e no deploy da Vercel (função `api/argus.ts`). Em uma hospedagem só de arquivos estáticos, ele não funciona.
-
-### Build de Produção
-
-Para validar a tipagem TypeScript e gerar os arquivos otimizados para produção:
-```bash
-npm run build
-```
-
-Para visualizar localmente o build gerado:
-```bash
-npm run preview
-```
+Os históricos são **intercambiáveis**: `historico_escalas.csv` e `relatorio_ura.csv` exportados por um são importados
+pelo outro.
 
 ---
 
-## 📄 Exemplo do Relatório Gerado
+## 🛠️ Tecnologias
 
-```text
-RELATÓRIO DE CONCLUSÃO DE ATIVIDADES
-08:00 – 09:00 *ALINHAMENTO DIÁRIO:* - Daily meeting com o time;
-09:00 – 12:00 *REFATORAÇÃO DE CÓDIGO:* - Migração para React e TypeScript;
-13:30 – 15:00 *CODE REVIEW*;
-```
-
----
-
-## 🛠️ Tecnologias Utilizadas
-
-- **[React 18](https://react.dev/)**
-- **[TypeScript](https://www.typescriptlang.org/)**
-- **[Vite](https://vitejs.dev/)**
-- **[Lucide React](https://lucide.dev/)** (ícones)
-- **Vanilla CSS Modular** (CSS custom properties, grid/flexbox)
+[React 18](https://react.dev/) · [TypeScript](https://www.typescriptlang.org/) · [Vite](https://vitejs.dev/) ·
+[Vitest](https://vitest.dev/) · [SheetJS](https://sheetjs.com/) (leitura de planilhas) ·
+[ExcelJS](https://github.com/exceljs/exceljs) (planilhas coloridas) · [Lucide](https://lucide.dev/) (ícones) ·
+CSS modular · [Vercel](https://vercel.com/) (publicação e ponte do Argus)
 
 ---
 

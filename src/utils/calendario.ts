@@ -120,15 +120,39 @@ export const feriadoNacional = (iso: string): string | null => {
 };
 
 /**
- * Último dia útil antes da data (segunda -> sexta; pula feriados nacionais).
+ * Feriado cadastrado à mão: estaduais, municipais e pontos facultativos (Carnaval,
+ * Corpus Christi...). Os nacionais já são calculados sozinhos.
+ */
+export interface FeriadoLocal {
+  data: string;
+  descricao: string;
+}
+
+/** Nome do feriado da data (local ou nacional), ou null */
+export const feriado = (iso: string, locais: FeriadoLocal[] = []): string | null =>
+  locais.find((f) => f.data === iso)?.descricao || feriadoNacional(iso);
+
+/** Lista de nacionais do ano, para mostrar nas Configurações */
+export const feriadosNacionaisDoAno = (ano: number): FeriadoLocal[] => {
+  const pascoa = isoParaDate(domingoDePascoa(ano));
+  pascoa.setDate(pascoa.getDate() - 2);
+  const sextaSanta = montarIso(pascoa.getFullYear(), pascoa.getMonth() + 1, pascoa.getDate());
+  return [
+    ...FERIADOS_FIXOS.map(([dia, mes, descricao]) => ({ data: montarIso(ano, mes, dia), descricao })),
+    { data: sextaSanta, descricao: 'Sexta-feira Santa' },
+  ].sort((a, b) => a.data.localeCompare(b.data));
+};
+
+/**
+ * Último dia útil antes da data (segunda -> sexta; pula feriados nacionais e os locais informados).
  * Exemplo: relatório feito em 20/10 é o de 19/10.
  */
-export const diaUtilAnterior = (iso: string): string => {
+export const diaUtilAnterior = (iso: string, locais: FeriadoLocal[] = []): string => {
   const data = isoParaDate(iso);
   const paraIso = () => montarIso(data.getFullYear(), data.getMonth() + 1, data.getDate());
 
   data.setDate(data.getDate() - 1);
-  while (ehFimDeSemana(paraIso()) || feriadoNacional(paraIso())) {
+  while (ehFimDeSemana(paraIso()) || feriado(paraIso(), locais)) {
     data.setDate(data.getDate() - 1);
   }
   return paraIso();

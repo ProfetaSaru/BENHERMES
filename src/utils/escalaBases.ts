@@ -6,7 +6,7 @@ import {
   ImportacaoEscala,
   ResultadoSorteio,
 } from '../types/escala';
-import { celulaParaIso, diaDaSemana, ehFimDeSemana, feriadoNacional, isoParaBr, brParaIso, normalizarNome } from './calendario';
+import { FeriadoLocal, celulaParaIso, diaDaSemana, ehFimDeSemana, feriado, isoParaBr, brParaIso, normalizarNome } from './calendario';
 import { escaparCsv } from './csvTexto';
 import { bordaFina, novaPlanilha, pintar } from './planilhaColorida';
 import type { Workbook } from 'exceljs';
@@ -167,7 +167,8 @@ export const realizarSorteio = (
   cadastro: EscalaCadastro,
   historico: EscalaRegistro[],
   data: string,
-  ausentes: string[]
+  ausentes: string[],
+  feriadosLocais: FeriadoLocal[] = []
 ): ResultadoSorteio => {
   const fora = new Set(ausentes.map(normalizarNome));
   const disponiveis = cadastro.pessoas.filter((p) => !fora.has(normalizarNome(p)));
@@ -175,9 +176,9 @@ export const realizarSorteio = (
   const historicoSemData = historico.filter((r) => r.data !== data);
 
   const avisos: string[] = [];
-  const feriado = feriadoNacional(data);
+  const nomeDoFeriado = feriado(data, feriadosLocais);
   if (ehFimDeSemana(data)) avisos.push('A data escolhida cai no fim de semana.');
-  if (feriado) avisos.push(`A data escolhida é feriado (${feriado}).`);
+  if (nomeDoFeriado) avisos.push(`A data escolhida é feriado (${nomeDoFeriado}).`);
   if (disponiveis.length < cadastro.bases.length) {
     avisos.push(
       `${disponiveis.length} pessoa(s) para ${cadastro.bases.length} base(s): alguém fica com mais de uma base.`
