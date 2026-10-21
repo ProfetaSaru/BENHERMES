@@ -369,9 +369,10 @@ const compararComAnterior = (
   for (const linha of linhas) {
     const antes = doAnterior.get(`${linha.tipo}|${normalizarNome(linha.nome)}`);
     if (!antes) continue;
-    linha.d_leads = (linha.leads ?? 0) - antes.leads;
-    linha.d_vendas = (linha.vendas ?? 0) - antes.vendas;
-    linha.d_custo = (linha.custo ?? 0) - antes.custo;
+    // NaN = número que não se conhece do dia anterior (ex.: custo sem a tarifação daquele dia)
+    if (Number.isFinite(antes.leads)) linha.d_leads = (linha.leads ?? 0) - antes.leads;
+    if (Number.isFinite(antes.vendas)) linha.d_vendas = (linha.vendas ?? 0) - antes.vendas;
+    if (Number.isFinite(antes.custo)) linha.d_custo = (linha.custo ?? 0) - antes.custo;
   }
   return anterior;
 };
@@ -434,3 +435,41 @@ export const metasAtivas = (metas: Metas): Metas =>
   Object.fromEntries(
     Object.entries(metas).filter(([, meta]) => meta && (meta.verde.trim() || meta.vermelho.trim()))
   ) as Metas;
+
+/**
+ * Cores automáticas, usadas quando nenhuma meta foi preenchida: cada indicador é dividido
+ * em terços entre os operadores do dia (sem contar os zeros). O terço melhor fica verde,
+ * o do meio amarelo e o pior vermelho. Zero em leads, vendas, clientes e produção fica
+ * vermelho; TMA, TMO e custo por CPF zerados ficam sem cor (não houve o que medir).
+ */
+export const metasAutomaticas = (linhas: LinhaRelatorio[]): Metas => {
+  const indicadores: [ChaveIndicador, Meta['sentido']][] = [
+    ['tma', 'menor'],
+    ['tmo', 'menor'],
+    ['leads', 'maior'],
+    ['vendas', 'maior'],
+    ['clientes', 'maior'],
+    ['custo_cpf', 'menor'],
+    ['prod_lead', 'maior'],
+  ];
+  const operadores = linhas.filter((l) => l.tipo === 'operador');
+  const metas: Metas = {};
+
+  for (const [chave, sentido] of indicadores) {
+    const valores = operadores
+      .map((l) => l[chave])
+      .filter((v): v is number => typeof v === 'number' && v > 0)
+      .sort((a, b) => a - b);
+    if (valores.length < 3) continue;
+    const tercil = (fracao: number) => valores[Math.min(valores.length - 1, Math.floor(fracao * valores.length))];
+    const [baixo, alto] = [tercil(1 / 3), tercil(2 / 3)];
+    if (baixo === alto) continue;
+    // Texto no formato que valorDaMeta entende (sem separador de milhar)
+    const texto = (v: number) => v.toFixed(2);
+    metas[chave] =
+      sentido === 'maior'
+        ? { sentido, verde: texto(alto), vermelho: texto(baixo) }
+        : { sentido, verde: texto(baixo), vermelho: texto(alto) };
+  }
+  return metas;
+};

@@ -20,7 +20,7 @@ const paraCss = ({ fundo, fonte, negrito }: EstiloCelula): React.CSSProperties =
  * e setas de comparação. As cores são as da empresa, então não mudam com o tema.
  */
 export const UraTabela: React.FC<UraTabelaProps> = ({ resultado, metas }) => {
-  const colunas = colunasDoRelatorio(resultado.dataAnterior);
+  const colunas = colunasDoRelatorio(resultado);
 
   return (
     <div className="ura-tabela-moldura">
