@@ -79,6 +79,22 @@ export const UraConferencia: React.FC<UraConferenciaProps> = ({ resultado, cadas
             <dt>Vendas de agentes fora do cadastro (ignoradas)</dt>
             <dd>{reais(resultado.vendasIgnoradas)}</dd>
           </dl>
+          {resultado.tarifacoes.length > 0 && (
+            <>
+              <h3 className="ura-subtitulo ura-subtitulo-espaco">Tarifações</h3>
+              <dl className="ura-custos">
+                {resultado.tarifacoes.map((t) => (
+                  <React.Fragment key={t.operadora}>
+                    <dt>
+                      {t.operadora}
+                      {t.real !== null ? ` (Argus estimou ${reais(t.estimado)})` : ' (valor do Argus)'}
+                    </dt>
+                    <dd>{reais(t.real ?? t.estimado)}</dd>
+                  </React.Fragment>
+                ))}
+              </dl>
+            </>
+          )}
         </div>
       </div>
 

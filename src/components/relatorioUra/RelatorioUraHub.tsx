@@ -32,13 +32,20 @@ import {
   tipoDeConfiguracao,
   tipoDoArquivo,
 } from '../../utils/uraLeitura';
-import { calcularRelatorio, metasAtivas, metasAutomaticas, registrarNoHistorico } from '../../utils/uraCalculo';
+import {
+  calcularRelatorio,
+  metasAtivas,
+  metasAutomaticas,
+  registrarNoHistorico,
+  totaisDasTarifacoes,
+} from '../../utils/uraCalculo';
 import { baixarDoArgus, diagnosticoLeads } from '../../utils/argusApi';
 import { baixarPlanilha } from '../../utils/planilhaColorida';
 import { gerarPlanilhaUra, historicoUraParaCsv, htmlDoRelatorio, textoDaCelula, textoDoRelatorio } from '../../utils/uraExportacao';
 import { UraTabela } from './UraTabela';
 import { UraConferencia } from './UraConferencia';
 import { UraConfiguracoes } from './UraConfiguracoes';
+import { UraTarifacoes, valorRealDigitado } from './UraTarifacoes';
 
 interface RelatorioUraHubProps {
   onNotify: (message: string, type?: NotificationType) => void;
@@ -75,6 +82,9 @@ export const RelatorioUraHub: React.FC<RelatorioUraHubProps> = ({ onNotify }) =>
   const [isCopied, setIsCopied] = useState(false);
   const [regerar, setRegerar] = useState(false);
   const [isBaixandoArgus, setIsBaixandoArgus] = useState(false);
+  // Valor real da fatura de cada tarifação, como foi digitado. A chave inclui os nomes dos
+  // arquivos: carregou outra tarifação, o valor digitado para a anterior não vale para ela
+  const [valoresReais, setValoresReais] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Metas preenchidas valem; sem nenhuma, as cores são automáticas (terços do dia)
@@ -82,8 +92,9 @@ export const RelatorioUraHub: React.FC<RelatorioUraHubProps> = ({ onNotify }) =>
   const coresAutomaticas = Object.keys(metasPreenchidas).length === 0;
   const metas = coresAutomaticas ? (resultado ? metasAutomaticas(resultado.linhas) : {}) : metasPreenchidas;
 
-  // Arquivos ou data mudaram: o relatório na tela não vale mais
-  useEffect(() => setResultado(null), [arquivos, dia]);
+  // Arquivos, data ou valores das faturas mudaram: o relatório na tela não vale mais
+  useEffect(() => setResultado(null), [arquivos, dia, valoresReais]);
+  const totaisTarifacao = totaisDasTarifacoes(arquivos).map((t) => ({ ...t, chave: `${t.operadora}|${t.arquivos.join('|')}` }));
 
   // Datas presentes no desempenho e nos leads (para sugerir a data certa)
   const datasDosArquivos = [
@@ -259,6 +270,11 @@ export const RelatorioUraHub: React.FC<RelatorioUraHubProps> = ({ onNotify }) =>
       apelidos: ura.apelidos,
       historico: [...ura.historico, ...(diaAnterior?.registros ?? [])],
       diaAnterior: diaUtilAnterior(dia, feriados),
+      valoresReais: Object.fromEntries(
+        totaisTarifacao
+          .map((t) => [t.operadora, valorRealDigitado(valoresReais[t.chave])] as const)
+          .filter((par): par is readonly [string, number] => par[1] !== null)
+      ),
     });
     if (diaAnterior) novo.avisos.unshift(diaAnterior.aviso);
     if (coresAutomaticas) {
@@ -478,6 +494,12 @@ export const RelatorioUraHub: React.FC<RelatorioUraHubProps> = ({ onNotify }) =>
             </div>
           </div>
         </div>
+
+        <UraTarifacoes
+          totais={totaisTarifacao}
+          valores={valoresReais}
+          onChange={(chave, texto) => setValoresReais((atuais) => ({ ...atuais, [chave]: texto }))}
+        />
 
         {sugestaoDeData && (
           <div className="escala-aviso">

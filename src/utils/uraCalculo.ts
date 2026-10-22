@@ -4,6 +4,7 @@ import {
   ArquivoConferencia,
   ChaveIndicador,
   CorMeta,
+  CorrecaoTarifacao,
   LinhaExportacao,
   LinhaRelatorio,
   Meta,
@@ -67,6 +68,35 @@ const dividir = (a: number, b: number): number => (b ? a / b : 0);
 const moeda = (valor: number): string =>
   `R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+/** "VENDITORE.csv" -> VENDITORE, "4net_19-10.xlsx" -> 4NET; outro nome fica como está */
+export const operadoraDaTarifacao = (nomeDoArquivo: string): string => {
+  const nome = normalizarNome(nomeDoArquivo).replace(/[^A-Z0-9]/g, '');
+  if (nome.includes('VENDITORE')) return 'VENDITORE';
+  if (nome.includes('4NET')) return '4NET';
+  return nomeDoArquivo.replace(/\.[^.]+$/, '');
+};
+
+/** Valor de cada linha da tarifação que entra no custo (operadores, robôs e sem derivação) */
+const valoresDaTarifacao = (arquivo: ArquivoCarregado) =>
+  arquivo.linhas
+    .map((linha) => ({ descricao: String(linha['DESCRICAO'] ?? '').trim(), valor: converterValorBr(linha['VALOR R$']) }))
+    .filter(({ descricao }) =>
+      descricao.startsWith('<') ? normalizarNome(descricao).includes(TEXTO_SEM_DERIVACAO) : Boolean(descricao)
+    );
+
+/** Total de cada operadora como o Argus estimou, na ordem em que os arquivos foram carregados */
+export const totaisDasTarifacoes = (arquivos: ArquivoCarregado[]): { operadora: string; arquivos: string[]; estimado: number }[] => {
+  const totais = new Map<string, { operadora: string; arquivos: string[]; estimado: number }>();
+  for (const arquivo of arquivos.filter((a) => a.tipo === 'tarifacao')) {
+    const operadora = operadoraDaTarifacao(arquivo.nome);
+    const atual = totais.get(operadora) ?? { operadora, arquivos: [], estimado: 0 };
+    atual.arquivos.push(arquivo.nome);
+    atual.estimado += valoresDaTarifacao(arquivo).reduce((soma, l) => soma + l.valor, 0);
+    totais.set(operadora, atual);
+  }
+  return [...totais.values()];
+};
+
 export interface EntradaRelatorio {
   dia: string;
   arquivos: ArquivoCarregado[];
@@ -75,6 +105,8 @@ export interface EntradaRelatorio {
   historico: RegistroHistoricoUra[];
   /** Dia útil anterior ao dia do relatório: com quem comparar */
   diaAnterior: string;
+  /** Valor real da fatura por operadora (VENDITORE, 4NET), quando o do Argus é só estimativa */
+  valoresReais?: Record<string, number>;
 }
 
 /**
@@ -123,6 +155,7 @@ export const calcularRelatorio = (entrada: EntradaRelatorio): ResultadoUra => {
     custoIgnorado: 0,
     custoNoRelatorio: 0,
     vendasIgnoradas: 0,
+    tarifacoes: [],
     semVinculo: {},
     exColaboradores: {},
     avisos: [],
@@ -178,23 +211,44 @@ export const calcularRelatorio = (entrada: EntradaRelatorio): ResultadoUra => {
     if (op) op.leads += Math.trunc(converterValorBr(linha['LEADS. ATEND.']));
   }
 
-  // 3. Custos (tarifação VENDITORE + 4NET)
+  // 3. Custos (tarifação VENDITORE + 4NET). Com o valor real da fatura, cada linha da
+  // operadora é multiplicada por real / estimado: o total bate com a fatura e a divisão
+  // entre operadores, robôs e sem derivação continua na mesma proporção do Argus.
   const tarifacoes = porTipo('tarifacao');
+  const fatores = new Map<string, number>();
+  resultado.tarifacoes = totaisDasTarifacoes(tarifacoes).map(({ operadora, arquivos, estimado }): CorrecaoTarifacao => {
+    const digitado = entrada.valoresReais?.[operadora];
+    const real = digitado !== undefined && Number.isFinite(digitado) && digitado > 0 ? digitado : null;
+    if (real !== null && estimado <= 0) {
+      resultado.avisos.push(
+        `A tarifação ${operadora} não tem valores para corrigir: o valor real de ${moeda(real)} não entrou no custo.`
+      );
+      return { operadora, arquivos, estimado, real: null, fator: 1 };
+    }
+    const fator = real !== null ? real / estimado : 1;
+    if (real !== null && Math.abs(fator - 1) > 0.5) {
+      resultado.avisos.push(
+        `O valor real da ${operadora} (${moeda(real)}) está muito longe do que o Argus estimou (${moeda(estimado)}). Confira se foi digitado certo.`
+      );
+    }
+    fatores.set(operadora, fator);
+    return { operadora, arquivos, estimado, real, fator };
+  });
   for (const arquivo of tarifacoes) {
-    conferencia.push({ nome: arquivo.nome, tipo: NOMES_DOS_TIPOS.tarifacao, observacao: `${arquivo.linhas.length} linha(s)` });
-    for (const linha of arquivo.linhas) {
-      const descricao = String(linha['DESCRICAO'] ?? '').trim();
-      const valor = converterValorBr(linha['VALOR R$']);
+    const fator = fatores.get(operadoraDaTarifacao(arquivo.nome)) ?? 1;
+    conferencia.push({
+      nome: arquivo.nome,
+      tipo: NOMES_DOS_TIPOS.tarifacao,
+      observacao: `${arquivo.linhas.length} linha(s)${fator !== 1 ? ' • corrigida pelo valor real da fatura' : ''}`,
+    });
+    for (const { descricao, valor: estimado } of valoresDaTarifacao(arquivo)) {
+      const valor = estimado * fator;
+      resultado.custoImportado += valor;
       if (descricao.startsWith('<')) {
-        // Linha de total; só a "SEM DERIVAÇÃO" entra no custo
-        if (normalizarNome(descricao).includes(TEXTO_SEM_DERIVACAO)) {
-          resultado.semDerivacao += valor;
-          resultado.custoImportado += valor;
-        }
+        // Das linhas de total, só a "SEM DERIVAÇÃO" entra no custo
+        resultado.semDerivacao += valor;
         continue;
       }
-      if (!descricao) continue;
-      resultado.custoImportado += valor;
       if (PREFIXOS_ROBO.some((p) => normalizarNome(descricao).startsWith(p))) {
         resultado.custoRobos += valor;
         continue;
