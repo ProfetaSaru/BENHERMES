@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { ArquivoCarregado, LinhaRelatorio, RegistroHistoricoUra } from '../types/relatorioUra';
-import { calcularRelatorio, corDaMeta, metasAutomaticas, registrarNoHistorico } from './uraCalculo';
+import {
+  calcularRelatorio,
+  corDaMeta,
+  metasAutomaticas,
+  operadoraDaTarifacao,
+  registrarNoHistorico,
+  totaisDasTarifacoes,
+} from './uraCalculo';
 import { cadastroDaExportacao, comoDicionarios, tipoDoArquivo } from './uraLeitura';
 import { colunasDoRelatorio, estiloDaCelula, SEMAFORO } from './uraExportacao';
 
@@ -69,7 +76,7 @@ const ARQUIVOS = [
   ]),
 ];
 
-const gerar = (historico: RegistroHistoricoUra[] = []) =>
+const gerar = (historico: RegistroHistoricoUra[] = [], valoresReais?: Record<string, number>) =>
   calcularRelatorio({
     dia: '2026-10-19',
     arquivos: ARQUIVOS,
@@ -77,6 +84,7 @@ const gerar = (historico: RegistroHistoricoUra[] = []) =>
     apelidos: [{ noSistema: 'KARLA CRUZ', oficial: 'CARLA CRUZ' }],
     historico,
     diaAnterior: '2026-10-16',
+    valoresReais,
   });
 
 const linha = (linhas: LinhaRelatorio[], nome: string) => linhas.find((l) => l.nome === nome)!;
@@ -175,5 +183,55 @@ describe('cores (semáforo)', () => {
     expect(corDaMeta(80, 'tma', meta)).toBe('verde');
     expect(corDaMeta(200, 'tma', meta)).toBe('vermelho');
     expect(corDaMeta(120, 'tma', meta)).toBe('amarelo');
+  });
+});
+
+describe('valor real das tarifações (o Argus só estima)', () => {
+  it('reconhece a operadora pelo nome do arquivo', () => {
+    expect(operadoraDaTarifacao('VENDITORE.csv')).toBe('VENDITORE');
+    expect(operadoraDaTarifacao('tarifacao_venditore 19-10.xlsx')).toBe('VENDITORE');
+    expect(operadoraDaTarifacao('4net_19-10.csv')).toBe('4NET');
+    expect(operadoraDaTarifacao('4 NET.csv')).toBe('4NET');
+    expect(operadoraDaTarifacao('OUTRA.csv')).toBe('OUTRA');
+  });
+
+  it('total estimado de cada operadora (operadores, robôs, sem derivação e fora do cadastro)', () => {
+    const totais = totaisDasTarifacoes(ARQUIVOS);
+    expect(totais.map((t) => t.operadora)).toEqual(['VENDITORE', '4NET']);
+    expect(totais[0].estimado).toBeCloseTo(100 + 1.5 + 30 + 10 + 2 + 0.7);
+    expect(totais[1].estimado).toBeCloseTo(20.5 + 1000.25 + 3);
+  });
+
+  it('sem valor real, nada muda', () => {
+    const r = gerar();
+    expect(r.tarifacoes.map((t) => [t.operadora, t.real, t.fator])).toEqual([
+      ['VENDITORE', null, 1],
+      ['4NET', null, 1],
+    ]);
+  });
+
+  it('corrige só a operadora informada, na mesma proporção', () => {
+    const r = gerar([], { '4NET': 2047.5 }); // o dobro do estimado
+    expect(linha(r.linhas, 'BRUNO BRITO').custo).toBeCloseTo(1000.25 * 2 + 10); // robôs da VENDITORE não mudam
+    expect(linha(r.linhas, 'CARLA CRUZ').custo).toBeCloseTo(6);
+    expect(linha(r.linhas, 'ANA ALVES').custo).toBeCloseTo(1.5 + 30);
+    expect(r.semDerivacao).toBeCloseTo(100 + 41);
+    expect(r.custoImportado).toBeCloseTo(144.2 + 2047.5);
+    expect(r.tarifacoes[1]).toMatchObject({ operadora: '4NET', real: 2047.5, fator: 2 });
+    expect(r.arquivos.find((a) => a.nome === '4NET.csv')?.observacao).toContain('corrigida');
+  });
+
+  it('robôs, sem derivação e fora do cadastro também são corrigidos; os custos continuam batendo', () => {
+    const r = gerar([], { VENDITORE: 144.2 * 1.1 });
+    expect(r.custoRobos).toBeCloseTo(44);
+    expect(linha(r.linhas, 'ANA ALVES').custo).toBeCloseTo(1.65 + 33);
+    expect(r.custoIgnorado).toBeCloseTo(2.97);
+    expect(r.custoImportado - r.custoNoRelatorio - r.custoIgnorado).toBeCloseTo(0);
+    expect(r.linhas.find((l) => l.tipo === 'total_geral')!.custo).toBeCloseTo(144.2 * 1.1 + 1023.75 - 2.97);
+  });
+
+  it('valor zerado é ignorado; valor muito diferente gera aviso', () => {
+    expect(gerar([], { VENDITORE: 0 }).tarifacoes[0].real).toBeNull();
+    expect(gerar([], { VENDITORE: 1000 }).avisos.join()).toContain('muito longe');
   });
 });

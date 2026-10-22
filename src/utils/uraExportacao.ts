@@ -285,6 +285,17 @@ export const gerarPlanilhaUra = async (resultado: ResultadoUra, metas: Metas): P
   ).forEach(([rotulo, valor]) => {
     adicionar([rotulo, Math.round(valor * 100) / 100]).getCell(2).numFmt = FORMATOS_EXCEL.reais;
   });
+  if (resultado.tarifacoes.length > 0) {
+    tituloSecao('Tarifações (valor usado no custo)');
+    resultado.tarifacoes.forEach((t) => {
+      const linha = adicionar([
+        `${t.operadora} (${t.arquivos.join(', ')})`,
+        Math.round((t.real ?? t.estimado) * 100) / 100,
+        t.real !== null ? `valor real da fatura; o Argus estimou ${textoDaCelula(t.estimado, 'reais')}` : 'valor do Argus',
+      ]);
+      linha.getCell(2).numFmt = FORMATOS_EXCEL.reais;
+    });
+  }
   tituloSecao('Nomes sem vínculo (cadastre em Apelidos se for grafia diferente)');
   Object.entries(resultado.semVinculo).sort().forEach(([nome, origens]) => adicionar([nome, origens.join(', ')]));
   tituloSecao('Ex-colaboradores ignorados (inativos no Argus)');

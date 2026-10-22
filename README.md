@@ -67,7 +67,7 @@ flowchart LR
 ```
 
 - [ ] **Escala:** abrir **Escala de Bases**, clicar nos nomes de quem faltou e em **Gerar escala do dia**. Depois, **Copiar texto** para o chat.
-- [ ] **Relatório:** abrir **Relatório URA** (a data já vem como o dia útil anterior), clicar em **Baixar do Argus**, arrastar a tarifação e a esteira e clicar em **Gerar relatório**.
+- [ ] **Relatório:** abrir **Relatório URA** (a data já vem como o dia útil anterior), clicar em **Baixar do Argus**, arrastar a tarifação e a esteira, digitar o **valor real da fatura** de cada tarifação (se já tiver) e clicar em **Gerar relatório**.
 - [ ] **Entregar:** **Copiar tabela** (cola com as cores no Excel e no Outlook) ou **Baixar planilha**.
 
 > [!TIP]
@@ -120,7 +120,7 @@ A escala é um **rodízio**: a cada dia, cada pessoa anda **uma base para frente
 |---|---|
 | **TMA / TMO** | Argus › Desempenho (TMA e TME), média ponderada pelos atendimentos de cada sessão |
 | **Leads atendidos/URA** | Argus › Desempenho do dia: atendimentos de cada operador, sem os robôs |
-| **Custo total** | Tarifação VENDITORE + 4NET: custo do operador + **rateio do custo dos robôs da URA** pelos leads |
+| **Custo total** | Tarifação VENDITORE + 4NET: custo do operador + **rateio do custo dos robôs da URA** pelos leads. Com o valor real da fatura, corrigido na mesma proporção |
 | **Vendas geral** | Esteira Vanguard: soma do Valor Contrato nas etapas Andamento, Pendente e Pago |
 | **Clientes efetivados** | Esteira Vanguard: CPFs únicos nas etapas Andamento e Pago |
 | **Custo por CPF / Produção por lead** | Custo ÷ clientes / vendas ÷ leads |
@@ -143,6 +143,7 @@ Setas: **verde é bom** (mais leads e vendas, menos custo); vermelho é ruim. TM
 <details>
 <summary><b>🧾 Conferência, apelidos e metas</b></summary>
 
+- **Valor real das tarifações:** o Argus costuma só estimar o custo. Em **Gerar relatório**, digite o total da fatura da VENDITORE e da 4NET (a operadora é reconhecida pelo nome do arquivo). Cada linha daquela tarifação (operadores, robôs, sem derivação) é multiplicada por *real ÷ estimado*: o total bate com a fatura e a divisão entre os operadores continua a mesma. Em branco, vale o valor do Argus. A conferência e a planilha mostram o valor estimado e o usado.
 - **Conferência:** de onde veio cada número, arquivos ignorados (de outro dia), custos que batem com a tarifação, nomes sem vínculo e ex-colaboradores.
 - **Apelidos:** quando um nome aparece diferente em algum sistema (ex.: `KARLA CRUZ` × `CARLA CRUZ`), escolha "É a mesma pessoa que..." na conferência e o relatório é gerado de novo.
 - **Metas:** em Configurações do relatório, por indicador, com sentido (maior/menor é melhor) e limites verde e vermelho.

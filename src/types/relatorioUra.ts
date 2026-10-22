@@ -81,6 +81,19 @@ export interface ArquivoConferencia {
   observacao: string;
 }
 
+/**
+ * Valor de uma tarifação (VENDITORE ou 4NET): o que o Argus estimou e, se digitado,
+ * o valor real da fatura. Com o valor real, todas as linhas daquela tarifação são
+ * multiplicadas pelo fator (real / estimado), mantendo a proporção entre operadores.
+ */
+export interface CorrecaoTarifacao {
+  operadora: string;
+  arquivos: string[];
+  estimado: number;
+  real: number | null;
+  fator: number;
+}
+
 export interface ResultadoUra {
   data: string;
   linhas: LinhaRelatorio[];
@@ -92,6 +105,7 @@ export interface ResultadoUra {
   custoIgnorado: number;
   custoNoRelatorio: number;
   vendasIgnoradas: number;
+  tarifacoes: CorrecaoTarifacao[];
   semVinculo: Record<string, string[]>;
   exColaboradores: Record<string, string[]>;
   avisos: string[];

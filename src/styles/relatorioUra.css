@@ -388,3 +388,82 @@
 .ura-acoes-gerar .btn {
   flex: 1;
 }
+
+/* Valor real das tarifações (o Argus só estima) */
+.ura-tarifacoes {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.ura-tarifacoes-titulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ura-tarifacoes-titulo span {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.ura-tarifacao {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(130px, auto) minmax(180px, 220px) minmax(150px, 1fr);
+  align-items: center;
+  gap: 12px 16px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+  font-size: 0.85rem;
+}
+
+.ura-tarifacao > div,
+.ura-tarifacao-real {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ura-tarifacao span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
+.ura-tarifacao strong {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.ura-tarifacao-real input {
+  font-variant-numeric: tabular-nums;
+}
+
+.ura-tarifacao-real input.invalido {
+  border-color: var(--red);
+}
+
+.ura-tarifacao-diferenca .ura-dif {
+  color: var(--ink);
+  font-size: 0.85rem !important;
+}
+
+.ura-tarifacao-diferenca .ura-dif.ruim {
+  font-size: 0.85rem !important;
+}
+
+.ura-tarifacao-sem {
+  font-style: italic;
+}
+
+@media (max-width: 760px) {
+  .ura-tarifacao {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.ura-subtitulo-espaco {
+  margin-top: 16px;
+}
