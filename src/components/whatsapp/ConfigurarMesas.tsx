@@ -32,7 +32,6 @@ interface Edicao {
 }
 
 const CENTROS: [Centro, string][] = [
-  ['SUPSUB', 'Supervisor + backup'],
   ['SUP', 'Supervisor'],
   ['NENHUM', 'Ninguém'],
 ];
@@ -56,7 +55,7 @@ export const ConfigurarMesas: React.FC<ConfigurarMesasProps> = ({ mapa, onMapa, 
     setEdicao({
       salaId,
       nova: true,
-      rascunho: novaMesa({ nome: `${n}º Equipe`, sigla, supervisor: '', esq: 4, dir: 4, centro: 'SUPSUB', inicio: 'sup' }, agora()),
+      rascunho: novaMesa({ nome: `${n}º Equipe`, sigla, supervisor: '', esq: 4, dir: 4, centro: 'SUP', inicio: 'sup' }, agora()),
     });
   };
 

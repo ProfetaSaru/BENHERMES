@@ -33,6 +33,37 @@
   --wpp-borda: var(--amber);
 }
 
+.wpp-analise {
+  --wpp-cor: #c2410c;
+  --wpp-fundo: #fff7ed;
+  --wpp-borda: #c2410c;
+}
+
+.wpp-permanente {
+  --wpp-cor: #111827;
+  --wpp-fundo: #f3f4f6;
+  --wpp-borda: #111827;
+}
+
+:root[data-theme='dark'] .wpp-analise {
+  --wpp-cor: #fb923c;
+  --wpp-fundo: rgba(251, 146, 60, 0.14);
+  --wpp-borda: #fb923c;
+}
+
+:root[data-theme='dark'] .wpp-permanente {
+  --wpp-cor: #e5e7eb;
+  --wpp-fundo: rgba(229, 231, 235, 0.08);
+  --wpp-borda: #e5e7eb;
+}
+
+/* Supervisor sem WhatsApp */
+.semwpp {
+  --wpp-cor: transparent;
+  --wpp-fundo: var(--paper-surface);
+  --wpp-borda: var(--line);
+}
+
 .wpp-nao_tem {
   --wpp-cor: var(--muted);
   --wpp-fundo: var(--paper-surface);
@@ -620,4 +651,138 @@
 
 .wpp-perigo {
   color: var(--red);
+}
+
+/* Onde está o WhatsApp da baia */
+.wpp-baia-local {
+  font-size: 0.7rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wpp-baia.semwpp .wpp-baia-situacao {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.wpp-baia.wpp-analise .wpp-baia-situacao,
+.wpp-baia.wpp-permanente .wpp-baia-situacao {
+  font-weight: 700;
+  color: var(--wpp-cor);
+}
+
+/* Alertas (Atenção) */
+.wpp-alertas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wpp-alertas-total {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: var(--red);
+  color: #fff;
+  font-size: 0.75rem;
+}
+
+.wpp-alertas-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wpp-alerta {
+  display: grid;
+  grid-template-columns: 12px minmax(130px, auto) minmax(0, 1.4fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--wpp-cor, var(--muted));
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wpp-alerta:hover {
+  background: var(--paper-surface);
+}
+
+.wpp-alerta-acao {
+  color: var(--wpp-cor);
+}
+
+.wpp-alerta-onde {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wpp-alerta-quem,
+.wpp-alerta-quando {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .wpp-alerta {
+    grid-template-columns: 12px 1fr auto;
+  }
+
+  .wpp-alerta-onde,
+  .wpp-alerta-quem {
+    grid-column: 2 / 4;
+  }
+}
+
+/* Ciclo do banimento no painel */
+.wpp-ciclo {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--wpp-cor);
+  background: var(--wpp-fundo);
+  color: var(--ink);
+  font-size: 0.85rem;
+}
+
+.wpp-ciclo p {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+}
+
+.wpp-ciclo.vencida {
+  border-left-width: 6px;
+}
+
+.wpp-painel-local {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wpp-situacoes {
+  grid-template-columns: 1fr 1fr;
 }

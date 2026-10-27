@@ -4,16 +4,14 @@ import * as XLSX from 'xlsx';
 import { NotificationType } from '../../types/task';
 import { MapaWhatsapp } from '../../types/whatsapp';
 import { useWhatsappBaias } from '../../hooks/useWhatsappBaias';
+import { nomeDoCelular, ondeEstaABaia, textoDoLocal } from '../../utils/celulares';
 import { codigoDoLugar } from '../../utils/mapaMesas';
 import { baixarPlanilha } from '../../utils/planilhaColorida';
-import { ResumoWhatsapp, exportarMapa, importarMapa, resumoDaSala, resumoGeral } from '../../utils/whatsappBaias';
-import {
-  gerarPlanilhaWhatsapp,
-  gradeDaPlanilha,
-  importarPlanilhaWhatsapp,
-  nomeDaPlanilhaWhatsapp,
-} from '../../utils/whatsappPlanilha';
-import { CampoCelular, CelularesCorporativos } from './CelularesCorporativos';
+import { AlvoAlerta, ResumoWhatsapp, alertas, resumoDaSala, resumoGeral } from '../../utils/whatsappAlertas';
+import { exportarMapa, importarMapa } from '../../utils/whatsappBaias';
+import { lerArquivoDoMapa } from '../../utils/whatsappPlanilha';
+import { gerarResumoWhatsapp, nomeDoResumoWhatsapp } from '../../utils/whatsappResumo';
+import { Alertas } from './Alertas';
 import { FiltroMapa, MapaMesa } from './MapaMesa';
 import { PainelLugar } from './PainelLugar';
 import { ConfigurarMesas } from './ConfigurarMesas';
@@ -22,9 +20,7 @@ interface WhatsappHubProps {
   onNotify: (message: string, type?: NotificationType) => void;
 }
 
-type Selecao =
-  | { tipo: 'lugar'; salaId: string; mesaId: string; posicao: string }
-  | { tipo: 'celular'; cor: string; campo: CampoCelular };
+type Selecao = AlvoAlerta;
 
 const doisDigitos = (n: number) => String(n).padStart(2, '0');
 const dataHora = (iso: string) => {
@@ -39,10 +35,8 @@ const FILTROS: [FiltroMapa, string][] = [
   ['vazias', 'Vagas vazias'],
 ];
 
-const NOME_CAMPO: Record<CampoCelular, string> = { messenger: 'Messenger', business: 'Business' };
-
-/** Chips de contagem (OK, BANIDO, RESTRINGIDO, NÃO TEM, vagas vazias) */
-const Contagens: React.FC<{ resumo: ResumoWhatsapp }> = ({ resumo }) => (
+/** Chips de contagem das 6 situações e das vagas vazias */
+const Contagens: React.FC<{ resumo: ResumoWhatsapp; celulares?: boolean }> = ({ resumo, celulares }) => (
   <div className="wpp-contagens">
     <span className="wpp-contagem wpp-ok">
       <span className="wpp-bolinha" aria-hidden="true" />
@@ -50,7 +44,15 @@ const Contagens: React.FC<{ resumo: ResumoWhatsapp }> = ({ resumo }) => (
     </span>
     <span className="wpp-contagem wpp-banido">
       <span className="wpp-bolinha" aria-hidden="true" />
-      {resumo.banido} banido(s)
+      {resumo.banido} pedir análise
+    </span>
+    <span className="wpp-contagem wpp-analise">
+      <span className="wpp-bolinha" aria-hidden="true" />
+      {resumo.analise} em análise{resumo.analiseAtrasada > 0 ? ` · ${resumo.analiseAtrasada} há +24 h` : ''}
+    </span>
+    <span className="wpp-contagem wpp-permanente">
+      <span className="wpp-bolinha" aria-hidden="true" />
+      {resumo.permanente} perdido(s)
     </span>
     <span className="wpp-contagem wpp-restringido">
       <span className="wpp-bolinha" aria-hidden="true" />
@@ -61,6 +63,7 @@ const Contagens: React.FC<{ resumo: ResumoWhatsapp }> = ({ resumo }) => (
       {resumo.naoTem} não tem
     </span>
     <span className="wpp-contagem vazia">{resumo.vagasVazias} vaga(s) vazia(s)</span>
+    {celulares && <span className="wpp-contagem">📱 {resumo.celulares} celular(es)</span>}
   </div>
 );
 
@@ -87,12 +90,29 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({ onNotify }) => {
   }, []);
 
   const geral = resumoGeral(mapa, agora);
-  const problemas = geral.banido + geral.restringido + geral.naoTem;
+  const problemas = geral.banido + geral.analise + geral.permanente + geral.restringido + geral.naoTem;
+  const listaDeAlertas = alertas(mapa, agora);
+
+  /** Vaga ligada abre o painel da baia; backup abre o painel da vaga */
+  const abrir = (alvo: AlvoAlerta) => {
+    if (alvo.tipo === 'vaga') {
+      const cel = mapa.celulares.find((c) => c.id === alvo.celularId);
+      const vaga = cel?.vagas.find((v) => v.id === alvo.vagaId);
+      if (cel && vaga?.baia && cel.mesaId) {
+        const sala = mapa.salas.find((s) => s.mesas.some((m) => m.id === cel.mesaId));
+        if (sala) {
+          setSelecao({ tipo: 'lugar', salaId: sala.id, mesaId: cel.mesaId, posicao: vaga.baia });
+          return;
+        }
+      }
+    }
+    setSelecao(alvo);
+  };
 
   const handleBaixarPlanilha = async () => {
     try {
       const momento = new Date();
-      await baixarPlanilha(await gerarPlanilhaWhatsapp(mapa, momento), nomeDaPlanilhaWhatsapp(momento));
+      await baixarPlanilha(await gerarResumoWhatsapp(mapa, momento), nomeDoResumoWhatsapp(momento));
       onNotify('Download da planilha iniciado!', 'success');
     } catch (err: any) {
       onNotify(`Erro ao gerar a planilha: ${err.message}`, 'error');
@@ -105,7 +125,7 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({ onNotify }) => {
     if (!arquivo) return;
     try {
       const livro = XLSX.read(await arquivo.arrayBuffer(), { type: 'array' });
-      const { mapa: lido, avisos } = importarPlanilhaWhatsapp(gradeDaPlanilha(livro), new Date());
+      const { mapa: lido, avisos } = lerArquivoDoMapa(livro, new Date());
       setPrevia({ arquivo: arquivo.name, mapa: lido, avisos });
     } catch (err: any) {
       onNotify(err.message || 'Não consegui ler a planilha.', 'error');
@@ -151,15 +171,16 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({ onNotify }) => {
   // Painel do que está selecionado
   const painel = (() => {
     if (!selecao) return null;
-    if (selecao.tipo === 'celular') {
-      const cel = mapa.celulares.find((c) => c.cor === selecao.cor);
-      if (!cel) return null;
+    if (selecao.tipo === 'vaga') {
+      const cel = mapa.celulares.find((c) => c.id === selecao.celularId);
+      const vaga = cel?.vagas.find((v) => v.id === selecao.vagaId);
+      if (!cel || !vaga) return null;
       return (
         <PainelLugar
-          titulo={`Celular ${cel.cor}`}
-          subtitulo={`WhatsApp ${NOME_CAMPO[selecao.campo]}`}
-          estado={cel[selecao.campo]}
-          onEstado={(novo) => wpp.alterarCelular(cel.cor, selecao.campo, novo)}
+          titulo={`${nomeDoCelular(cel)} · ${vaga.rotulo}`}
+          subtitulo={`${vaga.grupo} · backup "${cel.nomeBackup}"${vaga.numero ? ` · ${vaga.numero}` : ''}`}
+          estado={vaga.whatsapp}
+          onEstado={(novo) => wpp.alterarEstadoDaVaga(cel.id, vaga.id, novo)}
           agora={agora}
           onFechar={() => setSelecao(null)}
         />
@@ -170,20 +191,23 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({ onNotify }) => {
     const lugar = mesa?.lugares[selecao.posicao];
     if (!sala || !mesa || !lugar) return null;
     const { posicao } = selecao;
-    const nome =
-      posicao === 'SUP'
-        ? { rotulo: 'Supervisor', valor: mesa.supervisor, podeEsvaziar: false, onChange: (v: string) => wpp.alterarMesa(sala.id, mesa.id, { supervisor: v }) }
-        : {
-            rotulo: posicao === 'SUB' ? 'Backup (nome, opcional)' : 'Operador',
-            valor: lugar.operador,
-            podeEsvaziar: posicao !== 'SUB',
-            onChange: (v: string) => wpp.alterarLugar(sala.id, mesa.id, posicao, { operador: v }),
-          };
+    const ehSup = posicao === 'SUP';
+    const nome = ehSup
+      ? { rotulo: 'Supervisor', valor: mesa.supervisor, podeEsvaziar: false, onChange: (v: string) => wpp.alterarMesa(sala.id, mesa.id, { supervisor: v }) }
+      : {
+          rotulo: 'Operador',
+          valor: lugar.operador,
+          podeEsvaziar: true,
+          onChange: (v: string) => wpp.alterarLugar(sala.id, mesa.id, posicao, { operador: v }),
+        };
+    const onde = ondeEstaABaia(mapa, mesa.id, posicao);
     return (
       <PainelLugar
         titulo={codigoDoLugar(mesa.sigla, posicao)}
         subtitulo={`${mesa.nome} · ${sala.nome}`}
         nome={nome}
+        local={ehSup ? undefined : onde ? `${textoDoLocal(onde.celular, onde.vaga)}${onde.vaga.numero ? ` · ${onde.vaga.numero}` : ''}` : 'sem celular'}
+        supervisor={ehSup ? { valor: mesa.whatsappSupervisor, onChange: (v) => wpp.alterarMesa(sala.id, mesa.id, { whatsappSupervisor: v }) } : undefined}
         estado={lugar.whatsapp}
         onEstado={(novo) => wpp.alterarLugar(sala.id, mesa.id, posicao, { whatsapp: novo })}
         agora={agora}
@@ -202,8 +226,9 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({ onNotify }) => {
             WhatsApp das Baias
           </h1>
           <p>
-            Mapa das mesas com a situação do WhatsApp de cada lugar. Clique numa baia para trocar o operador ou a
-            situação; tudo fica salvo neste navegador. Atualizado em {dataHora(mapa.atualizadoEm)}.
+            Mapa das mesas com a situação do WhatsApp de cada lugar e os celulares corporativos. Clique numa baia
+            para trocar o operador ou a situação, ou num alerta para agir; tudo fica salvo neste navegador.
+            Atualizado em {dataHora(mapa.atualizadoEm)}.
           </p>
         </div>
         <div className="task-count">
@@ -241,7 +266,8 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({ onNotify }) => {
           </div>
         </div>
 
-        <Contagens resumo={geral} />
+        <Contagens resumo={geral} celulares />
+        <Alertas itens={listaDeAlertas} agora={agora} onAbrir={abrir} />
         {mapa.salas.length > 1 && (
           <div className="wpp-resumo-salas">
             {mapa.salas.map((s) => (
@@ -305,7 +331,9 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({ onNotify }) => {
           </div>
           <div className="wpp-legenda" aria-hidden="true">
             <span className="wpp-ok"><span className="wpp-bolinha" />OK</span>
-            <span className="wpp-banido"><span className="wpp-bolinha" />Banido</span>
+            <span className="wpp-banido"><span className="wpp-bolinha" />Banido — pedir análise</span>
+            <span className="wpp-analise"><span className="wpp-bolinha" />Em análise</span>
+            <span className="wpp-permanente"><span className="wpp-bolinha" />Perdido</span>
             <span className="wpp-restringido"><span className="wpp-bolinha" />Restringido</span>
             <span className="wpp-nao_tem"><span className="wpp-bolinha" />Não tem</span>
             <span className="vazia"><span className="wpp-bolinha" />Vaga vazia</span>
@@ -333,19 +361,20 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({ onNotify }) => {
                     selecao?.tipo === 'lugar' && selecao.mesaId === mesa.id ? selecao.posicao : null
                   }
                   onSelecionar={(posicao) => setSelecao({ tipo: 'lugar', salaId: sala.id, mesaId: mesa.id, posicao })}
+                  localDe={
+                    mapa.celulares.length > 0
+                      ? (posicao) => {
+                          const onde = ondeEstaABaia(mapa, mesa.id, posicao);
+                          return onde ? `📱 ${textoDoLocal(onde.celular, onde.vaga)}` : 'sem celular';
+                        }
+                      : undefined
+                  }
                 />
               </div>
             ))}
           </div>
         </section>
       ))}
-
-      <CelularesCorporativos
-        celulares={mapa.celulares}
-        agora={agora}
-        selecionado={selecao?.tipo === 'celular' ? { cor: selecao.cor, campo: selecao.campo } : null}
-        onSelecionar={(cor, campo) => setSelecao({ tipo: 'celular', cor, campo })}
-      />
 
       <ConfigurarMesas mapa={mapa} onMapa={wpp.substituir} onNotify={onNotify} />
 

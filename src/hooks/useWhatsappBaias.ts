@@ -1,12 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { EstadoWhatsapp, Lugar, MapaWhatsapp, Mesa } from '../types/whatsapp';
-import {
-  alterarCelularNoMapa,
-  alterarLugarNoMapa,
-  alterarMesaNoMapa,
-  carregarMapa,
-  lerMapaSalvo,
-} from '../utils/whatsappBaias';
+import { alterarLugarNoMapa, alterarMesaNoMapa, carregarMapa, lerMapaSalvo } from '../utils/whatsappBaias';
+import { alterarEstadoDaVaga as alterarEstadoDaVagaNoMapa } from '../utils/celulares';
 
 export const STORAGE_WHATSAPP_KEY = 'benhermes_whatsapp';
 
@@ -56,9 +51,13 @@ export function useWhatsappBaias() {
     setMapa((atual) => alterarMesaNoMapa(atual, salaId, mesaId, (m) => ({ ...m, ...mudanca }), new Date()));
   }, []);
 
-  const alterarCelular = useCallback((cor: string, campo: 'messenger' | 'business', e: EstadoWhatsapp) => {
-    setMapa((atual) => alterarCelularNoMapa(atual, cor, campo, e, new Date()));
+  /** Vaga ligada muda a situação da baia; backup muda a própria */
+  const alterarEstadoDaVaga = useCallback((celularId: string, vagaId: string, e: EstadoWhatsapp) => {
+    setMapa((atual) => alterarEstadoDaVagaNoMapa(atual, celularId, vagaId, e, new Date()));
   }, []);
 
-  return { mapa, avisoInicial, setMapa, substituir, alterarLugar, alterarMesa, alterarCelular };
+  /** Qualquer operação pura sobre o mapa (celulares, salas, mesas) */
+  const alterarMapa = useCallback((mudar: (m: MapaWhatsapp) => MapaWhatsapp) => setMapa((atual) => mudar(atual)), []);
+
+  return { mapa, avisoInicial, setMapa, substituir, alterarLugar, alterarMesa, alterarEstadoDaVaga, alterarMapa };
 }
