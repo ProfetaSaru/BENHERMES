@@ -1,15 +1,12 @@
 import * as XLSX from 'xlsx';
-import type { Borders, Cell, Workbook, Worksheet } from 'exceljs';
-import { CelularCorporativo, EstadoWhatsapp, Lugar, MapaWhatsapp, Mesa, Sala, Situacao } from '../types/whatsapp';
+import { EstadoWhatsapp, Lugar, MapaWhatsapp, Mesa, Sala, Situacao } from '../types/whatsapp';
 import { normalizarNome } from './calendario';
 import { codigoDoLugar } from './mapaMesas';
-import { novaPlanilha } from './planilhaColorida';
-import { ROTULOS, corDoCelular, estado, novaMesa } from './whatsappBaias';
+import { estado, importarMapa, novaMesa } from './whatsappBaias';
 
 /**
  * Planilha do WhatsApp das Baias: leitura da RELATORIO-WHATSAPP-INTUITIVO.xlsx
- * (salas, equipes lado a lado, supervisor/backup e celulares corporativos) e a planilha
- * de resumo no mesmo visual, que pode ser importada de volta.
+ * (salas, equipes lado a lado e supervisor) e o arquivo baixado pelo próprio BenHermes (aba dados).
  */
 
 /** Primeira aba como texto, em coordenadas absolutas: grade[0][0] = A1 */
@@ -147,7 +144,6 @@ export const importarPlanilhaWhatsapp = (grade: string[][], agora: Date): Result
       }
       linhas.push(l);
     }
-    const temBackup = rodape >= 0 && normalizarNome(cel(rodape, c + 2)).startsWith('BACKUP');
     // Cada lado vai até a última linha preenchida dele (o que vier antes, vazio, é vaga vazia)
     const ultima = (d: number) => {
       for (let i = linhas.length - 1; i >= 0; i--) if (cel(linhas[i], c + d) || cel(linhas[i], c + d + 1)) return i + 1;
@@ -156,8 +152,18 @@ export const importarPlanilhaWhatsapp = (grade: string[][], agora: Date): Result
     const esq = ultima(0);
     const dir = ultima(2);
     const operadores = linhas.slice(0, Math.max(esq, dir));
+    // O BACKUP da linha do supervisor não é usado (os backups agora são vagas dos celulares)
+    const supSemWhatsapp = rodape >= 0 && normalizarNome(cel(rodape, c + 1)) === 'NAO TEM';
     const mesa: Mesa = novaMesa(
-      { ...id, sigla, esq, dir, centro: rodape < 0 ? 'NENHUM' : temBackup ? 'SUPSUB' : 'SUP', inicio: 'sup' },
+      {
+        ...id,
+        sigla,
+        esq,
+        dir,
+        centro: rodape < 0 ? 'NENHUM' : 'SUP',
+        inicio: 'sup',
+        whatsappSupervisor: supSemWhatsapp ? 'NAO_TEM' : 'PC',
+      },
       agora
     );
 
@@ -170,7 +176,6 @@ export const importarPlanilhaWhatsapp = (grade: string[][], agora: Date): Result
       if (i < dir) mesa.lugares[`D${i + 1}`] = lugar(`D${i + 1}`, cel(l, c + 2), cel(l, c + 3));
     });
     if (rodape >= 0) mesa.lugares.SUP = lugar('SUP', '', cel(rodape, c + 1));
-    if (temBackup) mesa.lugares.SUB = lugar('SUB', '', cel(rodape, c + 3));
 
     // Equipes antes de qualquer título de sala vão para a primeira sala
     const sala = [...salas].reverse().find((s) => s.linha < r) ?? salas[0];
@@ -178,207 +183,27 @@ export const importarPlanilhaWhatsapp = (grade: string[][], agora: Date): Result
     else salas.push({ id: crypto.randomUUID(), nome: 'Sala 1', mesas: [mesa], linha: -1 });
   }
 
-  const lista: CelularCorporativo[] = [];
-  if (celulares) {
-    const { r, c } = celulares as { r: number; c: number };
-    for (let l = r + 2; l < grade.length && cel(l, c); l++) {
-      const cor = cel(l, c).toUpperCase();
-      lista.push({
-        cor,
-        hex: corDoCelular(cor),
-        messenger: situacaoDe(cel(l, c + 1), `Celular ${cor} (Messenger)`),
-        business: situacaoDe(cel(l, c + 3), `Celular ${cor} (Business)`),
-      });
-    }
-  }
+  // O bloco antigo de celulares (só Messenger/Business por cor) não tem as vagas: cadastro na tela
+  if (celulares) avisos.push('Os celulares não são importados da planilha antiga; cadastre-os em Configurar.');
 
   return {
     mapa: {
-      versao: 1,
+      versao: 2,
       salas: salas.filter((s) => s.mesas.length > 0).map(({ linha: _linha, ...sala }) => sala),
-      celulares: lista,
+      celulares: [],
       atualizadoEm: agora.toISOString(),
     },
     avisos,
   };
 };
 
-// ---------------------------------------------------------------------------
-// Planilha de resumo
-// ---------------------------------------------------------------------------
-
-const COR = {
-  fundo: 'FF002060',
-  amarelo: 'FFFFFF00',
-  branco: 'FFFFFFFF',
-  verde: 'FF00B050',
-  azul: 'FF0070C0',
-  vazio: 'FFFFD966',
-  desativada: 'FF808080',
-};
-
-const COR_DA_SITUACAO: Record<Situacao, string> = {
-  OK: 'FF70AD47',
-  BANIDO: 'FFFF0000',
-  RESTRINGIDO: 'FFBF8F00',
-  NAO_TEM: 'FF808080',
-};
-
-const LARGURAS: Record<string, number> = { E: 61, F: 22.57, G: 58.29, H: 18.71, K: 56.29, L: 18.71, M: 51.29, N: 31.71 };
-const ESPACO = 3; // colunas D, I, J e O
-const BLOCOS = [5, 11]; // E (5) e K (11): primeira coluna de cada equipe da linha
-
-const doisDigitos = (n: number) => String(n).padStart(2, '0');
-const dataHora = (d: Date) =>
-  `${doisDigitos(d.getDate())}/${doisDigitos(d.getMonth() + 1)}/${d.getFullYear()} ${doisDigitos(d.getHours())}:${doisDigitos(d.getMinutes())}`;
-
-export const nomeDaPlanilhaWhatsapp = (agora: Date): string =>
-  `relatorio_whatsapp_${agora.getFullYear()}-${doisDigitos(agora.getMonth() + 1)}-${doisDigitos(agora.getDate())}.xlsx`;
-
-const textoDaSituacao = (e: EstadoWhatsapp): string => {
-  if (e.situacao !== 'RESTRINGIDO' || !e.restritoAte) return ROTULOS[e.situacao];
-  const ate = new Date(e.restritoAte);
-  return `RESTRINGIDO ATÉ ${doisDigitos(ate.getDate())}/${doisDigitos(ate.getMonth() + 1)} ${doisDigitos(ate.getHours())}:${doisDigitos(ate.getMinutes())}`;
-};
-
-/** "1º EQUIPE - Supervisor"; nomes fora do padrão "Nº Equipe" saem como "DIGITAL" ou "PLANTÃO - Supervisor" */
-const tituloDaMesa = (mesa: Mesa): string => {
-  const padrao = mesa.nome.match(/^(\d+)º Equipe(?: \((.*)\))?$/);
-  if (!padrao) return `${mesa.nome.toUpperCase()}${mesa.supervisor ? ` - ${mesa.supervisor}` : ''}`;
-  const nota = padrao[2] ? `(${padrao[2].toUpperCase()})` : '';
-  return `${padrao[1]}º EQUIPE - ${[mesa.supervisor, nota].filter(Boolean).join(' ')}`;
-};
-
-const escrever = (
-  celula: Cell,
-  valor: string,
-  fonte: { nome?: string; tamanho: number; cor?: string; negrito?: boolean },
-  fundo = COR.branco
-): void => {
-  celula.value = valor;
-  celula.font = {
-    name: fonte.nome ?? 'Arial',
-    size: fonte.tamanho,
-    bold: fonte.negrito ?? false,
-    ...(fonte.cor ? { color: { argb: fonte.cor } } : {}),
-  };
-  celula.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fundo } };
-  celula.alignment = { horizontal: 'center', vertical: 'middle' };
-};
-
-const escreverSituacao = (celula: Cell, e: EstadoWhatsapp) => {
-  escrever(celula, textoDaSituacao(e), { nome: 'Calibri', tamanho: 14, cor: COR_DA_SITUACAO[e.situacao] });
-  celula.alignment = { horizontal: 'center', vertical: 'middle', shrinkToFit: true }; // "RESTRINGIDO ATÉ ..." é longo
-};
-
-/** Borda fina por dentro e grossa em volta do bloco */
-const moldura = (ws: Worksheet, r1: number, c1: number, r2: number, c2: number): void => {
-  for (let r = r1; r <= r2; r++) {
-    for (let c = c1; c <= c2; c++) {
-      const lado = (grosso: boolean) => ({ style: grosso ? ('thick' as const) : ('thin' as const), color: { argb: 'FF000000' } });
-      const borda: Partial<Borders> = { top: lado(r === r1), bottom: lado(r === r2), left: lado(c === c1), right: lado(c === c2) };
-      const celula = ws.getCell(r, c);
-      celula.border = borda;
-      if (!celula.fill || (celula.fill as any).fgColor?.argb === COR.fundo) {
-        celula.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COR.branco } };
-      }
-    }
-  }
-};
-
-/** Escreve uma equipe a partir da linha r, coluna c; devolve a última linha usada */
-const escreverMesa = (ws: Worksheet, mesa: Mesa, r: number, c: number): number => {
-  // Cada equipe usa só as suas linhas: o SUPERVISOR vem logo depois (a importação para na primeira linha vazia)
-  const linhas = Math.max(mesa.esq, mesa.dir);
-  ws.mergeCells(r, c, r, c + 3);
-  escrever(ws.getCell(r, c), tituloDaMesa(mesa), { tamanho: 20, negrito: true }, COR.amarelo);
-  ['OPERADOR', 'WHATSAPP', 'OPERADOR', 'WHATSAPP'].forEach((t, i) =>
-    escrever(ws.getCell(r + 1, c + i), t, { tamanho: 16, negrito: true, cor: COR.verde })
-  );
-  for (let i = 0; i < linhas; i++) {
-    (['E', 'D'] as const).forEach((lado, j) => {
-      const posicao = `${lado}${i + 1}`;
-      const quantidade = lado === 'E' ? mesa.esq : mesa.dir;
-      const nome = ws.getCell(r + 2 + i, c + j * 2);
-      const situacao = ws.getCell(r + 2 + i, c + j * 2 + 1);
-      if (i >= quantidade) return;
-      if (mesa.desativadas.includes(posicao)) {
-        escrever(nome, 'DESATIVADA', { tamanho: 12, negrito: true, cor: COR.desativada });
-        return;
-      }
-      const lugar = mesa.lugares[posicao];
-      if (!lugar) return;
-      escrever(nome, lugar.operador || 'VAZIO', { tamanho: 12, negrito: true, cor: lugar.operador ? COR.azul : COR.vazio });
-      escreverSituacao(situacao, lugar.whatsapp);
-    });
-  }
-  let fim = r + 1 + linhas;
-  if (mesa.centro !== 'NENHUM') {
-    fim++;
-    escrever(ws.getCell(fim, c), 'SUPERVISOR', { tamanho: 14, cor: COR.verde });
-    if (mesa.lugares.SUP) escreverSituacao(ws.getCell(fim, c + 1), mesa.lugares.SUP.whatsapp);
-    if (mesa.centro === 'SUPSUB') {
-      escrever(ws.getCell(fim, c + 2), 'BACKUP', { tamanho: 14, cor: COR.verde });
-      if (mesa.lugares.SUB) escreverSituacao(ws.getCell(fim, c + 3), mesa.lugares.SUB.whatsapp);
-    }
-  }
-  moldura(ws, r, c, fim, c + 3);
-  return fim;
-};
-
 /**
- * Planilha de resumo no visual da RELATORIO-WHATSAPP-INTUITIVO: fundo azul-escuro,
- * título amarelo por sala, duas equipes por linha (E–H e K–N) e os celulares corporativos.
+ * Lê um arquivo de planilha: a planilha baixada pelo BenHermes volta exata pela aba oculta
+ * "dados" (o .json do mapa em pedaços na coluna A); qualquer outra é lida como a planilha antiga.
  */
-export const gerarPlanilhaWhatsapp = async (mapa: MapaWhatsapp, agora: Date): Promise<Workbook> => {
-  const livro = await novaPlanilha();
-  const ws = livro.addWorksheet('WhatsApp');
-  ws.getColumn(1).width = ESPACO;
-  ['B', 'C', 'D', 'I', 'J', 'O'].forEach((col) => (ws.getColumn(col).width = ESPACO));
-  Object.entries(LARGURAS).forEach(([col, largura]) => (ws.getColumn(col).width = largura));
-
-  let r = 2;
-  for (const sala of mapa.salas) {
-    ws.mergeCells(r, 5, r, 14);
-    escrever(
-      ws.getCell(r, 5),
-      `STATUS DOS WHATSAPP DO ${sala.nome.toUpperCase()} — ${dataHora(agora)}`,
-      { nome: 'Calibri', tamanho: 36, negrito: true },
-      COR.amarelo
-    );
-    ws.getRow(r).height = 47.25;
-    r += 1;
-    for (let i = 0; i < sala.mesas.length; i += 2) {
-      const par = sala.mesas.slice(i, i + 2);
-      const fim = Math.max(...par.map((m, j) => escreverMesa(ws, m, r, BLOCOS[j])));
-      r = fim + 2;
-    }
-  }
-
-  if (mapa.celulares.length > 0) {
-    ws.mergeCells(r, 5, r, 8);
-    escrever(ws.getCell(r, 5), 'WHATSAPP DOS CELULARES CORPORATIVOS', { tamanho: 20, negrito: true }, COR.amarelo);
-    ['CELULAR', 'MESSENGER', 'CELULAR', 'BUSINESS'].forEach((t, i) =>
-      escrever(ws.getCell(r + 1, 5 + i), t, { tamanho: 16, negrito: true, cor: COR.verde })
-    );
-    mapa.celulares.forEach((cel, i) => {
-      const linha = r + 2 + i;
-      const cor = `FF${cel.hex.replace('#', '').toUpperCase()}`;
-      escrever(ws.getCell(linha, 5), cel.cor, { tamanho: 12, negrito: true, cor });
-      escreverSituacao(ws.getCell(linha, 6), cel.messenger);
-      escrever(ws.getCell(linha, 7), cel.cor, { tamanho: 12, negrito: true, cor });
-      escreverSituacao(ws.getCell(linha, 8), cel.business);
-    });
-    moldura(ws, r, 5, r + 1 + mapa.celulares.length, 8);
-    r += 2 + mapa.celulares.length;
-  }
-
-  // Fundo azul-escuro em volta dos blocos (o que não foi escrito)
-  for (let linha = 1; linha <= r + 1; linha++) {
-    for (let col = 4; col <= 15; col++) {
-      const celula = ws.getCell(linha, col);
-      if (!celula.fill) celula.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COR.fundo } };
-    }
-  }
-  return livro;
+export const lerArquivoDoMapa = (livro: XLSX.WorkBook, agora: Date): ResultadoImportacao => {
+  const aba = livro.SheetNames.find((n) => normalizarNome(n) === 'DADOS');
+  if (!aba) return importarPlanilhaWhatsapp(gradeDaPlanilha(livro), agora);
+  const linhas = XLSX.utils.sheet_to_json<unknown[]>(livro.Sheets[aba], { header: 1, defval: '', raw: true });
+  return { mapa: importarMapa(linhas.map((l) => String(l[0] ?? '')).join('')), avisos: [] };
 };
