@@ -133,6 +133,8 @@ export interface AcaoFeita {
   vaga: string;
   /** Só TROCOU_CHIP, opcional */
   numeroNovo?: string;
+  /** Só RESTRINGIDO: até quando (ISO) */
+  ate?: string;
 }
 
 export interface Manutencao {

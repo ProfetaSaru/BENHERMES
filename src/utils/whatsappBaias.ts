@@ -314,7 +314,8 @@ const acaoValida = (a: any): boolean =>
   !!a &&
   ['em', 'chave', 'codigo', 'operador', 'celular', 'vaga'].every((k) => ehTexto(a[k])) &&
   ACOES.includes(a.acao) &&
-  (a.numeroNovo === undefined || ehTexto(a.numeroNovo));
+  (a.numeroNovo === undefined || ehTexto(a.numeroNovo)) &&
+  (a.ate === undefined || ehTexto(a.ate));
 
 const manutencaoValida = (m: any): boolean =>
   !!m &&
