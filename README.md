@@ -46,7 +46,7 @@ tudo no navegador, sem instalar nada.
 |:-:|---|---|---|
 | 🎲 | **Escala de Bases** | Rodízio diário das bases do INSS entre os grupos dos supervisores do Ativo 2 | Todo dia útil, de manhã |
 | 📞 | **Relatório URA** | TMA, TMO, leads, custo, vendas e clientes por operador e equipe, com setas e cores | Todo dia útil (relatório do dia anterior) |
-| 💬 | **WhatsApp das Baias** | Mapa das mesas com a situação do WhatsApp de cada baia (OK, banido, restringido, não tem) e a planilha de resumo | Ao longo do dia, sempre que um número cair ou voltar |
+| 💬 | **WhatsApp das Baias** | Mapa das mesas com a situação do WhatsApp de cada baia, os celulares corporativos, o ciclo do banimento e a planilha de resumo | Ao longo do dia, sempre que um número cair ou voltar |
 | 📊 | **Formatador de Planilhas** | Converte qualquer planilha no CSV de mailing `CPF;BENEFICIO;NOME;TELEFONE1..5` | Quando chega uma base nova |
 | 📋 | **Central de Relatórios** | Relatórios de atividades e formulários a partir de modelos Markdown | No fim do expediente |
 | 🗂️ | **Histórico & Arquivos** | Relatórios de atividades salvos, com restauração completa | Quando precisar rever um dia |
@@ -190,29 +190,70 @@ sequenceDiagram
 ## 💬 WhatsApp das Baias
 
 Substitui a planilha **RELATORIO-WHATSAPP-INTUITIVO**. Cada sala (Comercial 1, Comercial 2) tem suas mesas no mesmo
-desenho do mapa do **Sistema de Chamados**: supervisor e backup no topo, baias do lado esquerdo (`OP1-E1`…) e do
-direito (`OP1-D1`…), com o corredor no meio.
+desenho do mapa do **Sistema de Chamados**: supervisor no topo, baias do lado esquerdo (`OP1-E1`…) e do direito
+(`OP1-D1`…), com o corredor no meio. **O mapa é a tela principal**; os celulares corporativos ficam logo abaixo.
 
-1. **Primeira vez:** **Importar planilha** → escolha a planilha atual → confira a prévia → **Substituir mapa**.
+1. **Primeira vez:** **Importar planilha** → escolha a planilha atual → confira a prévia → **Substituir mapa**. Depois
+   cadastre os celulares em **Configurar celulares** (a planilha antiga não traz os celulares).
 2. **No dia a dia:** clique numa baia para trocar o **operador** e a **situação**; clique no nome da equipe para trocar o
-   **supervisor**. Tudo salva na hora, neste navegador.
-3. **Para enviar:** **Baixar planilha** gera o `.xlsx` no visual da planilha antiga, com data e hora no título.
+   **supervisor** e dizer onde ele usa o WhatsApp (PC, celular ou não tem). Tudo salva na hora, neste navegador.
+3. **Atenção:** o bloco do resumo lista o que precisa de ação, do mais urgente ao menos. Clique para abrir a baia.
+4. **Para enviar:** **Baixar planilha** gera o `.xlsx` novo (Painel, Mapa, Celulares, Lista).
 
-| Situação | Na tela | Na planilha |
+| Situação | Na tela | O que fazer |
 |---|---|---|
-| ✅ OK | bolinha verde | `OK` em verde |
-| ⛔ BANIDO | baia vermelha | `BANIDO` em vermelho |
-| ⏳ RESTRINGIDO | baia amarela, "até 29/10 14:00 · faltam 1d 3h" | `RESTRINGIDO ATÉ 29/10 14:00` em amarelo-escuro |
-| ⚪ NÃO TEM | baia cinza | `NÃO TEM` em cinza |
+| ✅ OK | bolinha verde | nada |
+| ⛔ BANIDO | baia vermelha, "há 3h" | **Pedi a análise** |
+| 🔎 EM ANÁLISE | baia laranja, "pedida há 26h" | **Liberado** (volta a OK) ou **Permanente** |
+| ✖️ PERDIDO | baia escura | trocar o chip daquela vaga |
+| ⏳ RESTRINGIDO | baia amarela, "até 29/10 14:00 · faltam 1d 3h" | esperar; quando vence, conferir |
+| ⚪ NÃO TEM | baia cinza | — |
 
 <details>
-<summary><b>⏳ Restrição, filtros e celulares corporativos</b></summary>
+<summary><b>🔁 Ciclo do banimento e alertas</b></summary>
 
-- **Restringido** pede **por quanto tempo** (horas ou dias). Quando o prazo acaba, a baia **não volta sozinha** para
-  OK: aparece "Restrição terminou — confira" e o botão **Voltar para OK**.
-- **Filtros:** *Só problemas* (banido, restringido, não tem) e *Vagas vazias* apagam as outras baias no mapa.
+- **Banido → Pedi a análise → Liberado** (costuma voltar no dia seguinte) **ou Permanente** (número perdido).
+- O bloco **Atenção** mostra, nesta ordem: banidos sem análise pedida (o mais antigo primeiro), análises com
+  **mais de 24 h**, restrições que já terminaram, números perdidos, restringidos (pelo fim do prazo) e quem não tem.
+- **Restringido** pede **por quanto tempo** (horas ou dias). Quando o prazo acaba, a baia **não volta sozinha** para OK.
 - **A situação é da baia** (do número daquele lugar): esvaziar a baia não muda a situação.
-- **Celulares corporativos:** um cartão por cor, com o WhatsApp **Messenger** e o **Business**.
+- Supervisor **sem WhatsApp** fica fora das contagens e dos alertas.
+
+</details>
+
+<details>
+<summary><b>📱 Celulares corporativos</b></summary>
+
+Cada celular é identificado pela **cor da capinha** (e um apelido, se houver dois da mesma cor: "Preto · Joana") e
+fica numa **equipe** ou **guardado**. As **vagas** (cada WhatsApp do aparelho) nascem da marca:
+
+| Marca | Vagas |
+|---|---|
+| Samsung | 8 (Padrão e Pasta segura: Business + 2 Messenger cada; Clonado: 2 Messenger) |
+| Motorola | 6 do proprietário + 3 por usuário extra (15 com 4 usuários) |
+| Xiaomi | 3 por usuário (12 com 4 usuários) |
+| iPhone | 3 |
+| Outro | você cria e remove as vagas |
+
+- Ao entrar numa equipe, as vagas se **ligam sozinhas** às baias: **Messenger** no lado esquerdo, **Business** no
+  direito, pulando baias já ligadas a outro celular da equipe. As que sobram são **backup** ("Benconsig Comercial").
+- Na mesa **Digital** o celular é **compartilhado**: todas as vagas são backup "Digital Benconsig".
+- A baia ligada mostra o celular (📱 Azul · Usuário 2 · Messenger 1); a situação da vaga é a situação da baia.
+- **Configurar celulares**: mudar marca, usuários (vagas que somem com baia, número ou problema pedem confirmação),
+  equipe, ligar cada vaga a uma baia ou ao backup e anotar o **número do chip**.
+
+</details>
+
+<details>
+<summary><b>📊 Planilha nova</b></summary>
+
+| Aba | O que tem |
+|---|---|
+| **Painel** | 8 números (OK, banidos, em análise, perdidos…), o bloco **Atenção** e as equipes com barra de OK. Cabe na tela do celular |
+| **Mapa** | as mesas em pares, cada baia com operador e situação, pronta para imprimir |
+| **Celulares** | cada celular com as vagas, quem usa e a situação |
+| **Lista** | uma linha por WhatsApp, com filtro |
+| `dados` (oculta) | o mapa completo: **importar esta planilha devolve o mapa exatamente igual** |
 
 </details>
 
@@ -220,13 +261,13 @@ direito (`OP1-D1`…), com o corredor no meio.
 <summary><b>🧩 Salas, mesas e arquivos</b></summary>
 
 - **Configurar salas e mesas** (no fim da página): nova sala, nova mesa (nome, sigla, supervisor, baias de cada lado,
-  quem fica no centro, onde começa a baia 1), desativar uma baia clicando na prévia. Diminuir uma mesa com operador
-  pede confirmação.
-- **Importar planilha** reconhece salas ("STATUS DOS WHATSAPP DO COMERCIAL 1"), equipes ("1º EQUIPE - Supervisor",
-  ou qualquer título acima da linha `OPERADOR | WHATSAPP`), `VAZIO`, `SUPERVISOR`/`BACKUP` e os celulares. Situação
-  desconhecida vira NÃO TEM, com aviso na prévia. "Digital" vira a mesa `DG`.
+  supervisor ou ninguém no centro, onde começa a baia 1), desativar uma baia clicando na prévia. Diminuir uma mesa com
+  operador pede confirmação; remover uma mesa deixa os celulares dela guardados.
+- **Importar planilha** lê a planilha nova pela aba `dados` e a antiga pelos títulos ("STATUS DOS WHATSAPP DO
+  COMERCIAL 1", "1º EQUIPE - Supervisor" ou qualquer título acima da linha `OPERADOR | WHATSAPP`), `VAZIO` e
+  `SUPERVISOR`. Situação desconhecida vira NÃO TEM, com aviso na prévia. "Digital" vira a mesa `DG`.
 - **Exportar mapa / Importar mapa** (`.json`): cópia de segurança e o formato que vai levar o mapa para o Sistema de
-  Chamados, onde os supervisores poderão atualizar a própria equipe.
+  Chamados, onde os supervisores poderão atualizar a própria equipe. Mapas da primeira versão são convertidos sozinhos.
 
 </details>
 
@@ -516,8 +557,11 @@ testes e o build. **PR vermelho não deve ir para a `main`.**
 | [`uraCalculo.test.ts`](src/utils/uraCalculo.test.ts) | Relatório completo com **os mesmos números esperados do BENZAITEN**, comparação, cores automáticas e metas |
 | [`argusApi.test.ts`](src/utils/argusApi.test.ts) | API simulada: leads do dia sem robôs, média ponderada, token, diagnóstico |
 | [`mapaMesas.test.ts`](src/utils/mapaMesas.test.ts) | Códigos das baias (`OP1-E3`), ordem pelo supervisor ou pela porta, mudar o formato da mesa |
-| [`whatsappBaias.test.ts`](src/utils/whatsappBaias.test.ts) | Situações, restrição (prazo, vencida, tempo inválido), resumo, siglas, salas e mesas, arquivo `.json` |
-| [`whatsappPlanilha.test.ts`](src/utils/whatsappPlanilha.test.ts) | Leitura da planilha de WhatsApps (variações de texto, Digital, sem backup), cores da planilha gerada e ida e volta |
+| [`whatsappBaias.test.ts`](src/utils/whatsappBaias.test.ts) | Situações, ciclo do banimento, restrição (prazo, vencida, tempo inválido), siglas, salas e mesas, arquivo `.json` e migração da v1 |
+| [`whatsappPlanilha.test.ts`](src/utils/whatsappPlanilha.test.ts) | Leitura da planilha antiga (variações de texto, Digital, linhas em branco, virada do ano) e da nova pela aba `dados` |
+| [`celulares.test.ts`](src/utils/celulares.test.ts) | Vagas por marca, ligação automática às baias, compartilhado, mudar equipe/marca/usuários, ligar baia, remover mesa |
+| [`whatsappAlertas.test.ts`](src/utils/whatsappAlertas.test.ts) | Contagens por sala, geral e por celular; ordem e tipos dos alertas |
+| [`whatsappResumo.test.ts`](src/utils/whatsappResumo.test.ts) | Abas da planilha nova, números do Painel, Lista com filtro e ida e volta exata |
 | [`argusProxy.test.ts`](server/argusProxy.test.ts) | A ponte descarta CPF/e-mail, só aceita os 3 endereços e exige https e token |
 
 </details>
