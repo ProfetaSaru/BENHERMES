@@ -269,14 +269,15 @@
 }
 
 .wpp-baia:focus-visible,
-.wpp-celular-chip:focus-visible,
+.wpp-vaga:focus-visible,
+.wpp-alerta:focus-visible,
 .wpp-situacao:focus-visible {
   outline: 3px solid var(--yellow);
   outline-offset: 2px;
 }
 
 .wpp-baia.selecionada,
-.wpp-celular-chip.selecionada {
+.wpp-vaga.selecionada {
   border: 2px solid var(--blue);
   box-shadow: 0 0 0 3px var(--yellow);
 }
@@ -347,57 +348,6 @@
 .wpp-baia.wpp-restringido .wpp-baia-situacao {
   font-weight: 700;
   color: var(--wpp-cor);
-}
-
-/* Celulares corporativos */
-.wpp-celulares {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-  gap: 12px;
-}
-
-.wpp-celular {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-}
-
-.wpp-celular-cor {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 700;
-  color: var(--ink);
-}
-
-.wpp-celular-amostra {
-  width: 16px;
-  height: 16px;
-  border-radius: 4px;
-  border: 1px solid var(--line-strong);
-}
-
-.wpp-celular-chip {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 6px 10px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--wpp-borda);
-  background: var(--wpp-fundo);
-  color: var(--ink);
-  font-size: 0.82rem;
-  cursor: pointer;
-}
-
-.wpp-celular-chip strong {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
 }
 
 /* Painel lateral de edição */
@@ -785,4 +735,214 @@
 
 .wpp-situacoes {
   grid-template-columns: 1fr 1fr;
+}
+
+/* Celulares */
+.wpp-celulares {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.wpp-celular {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.wpp-celular.aberto {
+  grid-column: 1 / -1;
+}
+
+.wpp-celular.aberto .wpp-vagas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+  column-gap: 24px;
+}
+
+.wpp-celular.aberto .wpp-vagas-grupo {
+  grid-column: 1 / -1;
+}
+
+.wpp-celular-topo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.wpp-celular-topo svg.girado,
+.wpp-config-abrir svg.girado {
+  transform: rotate(180deg);
+}
+
+.wpp-celular-nome {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.wpp-celular-nome span {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.wpp-celular-amostra {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1px solid var(--line-strong);
+}
+
+.wpp-vagas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.wpp-vagas-grupo {
+  padding: 10px 0 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.wpp-vaga {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 4px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.82rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wpp-vaga:hover {
+  background: var(--paper-surface);
+}
+
+.wpp-vaga.selecionada {
+  border-radius: var(--radius-sm);
+}
+
+.wpp-vaga-dono {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wpp-vaga-dono em {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--blue-dark);
+  margin-right: 6px;
+}
+
+.wpp-vaga-dono.backup {
+  color: var(--muted);
+}
+
+.wpp-vaga-situacao {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: var(--wpp-cor);
+}
+
+/* Configurar celulares */
+.wpp-config-celular-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.wpp-config-celular-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wpp-cor {
+  width: 56px;
+  height: 40px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+}
+
+.wpp-config-celular {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.wpp-config-celular-topo,
+.wpp-config-celular-linha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.wpp-config-celular-topo .formatter-select {
+  width: auto;
+  min-width: 150px;
+}
+
+.wpp-config-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+
+.wpp-config-inline .formatter-select {
+  width: auto;
+  max-width: 220px;
+}
+
+.wpp-config-inline input[type='number'] {
+  max-width: 72px;
+}
+
+.wpp-config-vagas .formatter-select {
+  min-width: 160px;
+}
+
+.wpp-config-grupo {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.wpp-config-vaga-nova {
+  display: grid;
+  grid-template-columns: 1fr 140px 1fr auto;
+  gap: 8px;
 }

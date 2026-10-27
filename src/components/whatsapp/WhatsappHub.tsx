@@ -15,6 +15,8 @@ import { Alertas } from './Alertas';
 import { FiltroMapa, MapaMesa } from './MapaMesa';
 import { PainelLugar } from './PainelLugar';
 import { ConfigurarMesas } from './ConfigurarMesas';
+import { Celulares } from './Celulares';
+import { ConfigurarCelulares } from './ConfigurarCelulares';
 
 interface WhatsappHubProps {
   onNotify: (message: string, type?: NotificationType) => void;
@@ -376,7 +378,15 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({ onNotify }) => {
         </section>
       ))}
 
+      <Celulares
+        mapa={mapa}
+        agora={agora}
+        selecionado={selecao?.tipo === 'vaga' ? { celularId: selecao.celularId, vagaId: selecao.vagaId } : null}
+        onSelecionar={(celularId, vagaId) => abrir({ tipo: 'vaga', celularId, vagaId })}
+      />
+
       <ConfigurarMesas mapa={mapa} onMapa={wpp.substituir} onNotify={onNotify} />
+      <ConfigurarCelulares mapa={mapa} onMapa={wpp.substituir} onNotify={onNotify} />
 
       {painel}
     </div>

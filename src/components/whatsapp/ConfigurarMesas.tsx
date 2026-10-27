@@ -11,12 +11,12 @@ import {
   alternarDesativada,
   formatarMesa,
   novaMesa,
-  removerMesaNoMapa,
   removerSalaNoMapa,
   renomearSalaNoMapa,
   siglaValida,
 } from '../../utils/whatsappBaias';
 import { MapaMesa } from './MapaMesa';
+import { limparLigacoes, nomeDoCelular, removerMesaComCelulares } from '../../utils/celulares';
 
 interface ConfigurarMesasProps {
   mapa: MapaWhatsapp;
@@ -124,21 +124,24 @@ export const ConfigurarMesas: React.FC<ConfigurarMesasProps> = ({ mapa, onMapa, 
     ) {
       return;
     }
-    onMapa(alterarMesaNoMapa(mapa, salaId, mesa.id, () => mesa, agora()));
+    // Vagas de celular ligadas a baias que deixaram de existir viram backup
+    onMapa(limparLigacoes(alterarMesaNoMapa(mapa, salaId, mesa.id, () => mesa, agora())));
     onNotify(`Mesa ${mesa.nome} salva.`, 'success');
     setEdicao(null);
   };
 
   const removerMesa = () => {
     if (!edicao || edicao.nova) return;
-    if (!window.confirm(`Remover a mesa ${edicao.rascunho.nome} e todos os lugares dela?`)) return;
-    onMapa(removerMesaNoMapa(mapa, edicao.salaId, edicao.rascunho.id, agora()));
+    const celulares = mapa.celulares.filter((c) => c.mesaId === edicao.rascunho.id).map(nomeDoCelular);
+    const aviso = celulares.length ? `\n\nOs celulares ${celulares.join(', ')} ficam guardados (sem equipe).` : '';
+    if (!window.confirm(`Remover a mesa ${edicao.rascunho.nome} e todos os lugares dela?${aviso}`)) return;
+    onMapa(removerMesaComCelulares(mapa, edicao.salaId, edicao.rascunho.id, agora()));
     setEdicao(null);
   };
 
   const removerSala = (salaId: string, nome: string, mesas: number) => {
     if (!window.confirm(`Remover a sala ${nome}${mesas ? ` e as ${mesas} mesa(s) dela` : ''}?`)) return;
-    onMapa(removerSalaNoMapa(mapa, salaId, agora()));
+    onMapa(limparLigacoes(removerSalaNoMapa(mapa, salaId, agora())));
     if (edicao?.salaId === salaId) setEdicao(null);
   };
 
