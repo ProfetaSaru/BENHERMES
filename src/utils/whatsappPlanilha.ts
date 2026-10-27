@@ -37,10 +37,12 @@ export const lerSituacao = (texto: string, agora: Date): { situacao: Situacao; r
   const prazo = t.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?\s+(\d{1,2}):(\d{2})/);
   if (!prazo) return { situacao: 'RESTRINGIDO' };
   const [, dia, mes, ano, hora, minuto] = prazo.map(Number);
-  return {
-    situacao: 'RESTRINGIDO',
-    restritoAte: new Date(ano || agora.getFullYear(), mes - 1, dia, hora, minuto),
-  };
+  let restritoAte = new Date(ano || agora.getFullYear(), mes - 1, dia, hora, minuto);
+  // Sem ano: "02/01" lido em 30/12 é do ano seguinte
+  if (!ano && agora.getTime() - restritoAte.getTime() > 180 * 86_400_000) {
+    restritoAte = new Date(agora.getFullYear() + 1, mes - 1, dia, hora, minuto);
+  }
+  return { situacao: 'RESTRINGIDO', restritoAte };
 };
 
 export interface ResultadoImportacao {
@@ -48,7 +50,8 @@ export interface ResultadoImportacao {
   avisos: string[];
 }
 
-const TITULO_EQUIPE = /^(\d+)\s*[º°oO]?\s*EQUIPE\s*-\s*(.*)$/i;
+// "1º EQUIPE - Nome", "1° EQUIPE", "3º EQUIPE – Nome" (hífen, meia-risca ou travessão)
+const TITULO_EQUIPE = /^(\d+)\s*[º°oO]?\s*EQUIPE\s*(?:[-–—]\s*(.*))?$/i;
 // A planilha gerada aqui leva a data no título: "... DO COMERCIAL 1 — 27/10/2026 10:00"
 const TITULO_SALA = /^STATUS DOS WHATSAPP DO (.+?)(?:\s+[—–-]\s+\d{2}\/\d{2}\/\d{4}.*)?$/;
 const TITULO_CELULARES = 'WHATSAPP DOS CELULARES CORPORATIVOS';
@@ -112,7 +115,7 @@ export const importarPlanilhaWhatsapp = (grade: string[][], agora: Date): Result
         equipes.push({
           r,
           c,
-          id: numerada ? identificarEquipe(Number(numerada[1]), numerada[2]) : identificarSemNumero(valor.trim()),
+          id: numerada ? identificarEquipe(Number(numerada[1]), numerada[2] ?? '') : identificarSemNumero(valor.trim()),
         });
       }
       if (normal.startsWith(TITULO_CELULARES) && !celulares) celulares = { r, c };
@@ -127,20 +130,32 @@ export const importarPlanilhaWhatsapp = (grade: string[][], agora: Date): Result
     for (let letra = 66; siglas.has(sigla); letra++) sigla = `${id.sigla}${String.fromCharCode(letra)}`;
     siglas.add(sigla);
 
-    // Linhas de operadores: da linha seguinte ao cabeçalho até "SUPERVISOR" (ou até uma linha vazia)
-    const operadores: number[] = [];
+    // Linhas de operadores: da linha seguinte ao cabeçalho até "SUPERVISOR" ou até o próximo título
+    // (equipe na mesma coluna, sala ou celulares). Linhas em branco no meio viram vagas vazias.
+    const limite = Math.min(
+      grade.length,
+      ...equipes.filter((e) => e.c === c && e.r > r).map((e) => e.r),
+      ...salas.filter((s) => s.linha > r).map((s) => s.linha),
+      ...(celulares && (celulares as { r: number }).r > r ? [(celulares as { r: number }).r] : [])
+    );
+    const linhas: number[] = [];
     let rodape = -1;
-    for (let l = r + 2; l < grade.length; l++) {
+    for (let l = r + 2; l < limite; l++) {
       if (normalizarNome(cel(l, c)).startsWith('SUPERVISOR')) {
         rodape = l;
         break;
       }
-      if (![0, 1, 2, 3].some((d) => cel(l, c + d))) break;
-      operadores.push(l);
+      linhas.push(l);
     }
     const temBackup = rodape >= 0 && normalizarNome(cel(rodape, c + 2)).startsWith('BACKUP');
-    const esq = operadores.filter((l) => cel(l, c) || cel(l, c + 1)).length;
-    const dir = operadores.filter((l) => cel(l, c + 2) || cel(l, c + 3)).length;
+    // Cada lado vai até a última linha preenchida dele (o que vier antes, vazio, é vaga vazia)
+    const ultima = (d: number) => {
+      for (let i = linhas.length - 1; i >= 0; i--) if (cel(linhas[i], c + d) || cel(linhas[i], c + d + 1)) return i + 1;
+      return 0;
+    };
+    const esq = ultima(0);
+    const dir = ultima(2);
+    const operadores = linhas.slice(0, Math.max(esq, dir));
     const mesa: Mesa = novaMesa(
       { ...id, sigla, esq, dir, centro: rodape < 0 ? 'NENHUM' : temBackup ? 'SUPSUB' : 'SUP', inicio: 'sup' },
       agora

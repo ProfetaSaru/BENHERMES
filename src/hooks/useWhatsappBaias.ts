@@ -5,15 +5,28 @@ import {
   alterarLugarNoMapa,
   alterarMesaNoMapa,
   carregarMapa,
+  lerMapaSalvo,
 } from '../utils/whatsappBaias';
 
 export const STORAGE_WHATSAPP_KEY = 'benhermes_whatsapp';
 
-const lerDoNavegador = (): MapaWhatsapp => {
+/**
+ * Lê o mapa salvo. Se o que está salvo não puder ser lido, guarda uma cópia em
+ * benhermes_whatsapp_backup_<data> antes de o mapa inicial ser gravado por cima.
+ */
+const lerDoNavegador = (): { mapa: MapaWhatsapp; aviso: string | null } => {
   try {
-    return carregarMapa(localStorage.getItem(STORAGE_WHATSAPP_KEY), new Date());
+    const texto = localStorage.getItem(STORAGE_WHATSAPP_KEY);
+    const { mapa, ilegivel } = lerMapaSalvo(texto, new Date());
+    if (!ilegivel || texto === null) return { mapa, aviso: null };
+    const copia = `${STORAGE_WHATSAPP_KEY}_backup_${new Date().toISOString()}`;
+    localStorage.setItem(copia, texto);
+    return {
+      mapa,
+      aviso: `Não consegui ler o mapa salvo neste navegador. Guardei uma cópia (${copia}) e abri um mapa novo; importe a planilha ou o .json para recomeçar.`,
+    };
   } catch {
-    return carregarMapa(null, new Date());
+    return { mapa: carregarMapa(null, new Date()), aviso: null };
   }
 };
 
@@ -22,7 +35,8 @@ const lerDoNavegador = (): MapaWhatsapp => {
  * Toda mudança salva na hora e atualiza a data do mapa.
  */
 export function useWhatsappBaias() {
-  const [mapa, setMapa] = useState<MapaWhatsapp>(lerDoNavegador);
+  const [{ mapa: inicial, aviso: avisoInicial }] = useState(lerDoNavegador);
+  const [mapa, setMapa] = useState<MapaWhatsapp>(inicial);
 
   useEffect(() => {
     try {
@@ -46,5 +60,5 @@ export function useWhatsappBaias() {
     setMapa((atual) => alterarCelularNoMapa(atual, cor, campo, e, new Date()));
   }, []);
 
-  return { mapa, setMapa, substituir, alterarLugar, alterarMesa, alterarCelular };
+  return { mapa, avisoInicial, setMapa, substituir, alterarLugar, alterarMesa, alterarCelular };
 }

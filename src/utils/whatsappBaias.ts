@@ -297,11 +297,17 @@ export const importarMapa = (texto: string): MapaWhatsapp => {
   return lerMapa(dados);
 };
 
-/** O que está salvo no navegador; se faltar ou estiver corrompido, começa do mapa inicial */
-export const carregarMapa = (texto: string | null, agora: Date): MapaWhatsapp => {
+/**
+ * O que está salvo no navegador. Sem nada salvo, começa do mapa inicial; com algo salvo que não dá
+ * para ler, também, mas avisa (`ilegivel`) para guardar uma cópia antes de sobrescrever.
+ */
+export const lerMapaSalvo = (texto: string | null, agora: Date): { mapa: MapaWhatsapp; ilegivel: boolean } => {
+  if (texto === null) return { mapa: mapaInicial(agora), ilegivel: false };
   try {
-    return lerMapa(JSON.parse(texto ?? ''));
+    return { mapa: lerMapa(JSON.parse(texto)), ilegivel: false };
   } catch {
-    return mapaInicial(agora);
+    return { mapa: mapaInicial(agora), ilegivel: true };
   }
 };
+
+export const carregarMapa = (texto: string | null, agora: Date): MapaWhatsapp => lerMapaSalvo(texto, agora).mapa;

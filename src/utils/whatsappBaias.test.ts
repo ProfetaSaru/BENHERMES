@@ -16,6 +16,7 @@ import {
   estado,
   exportarMapa,
   importarMapa,
+  lerMapaSalvo,
   mapaInicial,
   mudarSituacao,
   novaMesa,
@@ -140,6 +141,13 @@ describe('arquivo do mapa (.json)', () => {
     expect(() => importarMapa(JSON.stringify({ ...errado, tipo: 'outra-coisa' }))).toThrow();
     errado.salas[0].mesas[0].lugares.E1.whatsapp.situacao = 'TALVEZ';
     expect(() => importarMapa(JSON.stringify(errado))).toThrow();
+  });
+
+  it('dados salvos ilegíveis são sinalizados para guardar uma cópia antes de sobrescrever', () => {
+    expect(lerMapaSalvo('lixo', AGORA).ilegivel).toBe(true);
+    expect(lerMapaSalvo('{"versao":2}', AGORA).ilegivel).toBe(true);
+    expect(lerMapaSalvo(null, AGORA).ilegivel).toBe(false);
+    expect(lerMapaSalvo(JSON.stringify(mapa), AGORA)).toEqual({ mapa, ilegivel: false });
   });
 
   it('dados salvos corrompidos abrem o mapa inicial', () => {

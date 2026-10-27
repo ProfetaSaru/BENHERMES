@@ -74,6 +74,12 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({ onNotify }) => {
   const planilhaRef = useRef<HTMLInputElement>(null);
   const jsonRef = useRef<HTMLInputElement>(null);
 
+  // Mapa salvo ilegível: avisa uma vez (a cópia já foi guardada pelo hook)
+  useEffect(() => {
+    if (wpp.avisoInicial) onNotify(wpp.avisoInicial, 'error');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // O tempo restante das restrições anda sozinho
   useEffect(() => {
     const id = window.setInterval(() => setAgora(new Date()), 60_000);

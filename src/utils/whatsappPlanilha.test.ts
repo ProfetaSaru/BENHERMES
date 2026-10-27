@@ -72,6 +72,10 @@ describe('situação escrita na planilha', () => {
       situacao: 'RESTRINGIDO',
       restritoAte: new Date('2026-10-29T14:00:00'),
     });
+    expect(lerSituacao('RESTRINGIDO ATÉ 02/01 10:00', new Date('2026-12-30T09:00:00'))).toEqual({
+      situacao: 'RESTRINGIDO',
+      restritoAte: new Date('2027-01-02T10:00:00'),
+    });
     expect(lerSituacao('TALVEZ', AGORA)).toBeNull();
     expect(lerSituacao('', AGORA)).toBeNull();
   });
@@ -152,6 +156,59 @@ describe('importar a planilha de status dos WhatsApps', () => {
     expect(digital).toMatchObject({ nome: 'Digital', sigla: 'DG', supervisor: '' });
     expect(plantao).toMatchObject({ nome: 'Plantão', sigla: 'PLA', supervisor: 'Joana Sousa', centro: 'SUP' });
     expect(plantao.lugares.E1.whatsapp.situacao).toBe('BANIDO');
+  });
+
+  it('buraco no meio de um lado: ninguém muda de baia', () => {
+    const g = montarGrade({
+      E34: 'STATUS DOS WHATSAPP DO COMERCIAL 1',
+      ...bloco('E', 35, '1º EQUIPE - Joana', [
+        ['ANA', 'OK', 'BIA', 'OK'],
+        ['', '', 'CAIO', 'OK'],
+        ['DUDA', 'BANIDO', 'EVA', 'OK'],
+      ], ['SUPERVISOR', 'OK', 'BACKUP', 'OK']),
+    });
+    const m = importarPlanilhaWhatsapp(g, AGORA).mapa.salas[0].mesas[0];
+    expect([m.esq, m.dir]).toEqual([3, 3]);
+    expect(m.lugares.E2.operador).toBe('');
+    expect(m.lugares.E3).toMatchObject({ operador: 'DUDA', whatsapp: { situacao: 'BANIDO' } });
+  });
+
+  it('linha inteira em branco no meio da equipe não corta o resto nem o SUPERVISOR', () => {
+    const g = montarGrade({
+      E34: 'STATUS DOS WHATSAPP DO COMERCIAL 1',
+      ...bloco('E', 35, '1º EQUIPE - Joana', [
+        ['ANA', 'OK', 'BIA', 'OK'],
+        ['', '', '', ''],
+        ['DUDA', 'BANIDO', 'EVA', 'OK'],
+      ], ['SUPERVISOR', 'BANIDO', 'BACKUP', 'OK']),
+      ...bloco('E', 45, '2º EQUIPE - Bia', [['X', 'OK', 'Y', 'OK']], ['SUPERVISOR', 'OK', 'BACKUP', 'OK']),
+    });
+    const [m, m2] = importarPlanilhaWhatsapp(g, AGORA).mapa.salas[0].mesas;
+    expect([m.esq, m.dir, m.centro]).toEqual([3, 3, 'SUPSUB']);
+    expect(m.lugares.E3.operador).toBe('DUDA');
+    expect(m.lugares.SUP.whatsapp.situacao).toBe('BANIDO');
+    expect(m2.sigla).toBe('OP2');
+  });
+
+  it('sem linha SUPERVISOR: as baias vão até o próximo título, sem perder ninguém', () => {
+    const g = montarGrade({
+      E34: 'STATUS DOS WHATSAPP DO COMERCIAL 1',
+      ...bloco('E', 35, '1º EQUIPE - Joana', [['ANA', 'OK', 'BIA', 'OK'], ['', '', '', ''], ['DUDA', 'OK', '', '']], null),
+    });
+    const { mapa, avisos } = importarPlanilhaWhatsapp(g, AGORA);
+    expect(mapa.salas[0].mesas[0].lugares.E3.operador).toBe('DUDA');
+    expect(avisos).toEqual([]);
+  });
+
+  it('título sem traço ou com travessão continua sendo a equipe numerada', () => {
+    const g = montarGrade({
+      E34: 'STATUS DOS WHATSAPP DO COMERCIAL 1',
+      ...bloco('E', 35, '1° EQUIPE', [['X', 'OK', 'Y', 'OK']], ['SUPERVISOR', 'OK', 'BACKUP', 'OK']),
+      ...bloco('K', 35, '3º EQUIPE – Joana Sousa', [['Z', 'OK', 'W', 'OK']], ['SUPERVISOR', 'OK', 'BACKUP', 'OK']),
+    });
+    const [a, b] = importarPlanilhaWhatsapp(g, AGORA).mapa.salas[0].mesas;
+    expect(a).toMatchObject({ nome: '1º Equipe', sigla: 'OP1', supervisor: '' });
+    expect(b).toMatchObject({ nome: '3º Equipe', sigla: 'OP3', supervisor: 'Joana Sousa' });
   });
 
   it('planilha sem equipes é recusada', () => {
