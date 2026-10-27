@@ -3,7 +3,6 @@ import { MapaWhatsapp } from '../types/whatsapp';
 import {
   adicionarMesaNoMapa,
   adicionarSalaNoMapa,
-  alterarCelularNoMapa,
   alternarDesativada,
   formatarMesa,
   removerMesaNoMapa,
@@ -12,18 +11,19 @@ import {
   alterarLugarNoMapa,
   alterarMesaNoMapa,
   carregarMapa,
-  corDoCelular,
   estado,
   exportarMapa,
   importarMapa,
+  analiseAtrasada,
+  migrarMapa,
+  pedirAnalise,
+  tempoDesde,
   lerMapaSalvo,
   mapaInicial,
   mudarSituacao,
   novaMesa,
   restricaoVencida,
   restringir,
-  resumoDaSala,
-  resumoGeral,
   siglaValida,
   tempoRestante,
 } from './whatsappBaias';
@@ -32,19 +32,90 @@ const AGORA = new Date('2026-10-27T10:00:00');
 const depois = (minutos: number) => new Date(AGORA.getTime() + minutos * 60_000);
 
 describe('mapa inicial', () => {
-  it('uma sala, a 1º Equipe 4 + 4 com supervisor e backup e os 6 celulares, tudo OK', () => {
+  it('versão 2: uma sala, a 1º Equipe 4 + 4 só com supervisor (no PC), sem celulares', () => {
     const mapa = mapaInicial(AGORA);
+    expect(mapa.versao).toBe(2);
+    expect(mapa.celulares).toEqual([]);
     expect(mapa.salas.map((s) => s.nome)).toEqual(['Comercial 1']);
     const mesa = mapa.salas[0].mesas[0];
-    expect(mesa).toMatchObject({ nome: '1º Equipe', sigla: 'OP1', esq: 4, dir: 4, centro: 'SUPSUB', inicio: 'sup' });
-    expect(Object.keys(mesa.lugares)).toEqual(['SUP', 'SUB', 'E1', 'E2', 'E3', 'E4', 'D1', 'D2', 'D3', 'D4']);
-    expect(mapa.celulares.map((c) => c.cor)).toEqual(['VERDE', 'AZUL', 'VERMELHO', 'CIANO', 'PRETO', 'ROXO']);
-    expect(resumoGeral(mapa, AGORA)).toEqual({ ok: 10, banido: 0, restringido: 0, vencidas: 0, naoTem: 0, vagasVazias: 8 });
+    expect(mesa).toMatchObject({ nome: '1º Equipe', sigla: 'OP1', esq: 4, dir: 4, centro: 'SUP', inicio: 'sup', whatsappSupervisor: 'PC' });
+    expect(Object.keys(mesa.lugares)).toEqual(['SUP', 'E1', 'E2', 'E3', 'E4', 'D1', 'D2', 'D3', 'D4']);
+  });
+});
+
+describe('ciclo do banimento', () => {
+  it('pedir análise grava a hora; "Em análise" não é escolhido direto', () => {
+    expect(pedirAnalise(AGORA)).toEqual({
+      situacao: 'ANALISE',
+      analisePedidaEm: AGORA.toISOString(),
+      mudouEm: AGORA.toISOString(),
+    });
+    expect(() => mudarSituacao(estado('BANIDO', AGORA), 'ANALISE', AGORA)).toThrow();
+    expect(mudarSituacao(pedirAnalise(AGORA), 'PERMANENTE', depois(60)).situacao).toBe('PERMANENTE');
   });
 
-  it('cor de celular desconhecida fica cinza', () => {
-    expect(corDoCelular('verde')).toBe('#00B050');
-    expect(corDoCelular('DOURADO')).toBe('#808080');
+  it('análise atrasada depois de 24 h', () => {
+    const e = pedirAnalise(AGORA);
+    expect(analiseAtrasada(e, depois(24 * 60 - 1))).toBe(false);
+    expect(analiseAtrasada(e, depois(24 * 60))).toBe(true);
+    expect(analiseAtrasada(estado('BANIDO', AGORA), depois(48 * 60))).toBe(false);
+  });
+
+  it('tempo desde', () => {
+    const iso = AGORA.toISOString();
+    expect(tempoDesde(iso, depois(45))).toBe('45min');
+    expect(tempoDesde(iso, depois(180))).toBe('3h');
+    expect(tempoDesde(iso, depois(26 * 60))).toBe('26h');
+    expect(tempoDesde(iso, depois(72 * 60))).toBe('3d');
+  });
+});
+
+describe('migração da versão 1', () => {
+  const v1 = {
+    versao: 1,
+    atualizadoEm: AGORA.toISOString(),
+    salas: [
+      {
+        id: 's1',
+        nome: 'Comercial 1',
+        mesas: [
+          {
+            id: 'm1', nome: '1º Equipe', sigla: 'OP1', supervisor: 'JOANA', esq: 1, dir: 1, centro: 'SUPSUB', inicio: 'sup', desativadas: [],
+            lugares: {
+              SUP: { operador: '', whatsapp: estado('NAO_TEM', AGORA) },
+              SUB: { operador: '', whatsapp: estado('OK', AGORA) },
+              E1: { operador: 'ANA', whatsapp: estado('BANIDO', AGORA) },
+              D1: { operador: 'BRUNO', whatsapp: estado('OK', AGORA) },
+            },
+          },
+          {
+            id: 'm2', nome: '2º Equipe', sigla: 'OP2', supervisor: '', esq: 1, dir: 1, centro: 'SUP', inicio: 'sup', desativadas: [],
+            lugares: {
+              SUP: { operador: '', whatsapp: estado('OK', AGORA) },
+              E1: { operador: '', whatsapp: estado('OK', AGORA) },
+              D1: { operador: '', whatsapp: estado('OK', AGORA) },
+            },
+          },
+        ],
+      },
+    ],
+    celulares: [{ cor: 'AZUL', hex: '#00B0F0', messenger: estado('OK', AGORA), business: estado('BANIDO', AGORA) }],
+  };
+
+  it('remove o backup e os celulares antigos; supervisor NÃO TEM vira "sem WhatsApp"', () => {
+    const m = migrarMapa(v1);
+    expect(m.versao).toBe(2);
+    expect(m.celulares).toEqual([]);
+    const [m1, m2] = m.salas[0].mesas;
+    expect(m1).toMatchObject({ centro: 'SUP', whatsappSupervisor: 'NAO_TEM' });
+    expect(Object.keys(m1.lugares)).toEqual(['SUP', 'E1', 'D1']);
+    expect(m1.lugares.E1).toEqual(v1.salas[0].mesas[0].lugares.E1);
+    expect(m2.whatsappSupervisor).toBe('PC');
+  });
+
+  it('um .json da versão 1 é importado já migrado', () => {
+    expect(importarMapa(JSON.stringify({ tipo: 'benhermes-whatsapp-baias', ...v1 }))).toEqual(migrarMapa(v1));
+    expect(carregarMapa(JSON.stringify(v1), AGORA)).toEqual(migrarMapa(v1));
   });
 });
 
@@ -84,25 +155,6 @@ describe('situação do WhatsApp', () => {
   });
 });
 
-describe('resumo', () => {
-  it('conta situações e vagas vazias, sem as baias desativadas', () => {
-    const mapa = mapaInicial(AGORA);
-    const mesa = mapa.salas[0].mesas[0];
-    mesa.lugares.E1 = { operador: 'ANA', whatsapp: estado('BANIDO', AGORA) };
-    mesa.lugares.E2 = { operador: 'BRUNO', whatsapp: restringir(1, 'horas', AGORA) };
-    mesa.lugares.D1 = { operador: 'CARLA', whatsapp: estado('NAO_TEM', AGORA) };
-    mesa.desativadas = ['D4'];
-    expect(resumoDaSala(mapa.salas[0], depois(120))).toEqual({
-      ok: 6,
-      banido: 1,
-      restringido: 1,
-      vencidas: 1,
-      naoTem: 1,
-      vagasVazias: 4,
-    });
-  });
-});
-
 describe('sigla da mesa', () => {
   const mapa = mapaInicial(AGORA);
   const op1 = mapa.salas[0].mesas[0];
@@ -126,7 +178,7 @@ describe('arquivo do mapa (.json)', () => {
 
   it('exportar e importar devolve o mesmo mapa', () => {
     const texto = exportarMapa(mapa, AGORA);
-    expect(JSON.parse(texto)).toMatchObject({ tipo: 'benhermes-whatsapp-baias', versao: 1, exportadoEm: AGORA.toISOString() });
+    expect(JSON.parse(texto)).toMatchObject({ tipo: 'benhermes-whatsapp-baias', versao: 2, exportadoEm: AGORA.toISOString() });
     expect(importarMapa(texto)).toEqual(mapa);
   });
 
@@ -146,6 +198,7 @@ describe('arquivo do mapa (.json)', () => {
   it('dados salvos ilegíveis são sinalizados para guardar uma cópia antes de sobrescrever', () => {
     expect(lerMapaSalvo('lixo', AGORA).ilegivel).toBe(true);
     expect(lerMapaSalvo('{"versao":2}', AGORA).ilegivel).toBe(true);
+    expect(lerMapaSalvo('{"versao":3,"salas":[],"celulares":[],"atualizadoEm":"x"}', AGORA).ilegivel).toBe(true);
     expect(lerMapaSalvo(null, AGORA).ilegivel).toBe(false);
     expect(lerMapaSalvo(JSON.stringify(mapa), AGORA)).toEqual({ mapa, ilegivel: false });
   });
@@ -178,12 +231,6 @@ describe('alterações no mapa (sem mexer no original)', () => {
     expect(novo.salas[0].mesas[0].supervisor).toBe('JOANA');
     expect(mesa.supervisor).toBe('');
   });
-
-  it('celular: Messenger ou Business', () => {
-    const novo = alterarCelularNoMapa(mapa, 'AZUL', 'business', estado('BANIDO', depois(3)), depois(3));
-    expect(novo.celulares[1].business.situacao).toBe('BANIDO');
-    expect(novo.celulares[1].messenger).toBe(mapa.celulares[1].messenger);
-  });
 });
 
 describe('configurar salas e mesas', () => {
@@ -211,11 +258,11 @@ describe('configurar salas e mesas', () => {
     const comAna = { ...mesa, lugares: { ...mesa.lugares, E4: { operador: 'ANA', whatsapp: estado('BANIDO', AGORA) } } };
     const { mesa: nova, removidos } = formatarMesa(
       comAna,
-      { nome: '1º Equipe', sigla: 'OP1', supervisor: 'JOANA', esq: 3, dir: 5, centro: 'SUP', inicio: 'porta', desativadas: [] },
+      { nome: '1º Equipe', sigla: 'OP1', supervisor: 'JOANA', esq: 3, dir: 5, centro: 'NENHUM', inicio: 'porta', desativadas: [] },
       depois(1)
     );
-    expect(removidos).toEqual([{ posicao: 'SUB', operador: '' }, { posicao: 'E4', operador: 'ANA' }]);
-    expect(nova).toMatchObject({ supervisor: 'JOANA', esq: 3, dir: 5, centro: 'SUP', inicio: 'porta', id: mesa.id });
+    expect(removidos).toEqual([{ posicao: 'SUP', operador: '' }, { posicao: 'E4', operador: 'ANA' }]);
+    expect(nova).toMatchObject({ supervisor: 'JOANA', esq: 3, dir: 5, centro: 'NENHUM', inicio: 'porta', id: mesa.id });
     expect(nova.lugares.E1).toBe(mesa.lugares.E1);
     expect(nova.lugares.D5).toEqual({ operador: '', whatsapp: estado('OK', depois(1)) });
   });
