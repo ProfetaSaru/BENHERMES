@@ -34,7 +34,8 @@ tudo no navegador, sem instalar nada.
 | 🎲 [Escala de Bases](#-escala-de-bases-ativo-2) | 🚀 [Como executar localmente](#-como-executar-localmente) |
 | 📞 [Relatório URA](#-relatório-de-produtividade-ura) | 🏗️ [Arquitetura](#️-arquitetura) |
 | 🔌 [API do Argus](#-api-do-argus) | 🐉 [BenHermes × BENZAITEN](#-benhermes--benzaiten) |
-| ⚙️ [Configurações (feriados)](#️-configurações-do-hub) | 🛠️ [Tecnologias](#️-tecnologias) |
+| 💬 [WhatsApp das Baias](#-whatsapp-das-baias) | 🛠️ [Tecnologias](#️-tecnologias) |
+| ⚙️ [Configurações (feriados)](#️-configurações-do-hub) | |
 | 📋 [Central de Relatórios](#-central-de-relatórios) | 📊 [Formatador de Planilhas](#-formatador-de-planilhas) |
 
 ---
@@ -45,6 +46,7 @@ tudo no navegador, sem instalar nada.
 |:-:|---|---|---|
 | 🎲 | **Escala de Bases** | Rodízio diário das bases do INSS entre os grupos dos supervisores do Ativo 2 | Todo dia útil, de manhã |
 | 📞 | **Relatório URA** | TMA, TMO, leads, custo, vendas e clientes por operador e equipe, com setas e cores | Todo dia útil (relatório do dia anterior) |
+| 💬 | **WhatsApp das Baias** | Mapa das mesas com a situação do WhatsApp de cada baia (OK, banido, restringido, não tem) e a planilha de resumo | Ao longo do dia, sempre que um número cair ou voltar |
 | 📊 | **Formatador de Planilhas** | Converte qualquer planilha no CSV de mailing `CPF;BENEFICIO;NOME;TELEFONE1..5` | Quando chega uma base nova |
 | 📋 | **Central de Relatórios** | Relatórios de atividades e formulários a partir de modelos Markdown | No fim do expediente |
 | 🗂️ | **Histórico & Arquivos** | Relatórios de atividades salvos, com restauração completa | Quando precisar rever um dia |
@@ -180,6 +182,51 @@ sequenceDiagram
 - Repassa só `report/desempenhoresumido`, `cmd/listargrupos` e `cmd/listarusuarios`, e **não grava nem registra nada**.
 - **Leads:** desempenho geral do dia, sem os robôs (`OPER VIRTUAL`). O filtro pelo grupo RECEPTIVO - URA trazia só quem **está** no grupo (346 de 2.985 leads em 20/10/2026).
 - **Diagnóstico dos leads** (Configurações do relatório): CSV com os leads de cada operador por filtro, sessões e datas. Serve para comparar com a exportação manual. Sem dados de clientes.
+
+</details>
+
+---
+
+## 💬 WhatsApp das Baias
+
+Substitui a planilha **RELATORIO-WHATSAPP-INTUITIVO**. Cada sala (Comercial 1, Comercial 2) tem suas mesas no mesmo
+desenho do mapa do **Sistema de Chamados**: supervisor e backup no topo, baias do lado esquerdo (`OP1-E1`…) e do
+direito (`OP1-D1`…), com o corredor no meio.
+
+1. **Primeira vez:** **Importar planilha** → escolha a planilha atual → confira a prévia → **Substituir mapa**.
+2. **No dia a dia:** clique numa baia para trocar o **operador** e a **situação**; clique no nome da equipe para trocar o
+   **supervisor**. Tudo salva na hora, neste navegador.
+3. **Para enviar:** **Baixar planilha** gera o `.xlsx` no visual da planilha antiga, com data e hora no título.
+
+| Situação | Na tela | Na planilha |
+|---|---|---|
+| ✅ OK | bolinha verde | `OK` em verde |
+| ⛔ BANIDO | baia vermelha | `BANIDO` em vermelho |
+| ⏳ RESTRINGIDO | baia amarela, "até 29/10 14:00 · faltam 1d 3h" | `RESTRINGIDO ATÉ 29/10 14:00` em amarelo-escuro |
+| ⚪ NÃO TEM | baia cinza | `NÃO TEM` em cinza |
+
+<details>
+<summary><b>⏳ Restrição, filtros e celulares corporativos</b></summary>
+
+- **Restringido** pede **por quanto tempo** (horas ou dias). Quando o prazo acaba, a baia **não volta sozinha** para
+  OK: aparece "Restrição terminou — confira" e o botão **Voltar para OK**.
+- **Filtros:** *Só problemas* (banido, restringido, não tem) e *Vagas vazias* apagam as outras baias no mapa.
+- **A situação é da baia** (do número daquele lugar): esvaziar a baia não muda a situação.
+- **Celulares corporativos:** um cartão por cor, com o WhatsApp **Messenger** e o **Business**.
+
+</details>
+
+<details>
+<summary><b>🧩 Salas, mesas e arquivos</b></summary>
+
+- **Configurar salas e mesas** (no fim da página): nova sala, nova mesa (nome, sigla, supervisor, baias de cada lado,
+  quem fica no centro, onde começa a baia 1), desativar uma baia clicando na prévia. Diminuir uma mesa com operador
+  pede confirmação.
+- **Importar planilha** reconhece salas ("STATUS DOS WHATSAPP DO COMERCIAL 1"), equipes ("1º EQUIPE - Supervisor",
+  ou qualquer título acima da linha `OPERADOR | WHATSAPP`), `VAZIO`, `SUPERVISOR`/`BACKUP` e os celulares. Situação
+  desconhecida vira NÃO TEM, com aviso na prévia. "Digital" vira a mesa `DG`.
+- **Exportar mapa / Importar mapa** (`.json`): cópia de segurança e o formato que vai levar o mapa para o Sistema de
+  Chamados, onde os supervisores poderão atualizar a própria equipe.
 
 </details>
 
@@ -439,6 +486,7 @@ repetir coluna), completa o CPF que perdeu o zero à esquerda e gera UTF-8 com B
 | `benhermes_relatorio_ura` | Cadastro de operadores (sem CPF/e-mail), apelidos, metas e **totais** de cada dia |
 | `benhermes_argus` | Token e endereço da API do Argus |
 | `benhermes_feriados` | Feriados locais |
+| `benhermes_whatsapp` | Mapa do WhatsApp das Baias (salas, mesas, operadores, situações e celulares) |
 | `benhermes_template_tasks` e outras | Central de Relatórios (tarefas, rascunhos e histórico) |
 
 > [!WARNING]
@@ -467,6 +515,9 @@ testes e o build. **PR vermelho não deve ir para a `main`.**
 | [`uraLeitura.test.ts`](src/utils/uraLeitura.test.ts) | Valores em R$, tempos, datas, reconhecimento das exportações, CSV |
 | [`uraCalculo.test.ts`](src/utils/uraCalculo.test.ts) | Relatório completo com **os mesmos números esperados do BENZAITEN**, comparação, cores automáticas e metas |
 | [`argusApi.test.ts`](src/utils/argusApi.test.ts) | API simulada: leads do dia sem robôs, média ponderada, token, diagnóstico |
+| [`mapaMesas.test.ts`](src/utils/mapaMesas.test.ts) | Códigos das baias (`OP1-E3`), ordem pelo supervisor ou pela porta, mudar o formato da mesa |
+| [`whatsappBaias.test.ts`](src/utils/whatsappBaias.test.ts) | Situações, restrição (prazo, vencida, tempo inválido), resumo, siglas, salas e mesas, arquivo `.json` |
+| [`whatsappPlanilha.test.ts`](src/utils/whatsappPlanilha.test.ts) | Leitura da planilha de WhatsApps (variações de texto, Digital, sem backup), cores da planilha gerada e ida e volta |
 | [`argusProxy.test.ts`](server/argusProxy.test.ts) | A ponte descarta CPF/e-mail, só aceita os 3 endereços e exige https e token |
 
 </details>
