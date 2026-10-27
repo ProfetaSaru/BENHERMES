@@ -1,12 +1,15 @@
 import * as XLSX from 'xlsx';
+import type { Borders, Cell, Workbook, Worksheet } from 'exceljs';
 import { CelularCorporativo, EstadoWhatsapp, Lugar, MapaWhatsapp, Mesa, Sala, Situacao } from '../types/whatsapp';
 import { normalizarNome } from './calendario';
 import { codigoDoLugar } from './mapaMesas';
-import { corDoCelular, estado, novaMesa } from './whatsappBaias';
+import { novaPlanilha } from './planilhaColorida';
+import { ROTULOS, corDoCelular, estado, novaMesa } from './whatsappBaias';
 
 /**
  * Planilha do WhatsApp das Baias: leitura da RELATORIO-WHATSAPP-INTUITIVO.xlsx
- * (salas, equipes lado a lado, supervisor/backup e celulares corporativos).
+ * (salas, equipes lado a lado, supervisor/backup e celulares corporativos) e a planilha
+ * de resumo no mesmo visual, que pode ser importada de volta.
  */
 
 /** Primeira aba como texto, em coordenadas absolutas: grade[0][0] = A1 */
@@ -46,7 +49,8 @@ export interface ResultadoImportacao {
 }
 
 const TITULO_EQUIPE = /^(\d+)\s*[º°oO]?\s*EQUIPE\s*-\s*(.*)$/i;
-const TITULO_SALA = /^STATUS DOS WHATSAPP DO (.+)$/;
+// A planilha gerada aqui leva a data no título: "... DO COMERCIAL 1 — 27/10/2026 10:00"
+const TITULO_SALA = /^STATUS DOS WHATSAPP DO (.+?)(?:\s+[—–-]\s+\d{2}\/\d{2}\/\d{4}.*)?$/;
 const TITULO_CELULARES = 'WHATSAPP DOS CELULARES CORPORATIVOS';
 
 /** "COMERCIAL 1" -> "Comercial 1" */
@@ -55,6 +59,15 @@ const nomeDaSala = (texto: string): string =>
     .toLowerCase()
     .replace(/(^|\s)\S/g, (l) => l.toUpperCase())
     .trim();
+
+/** Título sem número ("DIGITAL", "PLANTÃO - Joana"): nome, supervisor e sigla com as 3 primeiras letras */
+const identificarSemNumero = (titulo: string) => {
+  const [nome, ...resto] = titulo.split(' - ');
+  if (normalizarNome(nome) === 'DIGITAL') return { nome: 'Digital', sigla: 'DG', supervisor: resto.join(' - ').trim() };
+  const bonito = nome.trim().toLowerCase().replace(/(^|\s)\S/g, (l) => l.toUpperCase());
+  const sigla = normalizarNome(nome).replace(/[^A-Z0-9]/g, '').slice(0, 3) || 'MESA';
+  return { nome: bonito, sigla, supervisor: resto.join(' - ').trim() };
+};
 
 /** Nome, sigla e supervisor a partir de "Nº EQUIPE - texto" */
 const identificarEquipe = (numero: number, texto: string) => {
@@ -84,7 +97,8 @@ export const importarPlanilhaWhatsapp = (grade: string[][], agora: Date): Result
   };
 
   const salas: (Sala & { linha: number })[] = [];
-  const equipes: { r: number; c: number; numero: number; texto: string }[] = [];
+  // Uma equipe é o título logo acima da linha "OPERADOR | WHATSAPP"
+  const equipes: { r: number; c: number; id: { nome: string; sigla: string; supervisor: string } }[] = [];
   let celulares: { r: number; c: number } | null = null;
 
   grade.forEach((linha, r) =>
@@ -92,8 +106,15 @@ export const importarPlanilhaWhatsapp = (grade: string[][], agora: Date): Result
       const normal = normalizarNome(valor);
       const sala = normal.match(TITULO_SALA);
       if (sala) salas.push({ id: crypto.randomUUID(), nome: nomeDaSala(sala[1]), mesas: [], linha: r });
-      const equipe = valor.trim().match(TITULO_EQUIPE);
-      if (equipe) equipes.push({ r, c, numero: Number(equipe[1]), texto: equipe[2] });
+      const cabecalho = normalizarNome(cel(r + 1, c)) === 'OPERADOR' && normalizarNome(cel(r + 1, c + 1)) === 'WHATSAPP';
+      const numerada = valor.trim().match(TITULO_EQUIPE);
+      if (valor.trim() && (numerada || cabecalho)) {
+        equipes.push({
+          r,
+          c,
+          id: numerada ? identificarEquipe(Number(numerada[1]), numerada[2]) : identificarSemNumero(valor.trim()),
+        });
+      }
       if (normal.startsWith(TITULO_CELULARES) && !celulares) celulares = { r, c };
     })
   );
@@ -101,8 +122,7 @@ export const importarPlanilhaWhatsapp = (grade: string[][], agora: Date): Result
   if (equipes.length === 0) throw new Error('Não encontrei nenhuma equipe ("Nº EQUIPE - ...") na planilha.');
 
   const siglas = new Set<string>();
-  for (const { r, c, numero, texto } of equipes) {
-    const id = identificarEquipe(numero, texto);
+  for (const { r, c, id } of equipes) {
     let sigla = id.sigla;
     for (let letra = 66; siglas.has(sigla); letra++) sigla = `${id.sigla}${String.fromCharCode(letra)}`;
     siglas.add(sigla);
@@ -166,4 +186,184 @@ export const importarPlanilhaWhatsapp = (grade: string[][], agora: Date): Result
     },
     avisos,
   };
+};
+
+// ---------------------------------------------------------------------------
+// Planilha de resumo
+// ---------------------------------------------------------------------------
+
+const COR = {
+  fundo: 'FF002060',
+  amarelo: 'FFFFFF00',
+  branco: 'FFFFFFFF',
+  verde: 'FF00B050',
+  azul: 'FF0070C0',
+  vazio: 'FFFFD966',
+  desativada: 'FF808080',
+};
+
+const COR_DA_SITUACAO: Record<Situacao, string> = {
+  OK: 'FF70AD47',
+  BANIDO: 'FFFF0000',
+  RESTRINGIDO: 'FFBF8F00',
+  NAO_TEM: 'FF808080',
+};
+
+const LARGURAS: Record<string, number> = { E: 61, F: 22.57, G: 58.29, H: 18.71, K: 56.29, L: 18.71, M: 51.29, N: 31.71 };
+const ESPACO = 3; // colunas D, I, J e O
+const BLOCOS = [5, 11]; // E (5) e K (11): primeira coluna de cada equipe da linha
+
+const doisDigitos = (n: number) => String(n).padStart(2, '0');
+const dataHora = (d: Date) =>
+  `${doisDigitos(d.getDate())}/${doisDigitos(d.getMonth() + 1)}/${d.getFullYear()} ${doisDigitos(d.getHours())}:${doisDigitos(d.getMinutes())}`;
+
+export const nomeDaPlanilhaWhatsapp = (agora: Date): string =>
+  `relatorio_whatsapp_${agora.getFullYear()}-${doisDigitos(agora.getMonth() + 1)}-${doisDigitos(agora.getDate())}.xlsx`;
+
+const textoDaSituacao = (e: EstadoWhatsapp): string => {
+  if (e.situacao !== 'RESTRINGIDO' || !e.restritoAte) return ROTULOS[e.situacao];
+  const ate = new Date(e.restritoAte);
+  return `RESTRINGIDO ATÉ ${doisDigitos(ate.getDate())}/${doisDigitos(ate.getMonth() + 1)} ${doisDigitos(ate.getHours())}:${doisDigitos(ate.getMinutes())}`;
+};
+
+/** "1º EQUIPE - Supervisor"; nomes fora do padrão "Nº Equipe" saem como "DIGITAL" ou "PLANTÃO - Supervisor" */
+const tituloDaMesa = (mesa: Mesa): string => {
+  const padrao = mesa.nome.match(/^(\d+)º Equipe(?: \((.*)\))?$/);
+  if (!padrao) return `${mesa.nome.toUpperCase()}${mesa.supervisor ? ` - ${mesa.supervisor}` : ''}`;
+  const nota = padrao[2] ? `(${padrao[2].toUpperCase()})` : '';
+  return `${padrao[1]}º EQUIPE - ${[mesa.supervisor, nota].filter(Boolean).join(' ')}`;
+};
+
+const escrever = (
+  celula: Cell,
+  valor: string,
+  fonte: { nome?: string; tamanho: number; cor?: string; negrito?: boolean },
+  fundo = COR.branco
+): void => {
+  celula.value = valor;
+  celula.font = {
+    name: fonte.nome ?? 'Arial',
+    size: fonte.tamanho,
+    bold: fonte.negrito ?? false,
+    ...(fonte.cor ? { color: { argb: fonte.cor } } : {}),
+  };
+  celula.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fundo } };
+  celula.alignment = { horizontal: 'center', vertical: 'middle' };
+};
+
+const escreverSituacao = (celula: Cell, e: EstadoWhatsapp) => {
+  escrever(celula, textoDaSituacao(e), { nome: 'Calibri', tamanho: 14, cor: COR_DA_SITUACAO[e.situacao] });
+  celula.alignment = { horizontal: 'center', vertical: 'middle', shrinkToFit: true }; // "RESTRINGIDO ATÉ ..." é longo
+};
+
+/** Borda fina por dentro e grossa em volta do bloco */
+const moldura = (ws: Worksheet, r1: number, c1: number, r2: number, c2: number): void => {
+  for (let r = r1; r <= r2; r++) {
+    for (let c = c1; c <= c2; c++) {
+      const lado = (grosso: boolean) => ({ style: grosso ? ('thick' as const) : ('thin' as const), color: { argb: 'FF000000' } });
+      const borda: Partial<Borders> = { top: lado(r === r1), bottom: lado(r === r2), left: lado(c === c1), right: lado(c === c2) };
+      const celula = ws.getCell(r, c);
+      celula.border = borda;
+      if (!celula.fill || (celula.fill as any).fgColor?.argb === COR.fundo) {
+        celula.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COR.branco } };
+      }
+    }
+  }
+};
+
+/** Escreve uma equipe a partir da linha r, coluna c; devolve a última linha usada */
+const escreverMesa = (ws: Worksheet, mesa: Mesa, r: number, c: number): number => {
+  // Cada equipe usa só as suas linhas: o SUPERVISOR vem logo depois (a importação para na primeira linha vazia)
+  const linhas = Math.max(mesa.esq, mesa.dir);
+  ws.mergeCells(r, c, r, c + 3);
+  escrever(ws.getCell(r, c), tituloDaMesa(mesa), { tamanho: 20, negrito: true }, COR.amarelo);
+  ['OPERADOR', 'WHATSAPP', 'OPERADOR', 'WHATSAPP'].forEach((t, i) =>
+    escrever(ws.getCell(r + 1, c + i), t, { tamanho: 16, negrito: true, cor: COR.verde })
+  );
+  for (let i = 0; i < linhas; i++) {
+    (['E', 'D'] as const).forEach((lado, j) => {
+      const posicao = `${lado}${i + 1}`;
+      const quantidade = lado === 'E' ? mesa.esq : mesa.dir;
+      const nome = ws.getCell(r + 2 + i, c + j * 2);
+      const situacao = ws.getCell(r + 2 + i, c + j * 2 + 1);
+      if (i >= quantidade) return;
+      if (mesa.desativadas.includes(posicao)) {
+        escrever(nome, 'DESATIVADA', { tamanho: 12, negrito: true, cor: COR.desativada });
+        return;
+      }
+      const lugar = mesa.lugares[posicao];
+      if (!lugar) return;
+      escrever(nome, lugar.operador || 'VAZIO', { tamanho: 12, negrito: true, cor: lugar.operador ? COR.azul : COR.vazio });
+      escreverSituacao(situacao, lugar.whatsapp);
+    });
+  }
+  let fim = r + 1 + linhas;
+  if (mesa.centro !== 'NENHUM') {
+    fim++;
+    escrever(ws.getCell(fim, c), 'SUPERVISOR', { tamanho: 14, cor: COR.verde });
+    if (mesa.lugares.SUP) escreverSituacao(ws.getCell(fim, c + 1), mesa.lugares.SUP.whatsapp);
+    if (mesa.centro === 'SUPSUB') {
+      escrever(ws.getCell(fim, c + 2), 'BACKUP', { tamanho: 14, cor: COR.verde });
+      if (mesa.lugares.SUB) escreverSituacao(ws.getCell(fim, c + 3), mesa.lugares.SUB.whatsapp);
+    }
+  }
+  moldura(ws, r, c, fim, c + 3);
+  return fim;
+};
+
+/**
+ * Planilha de resumo no visual da RELATORIO-WHATSAPP-INTUITIVO: fundo azul-escuro,
+ * título amarelo por sala, duas equipes por linha (E–H e K–N) e os celulares corporativos.
+ */
+export const gerarPlanilhaWhatsapp = async (mapa: MapaWhatsapp, agora: Date): Promise<Workbook> => {
+  const livro = await novaPlanilha();
+  const ws = livro.addWorksheet('WhatsApp');
+  ws.getColumn(1).width = ESPACO;
+  ['B', 'C', 'D', 'I', 'J', 'O'].forEach((col) => (ws.getColumn(col).width = ESPACO));
+  Object.entries(LARGURAS).forEach(([col, largura]) => (ws.getColumn(col).width = largura));
+
+  let r = 2;
+  for (const sala of mapa.salas) {
+    ws.mergeCells(r, 5, r, 14);
+    escrever(
+      ws.getCell(r, 5),
+      `STATUS DOS WHATSAPP DO ${sala.nome.toUpperCase()} — ${dataHora(agora)}`,
+      { nome: 'Calibri', tamanho: 36, negrito: true },
+      COR.amarelo
+    );
+    ws.getRow(r).height = 47.25;
+    r += 1;
+    for (let i = 0; i < sala.mesas.length; i += 2) {
+      const par = sala.mesas.slice(i, i + 2);
+      const fim = Math.max(...par.map((m, j) => escreverMesa(ws, m, r, BLOCOS[j])));
+      r = fim + 2;
+    }
+  }
+
+  if (mapa.celulares.length > 0) {
+    ws.mergeCells(r, 5, r, 8);
+    escrever(ws.getCell(r, 5), 'WHATSAPP DOS CELULARES CORPORATIVOS', { tamanho: 20, negrito: true }, COR.amarelo);
+    ['CELULAR', 'MESSENGER', 'CELULAR', 'BUSINESS'].forEach((t, i) =>
+      escrever(ws.getCell(r + 1, 5 + i), t, { tamanho: 16, negrito: true, cor: COR.verde })
+    );
+    mapa.celulares.forEach((cel, i) => {
+      const linha = r + 2 + i;
+      const cor = `FF${cel.hex.replace('#', '').toUpperCase()}`;
+      escrever(ws.getCell(linha, 5), cel.cor, { tamanho: 12, negrito: true, cor });
+      escreverSituacao(ws.getCell(linha, 6), cel.messenger);
+      escrever(ws.getCell(linha, 7), cel.cor, { tamanho: 12, negrito: true, cor });
+      escreverSituacao(ws.getCell(linha, 8), cel.business);
+    });
+    moldura(ws, r, 5, r + 1 + mapa.celulares.length, 8);
+    r += 2 + mapa.celulares.length;
+  }
+
+  // Fundo azul-escuro em volta dos blocos (o que não foi escrito)
+  for (let linha = 1; linha <= r + 1; linha++) {
+    for (let col = 4; col <= 15; col++) {
+      const celula = ws.getCell(linha, col);
+      if (!celula.fill) celula.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COR.fundo } };
+    }
+  }
+  return livro;
 };

@@ -1,6 +1,14 @@
 import * as XLSX from 'xlsx';
 import { describe, expect, it } from 'vitest';
-import { gradeDaPlanilha, importarPlanilhaWhatsapp, lerSituacao } from './whatsappPlanilha';
+import type { Cell, Workbook } from 'exceljs';
+import { MapaWhatsapp } from '../types/whatsapp';
+import {
+  gerarPlanilhaWhatsapp,
+  gradeDaPlanilha,
+  importarPlanilhaWhatsapp,
+  lerSituacao,
+  nomeDaPlanilhaWhatsapp,
+} from './whatsappPlanilha';
 
 const AGORA = new Date('2026-10-27T10:00:00');
 
@@ -134,6 +142,18 @@ describe('importar a planilha de status dos WhatsApps', () => {
     expect(importarPlanilhaWhatsapp(repetida, AGORA).mapa.salas[0].mesas.map((m) => m.sigla)).toEqual(['OP6', 'OP6B']);
   });
 
+  it('título sem número: reconhecido pela linha OPERADOR / WHATSAPP logo abaixo', () => {
+    const sem = montarGrade({
+      E34: 'STATUS DOS WHATSAPP DO COMERCIAL 2',
+      ...bloco('E', 35, 'DIGITAL', [['X', 'OK', 'Y', 'OK']], ['SUPERVISOR', 'OK', 'BACKUP', 'OK']),
+      ...bloco('K', 35, 'PLANTÃO - Joana Sousa', [['Z', 'BANIDO', 'W', 'OK']], ['SUPERVISOR', 'OK', '', '']),
+    });
+    const [digital, plantao] = importarPlanilhaWhatsapp(sem, AGORA).mapa.salas[0].mesas;
+    expect(digital).toMatchObject({ nome: 'Digital', sigla: 'DG', supervisor: '' });
+    expect(plantao).toMatchObject({ nome: 'Plantão', sigla: 'PLA', supervisor: 'Joana Sousa', centro: 'SUP' });
+    expect(plantao.lugares.E1.whatsapp.situacao).toBe('BANIDO');
+  });
+
   it('planilha sem equipes é recusada', () => {
     expect(() => importarPlanilhaWhatsapp(montarGrade({ A1: 'qualquer coisa' }), AGORA)).toThrow(
       'Não encontrei nenhuma equipe ("Nº EQUIPE - ...") na planilha.'
@@ -150,5 +170,68 @@ describe('leitura do arquivo', () => {
     XLSX.utils.book_append_sheet(livro, aba, 'Planilha1');
     const lido = XLSX.read(XLSX.write(livro, { type: 'array', bookType: 'xlsx' }), { type: 'array' });
     expect(gradeDaPlanilha(lido)[33][4]).toBe('STATUS DOS WHATSAPP DO COMERCIAL 1');
+  });
+});
+
+describe('planilha de resumo', () => {
+  const { mapa } = importarPlanilhaWhatsapp(PLANILHA, AGORA);
+
+  const gerar = async (): Promise<{ livro: Workbook; buffer: ArrayBuffer }> => {
+    const gerado = await gerarPlanilhaWhatsapp(mapa, AGORA);
+    const buffer = (await gerado.xlsx.writeBuffer()) as ArrayBuffer;
+    const ExcelJS = (await import('exceljs')).default;
+    const livro = new ExcelJS.Workbook();
+    await livro.xlsx.load(buffer);
+    return { livro, buffer };
+  };
+
+  const celulas = (livro: Workbook): Cell[] => {
+    const lista: Cell[] = [];
+    livro.worksheets[0].eachRow((linha) => linha.eachCell((c) => lista.push(c)));
+    return lista;
+  };
+  const achar = (livro: Workbook, texto: string): Cell => {
+    const c = celulas(livro).find((x) => x.value === texto);
+    if (!c) throw new Error(`não achei "${texto}"`);
+    return c;
+  };
+  const corDaFonte = (c: Cell) => c.font?.color?.argb;
+
+  it('nome do arquivo com a data', () => {
+    expect(nomeDaPlanilhaWhatsapp(AGORA)).toBe('relatorio_whatsapp_2026-10-27.xlsx');
+  });
+
+  it('títulos das salas e das equipes', async () => {
+    const { livro } = await gerar();
+    const titulo = achar(livro, 'STATUS DOS WHATSAPP DO COMERCIAL 1 — 27/10/2026 10:00');
+    expect((titulo.fill as any).fgColor.argb).toBe('FFFFFF00');
+    expect(titulo.font).toMatchObject({ size: 36, bold: true });
+    expect(achar(livro, '1º EQUIPE - Joana Sousa').font).toMatchObject({ name: 'Arial', size: 20, bold: true });
+    achar(livro, 'DIGITAL');
+    achar(livro, '7º EQUIPE - (SEGUNDA ESPINHA AO CHEGAR NO COMERCIAL)');
+    expect(livro.worksheets[0].getColumn('E').width).toBe(61);
+  });
+
+  it('situação longa encolhe para caber na coluna', async () => {
+    const { livro } = await gerar();
+    expect(achar(livro, 'RESTRINGIDO ATÉ 29/10 14:00').alignment).toMatchObject({ shrinkToFit: true });
+  });
+
+  it('cores de cada situação e da vaga vazia', async () => {
+    const { livro } = await gerar();
+    expect(corDaFonte(achar(livro, 'BANIDO'))).toBe('FFFF0000');
+    expect(corDaFonte(achar(livro, 'OK'))).toBe('FF70AD47');
+    expect(corDaFonte(achar(livro, 'NÃO TEM'))).toBe('FF808080');
+    expect(corDaFonte(achar(livro, 'RESTRINGIDO ATÉ 29/10 14:00'))).toBe('FFBF8F00');
+    expect(corDaFonte(achar(livro, 'VAZIO'))).toBe('FFFFD966');
+    expect(corDaFonte(achar(livro, 'ANA ALVES'))).toBe('FF0070C0');
+  });
+
+  it('ida e volta: importar a planilha gerada devolve o mesmo mapa', async () => {
+    const { buffer } = await gerar();
+    const relido = importarPlanilhaWhatsapp(gradeDaPlanilha(XLSX.read(buffer, { type: 'array' })), AGORA).mapa;
+    const semIds = (m: MapaWhatsapp) =>
+      JSON.parse(JSON.stringify(m, (chave, valor) => (chave === 'id' ? undefined : valor)));
+    expect(semIds(relido)).toEqual(semIds(mapa));
   });
 });
