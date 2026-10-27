@@ -501,3 +501,123 @@
 .wpp-previa p {
   margin: 0;
 }
+
+/* Configurar salas e mesas */
+.wpp-config-abrir {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.wpp-config-abrir svg.girado {
+  transform: rotate(180deg);
+}
+
+.wpp-config-sala {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.wpp-config-sala-topo,
+.wpp-config-nova-sala {
+  display: grid;
+  grid-template-columns: minmax(0, 320px) auto auto;
+  align-items: center;
+  justify-content: start;
+  gap: 10px;
+}
+
+.wpp-config-nova-sala {
+  grid-template-columns: minmax(0, 320px) auto;
+}
+
+.wpp-config-mesas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.wpp-config-mesa {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.wpp-config-mesa.ativa {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+}
+
+.wpp-config-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+  gap: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 900px) {
+  .wpp-config-editor,
+  .wpp-config-sala-topo,
+  .wpp-config-nova-sala {
+    grid-template-columns: 1fr;
+  }
+}
+
+.wpp-config-form,
+.wpp-config-previa {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.wpp-stepper {
+  display: grid;
+  grid-template-columns: 1fr 44px 32px 44px;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.wpp-stepper .btn {
+  width: 44px;
+  padding: 0;
+  justify-content: center;
+}
+
+.wpp-stepper strong {
+  text-align: center;
+}
+
+.wpp-opcoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.wpp-opcoes .wpp-filtro {
+  border: 1px solid var(--line);
+}
+
+.wpp-perigo {
+  color: var(--red);
+}

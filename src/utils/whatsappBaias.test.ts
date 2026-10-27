@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { MapaWhatsapp } from '../types/whatsapp';
 import {
+  adicionarMesaNoMapa,
+  adicionarSalaNoMapa,
   alterarCelularNoMapa,
+  alternarDesativada,
+  formatarMesa,
+  removerMesaNoMapa,
+  removerSalaNoMapa,
+  renomearSalaNoMapa,
   alterarLugarNoMapa,
   alterarMesaNoMapa,
   carregarMapa,
@@ -168,5 +175,49 @@ describe('alterações no mapa (sem mexer no original)', () => {
     const novo = alterarCelularNoMapa(mapa, 'AZUL', 'business', estado('BANIDO', depois(3)), depois(3));
     expect(novo.celulares[1].business.situacao).toBe('BANIDO');
     expect(novo.celulares[1].messenger).toBe(mapa.celulares[1].messenger);
+  });
+});
+
+describe('configurar salas e mesas', () => {
+  const mapa = mapaInicial(AGORA);
+  const sala = mapa.salas[0];
+  const mesa = sala.mesas[0];
+
+  it('salas: adicionar, renomear e remover', () => {
+    const com2 = adicionarSalaNoMapa(mapa, 'Comercial 2', depois(1));
+    expect(com2.salas.map((s) => s.nome)).toEqual(['Comercial 1', 'Comercial 2']);
+    expect(com2.salas[1].mesas).toEqual([]);
+    const renomeado = renomearSalaNoMapa(com2, com2.salas[1].id, 'Sala Digital', depois(2));
+    expect(renomeado.salas[1].nome).toBe('Sala Digital');
+    expect(removerSalaNoMapa(renomeado, renomeado.salas[1].id, depois(3)).salas).toHaveLength(1);
+  });
+
+  it('mesas: adicionar e remover', () => {
+    const nova = novaMesa({ nome: 'Digital', sigla: 'DG', supervisor: '', esq: 5, dir: 5, centro: 'NENHUM', inicio: 'sup' }, AGORA);
+    const com = adicionarMesaNoMapa(mapa, sala.id, nova, depois(1));
+    expect(com.salas[0].mesas.map((m) => m.sigla)).toEqual(['OP1', 'DG']);
+    expect(removerMesaNoMapa(com, sala.id, nova.id, depois(2)).salas[0].mesas.map((m) => m.sigla)).toEqual(['OP1']);
+  });
+
+  it('mudar o formato: mantém quem fica, cria vagas novas e informa quem sai', () => {
+    const comAna = { ...mesa, lugares: { ...mesa.lugares, E4: { operador: 'ANA', whatsapp: estado('BANIDO', AGORA) } } };
+    const { mesa: nova, removidos } = formatarMesa(
+      comAna,
+      { nome: '1º Equipe', sigla: 'OP1', supervisor: 'JOANA', esq: 3, dir: 5, centro: 'SUP', inicio: 'porta', desativadas: [] },
+      depois(1)
+    );
+    expect(removidos).toEqual([{ posicao: 'SUB', operador: '' }, { posicao: 'E4', operador: 'ANA' }]);
+    expect(nova).toMatchObject({ supervisor: 'JOANA', esq: 3, dir: 5, centro: 'SUP', inicio: 'porta', id: mesa.id });
+    expect(nova.lugares.E1).toBe(mesa.lugares.E1);
+    expect(nova.lugares.D5).toEqual({ operador: '', whatsapp: estado('OK', depois(1)) });
+  });
+
+  it('desativar e reativar uma baia guarda o que estava nela', () => {
+    const comAna = { ...mesa, lugares: { ...mesa.lugares, D2: { operador: 'ANA', whatsapp: estado('OK', AGORA) } } };
+    const desativada = alternarDesativada(comAna, 'D2', depois(1));
+    expect(desativada.desativadas).toEqual(['D2']);
+    const reativada = alternarDesativada(desativada, 'D2', depois(2));
+    expect(reativada.desativadas).toEqual([]);
+    expect(reativada.lugares.D2.operador).toBe('ANA');
   });
 });

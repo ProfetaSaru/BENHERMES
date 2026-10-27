@@ -1,5 +1,5 @@
 import { CelularCorporativo, EstadoWhatsapp, Lugar, MapaWhatsapp, Mesa, Sala, Situacao } from '../types/whatsapp';
-import { posicoesAtivas } from './mapaMesas';
+import { FormatoMesa, ajustarLugares, posicoesAtivas } from './mapaMesas';
 
 /**
  * Regras do WhatsApp das Baias: situação de cada lugar, restrição com prazo, resumo,
@@ -169,6 +169,67 @@ export const alterarCelularNoMapa = (
   celulares: mapa.celulares.map((c) => (c.cor === cor ? { ...c, [campo]: novo } : c)),
   atualizadoEm: agora.toISOString(),
 });
+
+// ---------------------------------------------------------------------------
+// Configurar salas e mesas
+// ---------------------------------------------------------------------------
+
+const comSalas = (mapa: MapaWhatsapp, salas: Sala[], agora: Date): MapaWhatsapp => ({
+  ...mapa,
+  salas,
+  atualizadoEm: agora.toISOString(),
+});
+
+export const adicionarSalaNoMapa = (mapa: MapaWhatsapp, nome: string, agora: Date): MapaWhatsapp =>
+  comSalas(mapa, [...mapa.salas, { id: crypto.randomUUID(), nome: nome.trim(), mesas: [] }], agora);
+
+export const renomearSalaNoMapa = (mapa: MapaWhatsapp, salaId: string, nome: string, agora: Date): MapaWhatsapp =>
+  comSalas(mapa, mapa.salas.map((s) => (s.id === salaId ? { ...s, nome } : s)), agora);
+
+export const removerSalaNoMapa = (mapa: MapaWhatsapp, salaId: string, agora: Date): MapaWhatsapp =>
+  comSalas(mapa, mapa.salas.filter((s) => s.id !== salaId), agora);
+
+export const adicionarMesaNoMapa = (mapa: MapaWhatsapp, salaId: string, mesa: Mesa, agora: Date): MapaWhatsapp =>
+  comSalas(mapa, mapa.salas.map((s) => (s.id === salaId ? { ...s, mesas: [...s.mesas, mesa] } : s)), agora);
+
+export const removerMesaNoMapa = (mapa: MapaWhatsapp, salaId: string, mesaId: string, agora: Date): MapaWhatsapp =>
+  comSalas(mapa, mapa.salas.map((s) => (s.id === salaId ? { ...s, mesas: s.mesas.filter((m) => m.id !== mesaId) } : s)), agora);
+
+export type DadosDaMesa = FormatoMesa & Pick<Mesa, 'nome' | 'supervisor'>;
+
+/**
+ * Novo formato da mesa: quem continua fica como está, posições novas entram vazias e OK,
+ * e as que deixaram de existir voltam em `removidos` (para pedir confirmação se tinham operador).
+ * Baias desativadas guardam o que tinham, para voltar igual ao reativar.
+ */
+export const formatarMesa = (
+  mesa: Mesa,
+  dados: DadosDaMesa,
+  agora: Date
+): { mesa: Mesa; removidos: { posicao: string; operador: string }[] } => {
+  const { lugares, removidos } = ajustarLugares(mesa.lugares, { ...dados, desativadas: [] }, () => ({
+    operador: '',
+    whatsapp: estado('OK', agora),
+  }));
+  return {
+    mesa: {
+      ...mesa,
+      ...dados,
+      sigla: dados.sigla.trim().toUpperCase(),
+      desativadas: dados.desativadas.filter((p) => p in lugares),
+      lugares,
+    },
+    removidos: removidos.map((posicao) => ({ posicao, operador: mesa.lugares[posicao]?.operador ?? '' })),
+  };
+};
+
+export const alternarDesativada = (mesa: Mesa, posicao: string, agora: Date): Mesa => {
+  if (mesa.desativadas.includes(posicao)) {
+    const lugares = posicao in mesa.lugares ? mesa.lugares : { ...mesa.lugares, [posicao]: { operador: '', whatsapp: estado('OK', agora) } };
+    return { ...mesa, desativadas: mesa.desativadas.filter((p) => p !== posicao), lugares };
+  }
+  return { ...mesa, desativadas: [...mesa.desativadas, posicao] };
+};
 
 /** null = sigla pode ser usada; senão, o motivo */
 export const siglaValida = (sigla: string, mapa: MapaWhatsapp, idDaMesa?: string): string | null => {
