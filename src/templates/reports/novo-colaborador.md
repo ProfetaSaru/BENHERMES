@@ -28,6 +28,6 @@ LOGIN BENHUB
 
 {{nome_benhub}}
 | {{email_benhub}}
-
 | {{senha_benhub:password}}
-EQUIPE: {{equipe}}.
+
+EQUIPE: {{equipe}}.
