@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { MapaWhatsapp } from '../types/whatsapp';
 import {
+  alterarCelularNoMapa,
+  alterarLugarNoMapa,
+  alterarMesaNoMapa,
   carregarMapa,
   corDoCelular,
   estado,
@@ -62,6 +65,7 @@ describe('situação do WhatsApp', () => {
 
   it('tempo restante e restrição vencida', () => {
     expect(tempoRestante(restringir(27, 'horas', AGORA), AGORA)).toBe('1d 3h');
+    expect(tempoRestante(restringir(2, 'dias', AGORA), AGORA)).toBe('2d');
     expect(tempoRestante(restringir(320, 'horas', AGORA), depois(320 * 60 - 320))).toBe('5h 20min');
     expect(tempoRestante(restringir(1, 'horas', AGORA), depois(15))).toBe('45min');
     const r = restringir(1, 'horas', AGORA);
@@ -118,6 +122,10 @@ describe('arquivo do mapa (.json)', () => {
     expect(importarMapa(texto)).toEqual(mapa);
   });
 
+  it('arquivo salvo com BOM (Bloco de Notas, Excel) também é aceito', () => {
+    expect(importarMapa('\uFEFF' + exportarMapa(mapa, AGORA))).toEqual(mapa);
+  });
+
   it('arquivo inválido é recusado com mensagem', () => {
     const errado = JSON.parse(exportarMapa(mapa, AGORA));
     expect(() => importarMapa('x')).toThrow();
@@ -134,5 +142,31 @@ describe('arquivo do mapa (.json)', () => {
     }
     const salvo = JSON.stringify(mapa);
     expect(carregarMapa(salvo, AGORA)).toEqual(mapa);
+  });
+});
+
+describe('alterações no mapa (sem mexer no original)', () => {
+  const mapa = mapaInicial(AGORA);
+  const sala = mapa.salas[0];
+  const mesa = sala.mesas[0];
+
+  it('lugar: troca só o lugar pedido e atualiza a data do mapa', () => {
+    const novo = alterarLugarNoMapa(mapa, sala.id, mesa.id, 'E1', { operador: 'ANA' }, depois(1));
+    expect(novo.salas[0].mesas[0].lugares.E1.operador).toBe('ANA');
+    expect(novo.salas[0].mesas[0].lugares.E2).toBe(mesa.lugares.E2);
+    expect(novo.atualizadoEm).toBe(depois(1).toISOString());
+    expect(mapa.salas[0].mesas[0].lugares.E1.operador).toBe('');
+  });
+
+  it('mesa: aplica a mudança e mantém as outras salas', () => {
+    const novo = alterarMesaNoMapa(mapa, sala.id, mesa.id, (m) => ({ ...m, supervisor: 'JOANA' }), depois(2));
+    expect(novo.salas[0].mesas[0].supervisor).toBe('JOANA');
+    expect(mesa.supervisor).toBe('');
+  });
+
+  it('celular: Messenger ou Business', () => {
+    const novo = alterarCelularNoMapa(mapa, 'AZUL', 'business', estado('BANIDO', depois(3)), depois(3));
+    expect(novo.celulares[1].business.situacao).toBe('BANIDO');
+    expect(novo.celulares[1].messenger).toBe(mapa.celulares[1].messenger);
   });
 });

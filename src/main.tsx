@@ -10,6 +10,7 @@ import './styles/history.css';
 import './styles/formatter.css';
 import './styles/escala.css';
 import './styles/relatorioUra.css';
+import './styles/whatsapp.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

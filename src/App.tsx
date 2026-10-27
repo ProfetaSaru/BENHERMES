@@ -14,6 +14,7 @@ import { DataFormatterHub } from './components/formatter/DataFormatterHub';
 import { EscalaBasesHub } from './components/escala/EscalaBasesHub';
 import { RelatorioUraHub } from './components/relatorioUra/RelatorioUraHub';
 import { ConfiguracoesHub } from './components/configuracoes/ConfiguracoesHub';
+import { WhatsappHub } from './components/whatsapp/WhatsappHub';
 import { Modal } from './components/common/Modal';
 import { Task, SavedReport, SaveReportParams } from './types/task';
 import { getNavigationItems } from './utils/navigationItems';
@@ -231,6 +232,10 @@ export const App: React.FC = () => {
           ) : activeToolId === 'escala' ? (
             <main className="container" style={{ maxWidth: '1200px', padding: '0 16px' }}>
               <EscalaBasesHub onNotify={notify} />
+            </main>
+          ) : activeToolId === 'whatsapp' ? (
+            <main className="container" style={{ maxWidth: '1480px', padding: '0 16px' }}>
+              <WhatsappHub onNotify={notify} />
             </main>
           ) : activeToolId === 'relatorio-ura' ? (
             <main className="container" style={{ maxWidth: '1480px', padding: '0 16px' }}>

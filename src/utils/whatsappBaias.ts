@@ -1,4 +1,4 @@
-import { CelularCorporativo, EstadoWhatsapp, MapaWhatsapp, Mesa, Sala, Situacao } from '../types/whatsapp';
+import { CelularCorporativo, EstadoWhatsapp, Lugar, MapaWhatsapp, Mesa, Sala, Situacao } from '../types/whatsapp';
 import { posicoesAtivas } from './mapaMesas';
 
 /**
@@ -80,7 +80,7 @@ export const tempoRestante = (e: EstadoWhatsapp, agora: Date): string => {
   const dias = Math.floor(minutos / 1440);
   const horas = Math.floor((minutos % 1440) / 60);
   const resto = minutos % 60;
-  if (dias > 0) return `${dias}d ${horas}h`;
+  if (dias > 0) return horas > 0 ? `${dias}d ${horas}h` : `${dias}d`;
   if (horas > 0) return resto > 0 ? `${horas}h ${resto}min` : `${horas}h`;
   return `${resto}min`;
 };
@@ -123,6 +123,52 @@ export const resumoGeral = (mapa: MapaWhatsapp, agora: Date): ResumoWhatsapp => 
   mapa.salas.forEach((sala) => sala.mesas.forEach((mesa) => somarMesa(resumo, mesa, agora)));
   return resumo;
 };
+
+// ---------------------------------------------------------------------------
+// Alterações (devolvem um mapa novo; o original não muda)
+// ---------------------------------------------------------------------------
+
+export const alterarMesaNoMapa = (
+  mapa: MapaWhatsapp,
+  salaId: string,
+  mesaId: string,
+  mudar: (mesa: Mesa) => Mesa,
+  agora: Date
+): MapaWhatsapp => ({
+  ...mapa,
+  salas: mapa.salas.map((s) =>
+    s.id !== salaId ? s : { ...s, mesas: s.mesas.map((m) => (m.id === mesaId ? mudar(m) : m)) }
+  ),
+  atualizadoEm: agora.toISOString(),
+});
+
+export const alterarLugarNoMapa = (
+  mapa: MapaWhatsapp,
+  salaId: string,
+  mesaId: string,
+  posicao: string,
+  mudanca: Partial<Lugar>,
+  agora: Date
+): MapaWhatsapp =>
+  alterarMesaNoMapa(
+    mapa,
+    salaId,
+    mesaId,
+    (m) => ({ ...m, lugares: { ...m.lugares, [posicao]: { ...m.lugares[posicao], ...mudanca } } }),
+    agora
+  );
+
+export const alterarCelularNoMapa = (
+  mapa: MapaWhatsapp,
+  cor: string,
+  campo: 'messenger' | 'business',
+  novo: EstadoWhatsapp,
+  agora: Date
+): MapaWhatsapp => ({
+  ...mapa,
+  celulares: mapa.celulares.map((c) => (c.cor === cor ? { ...c, [campo]: novo } : c)),
+  atualizadoEm: agora.toISOString(),
+});
 
 /** null = sigla pode ser usada; senão, o motivo */
 export const siglaValida = (sigla: string, mapa: MapaWhatsapp, idDaMesa?: string): string | null => {
@@ -182,7 +228,7 @@ const lerMapa = (dados: any): MapaWhatsapp => {
 export const importarMapa = (texto: string): MapaWhatsapp => {
   let dados: any;
   try {
-    dados = JSON.parse(texto);
+    dados = JSON.parse(texto.replace(/^\uFEFF/, ''));
   } catch {
     throw new Error('O arquivo não é um .json válido.');
   }
