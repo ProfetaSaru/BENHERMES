@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Download, FileJson, FileUp, MessageCircle, Upload, Users } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { NotificationType } from '../../types/task';
+import { NotificationState, NotificationType } from '../../types/task';
+import { NotificationToast } from '../common/NotificationToast';
 import { MapaWhatsapp } from '../../types/whatsapp';
 import { useWhatsappBaias } from '../../hooks/useWhatsappBaias';
 import { nomeDoCelular, ondeEstaABaia, textoDoLocal } from '../../utils/celulares';
@@ -19,6 +20,8 @@ import { Celulares } from './Celulares';
 import { ConfigurarCelulares } from './ConfigurarCelulares';
 
 interface WhatsappHubProps {
+  /** Aviso atual do app: aparece flutuando, porque as ações acontecem em qualquer ponto da página */
+  notification: NotificationState;
   onNotify: (message: string, type?: NotificationType) => void;
 }
 
@@ -69,7 +72,7 @@ const Contagens: React.FC<{ resumo: ResumoWhatsapp; celulares?: boolean }> = ({ 
   </div>
 );
 
-export const WhatsappHub: React.FC<WhatsappHubProps> = ({ onNotify }) => {
+export const WhatsappHub: React.FC<WhatsappHubProps> = ({ notification, onNotify }) => {
   const wpp = useWhatsappBaias();
   const { mapa } = wpp;
   const [agora, setAgora] = useState(() => new Date());
@@ -389,6 +392,12 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({ onNotify }) => {
       <ConfigurarCelulares mapa={mapa} onMapa={wpp.substituir} onNotify={onNotify} />
 
       {painel}
+
+      {notification.message && (
+        <div className="wpp-aviso">
+          <NotificationToast message={notification.message} type={notification.type} />
+        </div>
+      )}
     </div>
   );
 };

@@ -969,3 +969,23 @@
   grid-template-columns: 1fr 140px 1fr auto;
   gap: 8px;
 }
+
+/* Aviso flutuante (ligar uma baia já usada, erros de importação…) */
+.wpp-aviso {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 60;
+  transform: translateX(-50%);
+  max-width: calc(100vw - 32px);
+  padding: 10px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+}
+
+.wpp-aviso .form-message {
+  margin: 0;
+  min-height: 0;
+}

@@ -151,7 +151,7 @@ export const alterarCelularNoMapa = (
 ): MapaWhatsapp => comCelulares(mapa, mapa.celulares.map((c) => (c.id === celularId ? mudar(c) : c)), agora);
 
 export const removerCelularNoMapa = (mapa: MapaWhatsapp, celularId: string, agora: Date): MapaWhatsapp =>
-  comCelulares(mapa, mapa.celulares.filter((c) => c.id !== celularId), agora);
+  transferirSituacoes(mapa, comCelulares(mapa, mapa.celulares.filter((c) => c.id !== celularId), agora), agora);
 
 /** "Preto · Joana" ou "Azul" */
 export const nomeDoCelular = (c: Pick<Celular, 'cor' | 'apelido'>): string =>
@@ -189,15 +189,19 @@ export const ligarBaia = (
       }),
     };
   });
-  return { mapa: comCelulares(mapa, celulares, agora), desligada };
+  return { mapa: transferirSituacoes(mapa, comCelulares(mapa, celulares, agora), agora), desligada };
 };
 
 /** Nova equipe (ou guardado, com null): refaz a ligação automática na equipe nova */
 export const mudarEquipe = (mapa: MapaWhatsapp, celularId: string, mesaId: string | null, agora: Date): MapaWhatsapp =>
-  alterarCelularNoMapa(
+  transferirSituacoes(
     mapa,
-    celularId,
-    (c) => ligarAutomaticamente({ ...c, mesaId, ...perfilDaMesa(acharMesa(mapa, mesaId)?.mesa) }, mapa),
+    alterarCelularNoMapa(
+      mapa,
+      celularId,
+      (c) => ligarAutomaticamente({ ...c, mesaId, ...perfilDaMesa(acharMesa(mapa, mesaId)?.mesa) }, mapa),
+      agora
+    ),
     agora
   );
 
@@ -246,7 +250,57 @@ export const limparLigacoes = (mapa: MapaWhatsapp): MapaWhatsapp => ({
 });
 
 export const removerMesaComCelulares = (mapa: MapaWhatsapp, salaId: string, mesaId: string, agora: Date): MapaWhatsapp =>
-  limparLigacoes(removerMesaNoMapa(mapa, salaId, mesaId, agora));
+  transferirSituacoes(mapa, limparLigacoes(removerMesaNoMapa(mapa, salaId, mesaId, agora)), agora);
+
+/**
+ * A situação é do número (da vaga). Comparando o mapa de antes com o de depois de mudar ligações:
+ * a vaga que sai de uma baia leva a situação que tinha; a que entra numa baia leva a dela para a
+ * baia; a baia que perdeu o número sem ganhar outro fica NÃO TEM. Vaga nova (que não existia
+ * antes) assume a situação da baia, como no primeiro cadastro dos celulares.
+ */
+export const transferirSituacoes = (antes: MapaWhatsapp, depois: MapaWhatsapp, agora: Date): MapaWhatsapp => {
+  const chaveDoLugar = (m: MapaWhatsapp, c: Celular, v: VagaWhatsapp) =>
+    lugarDaVaga(m, c, v) ? `${c.mesaId}|${v.baia}` : null;
+  const anteriores = new Map<string, { estado: EstadoWhatsapp; lugar: string | null }>();
+  const ocupadasAntes = new Set<string>();
+  for (const c of antes.celulares) {
+    for (const v of c.vagas) {
+      const lugar = chaveDoLugar(antes, c, v);
+      anteriores.set(`${c.id}|${v.id}`, { estado: estadoDaVaga(antes, c, v), lugar });
+      if (lugar) ocupadasAntes.add(lugar);
+    }
+  }
+  const escritas = new Map<string, EstadoWhatsapp>();
+  const ocupadasDepois = new Set<string>();
+  const celulares = depois.celulares.map((c) => ({
+    ...c,
+    vagas: c.vagas.map((v) => {
+      const lugar = chaveDoLugar(depois, c, v);
+      if (lugar) ocupadasDepois.add(lugar);
+      const anterior = anteriores.get(`${c.id}|${v.id}`);
+      if (!anterior || anterior.lugar === lugar) return v;
+      if (lugar) escritas.set(lugar, anterior.estado);
+      return { ...v, whatsapp: anterior.estado };
+    }),
+  }));
+  const salas = depois.salas.map((sala) => ({
+    ...sala,
+    mesas: sala.mesas.map((mesa) => {
+      let mudou = false;
+      const lugares = Object.fromEntries(
+        Object.entries(mesa.lugares).map(([pos, l]) => {
+          const chave = `${mesa.id}|${pos}`;
+          const novo = escritas.get(chave) ?? (ocupadasAntes.has(chave) && !ocupadasDepois.has(chave) ? estado('NAO_TEM', agora) : null);
+          if (!novo) return [pos, l];
+          mudou = true;
+          return [pos, { ...l, whatsapp: novo }];
+        })
+      );
+      return mudou ? { ...mesa, lugares } : mesa;
+    }),
+  }));
+  return { ...depois, salas, celulares };
+};
 
 // ---------------------------------------------------------------------------
 // Situação e nomes

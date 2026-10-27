@@ -15,8 +15,10 @@ import {
   novoCelular,
   ondeEstaABaia,
   removerMesaComCelulares,
+  removerCelularNoMapa,
   removerVaga,
   textoDoLocal,
+  transferirSituacoes,
   vagasDaMarca,
 } from './celulares';
 import { estado, formatarMesa, alterarMesaNoMapa, mapaInicial, novaMesa } from './whatsappBaias';
@@ -192,5 +194,65 @@ describe('situação e nomes', () => {
     expect(nomeDoCelular(celular)).toBe('Azul');
     const u2 = celular.vagas.find((v) => v.grupo === 'Usuário 2' && v.rotulo === 'Messenger 1')!;
     expect(textoDoLocal(celular, u2)).toBe('Azul · Usuário 2 · Messenger 1');
+  });
+});
+
+describe('a situação acompanha o número (a vaga) quando a ligação muda', () => {
+  const banirE1 = () => {
+    const base = montarMapa();
+    const op1 = base.salas[0].mesas[0];
+    const { celular, mapa } = criar(base, 'MOTOROLA', op1.id);
+    const naE1 = celular.vagas.find((v) => v.baia === 'E1')!;
+    const banido = alterarEstadoDaVaga(mapa, celular.id, naE1.id, estado('BANIDO', AGORA), AGORA);
+    return { mapa: banido, op1, celular, naE1 };
+  };
+  const vaga = (m: MapaWhatsapp, id: string) => m.celulares.flatMap((c) => c.vagas.map((v) => ({ c, v }))).find((x) => x.v.id === id)!;
+  const situacao = (m: MapaWhatsapp, id: string) => { const { c, v } = vaga(m, id); return estadoDaVaga(m, c, v).situacao; };
+
+  it('trocar a vaga da baia banida: o banido vira backup ainda BANIDO e a baia fica com a situação da vaga nova', () => {
+    const { mapa, celular, naE1 } = banirE1();
+    const backup = celular.vagas.find((v) => v.grupo === 'Usuário 2' && v.rotulo === 'Messenger 1')!;
+    const { mapa: novo } = ligarBaia(mapa, celular.id, backup.id, 'E1', AGORA);
+    expect(situacao(novo, naE1.id)).toBe('BANIDO');
+    expect(vaga(novo, naE1.id).v.baia).toBeNull();
+    expect(situacao(novo, backup.id)).toBe('OK');
+    expect(novo.salas[0].mesas[0].lugares.E1.whatsapp.situacao).toBe('OK');
+  });
+
+  it('desligar a vaga sem pôr outra: a baia fica NÃO TEM e a vaga leva o BANIDO', () => {
+    const { mapa, celular, naE1 } = banirE1();
+    const { mapa: novo } = ligarBaia(mapa, celular.id, naE1.id, null, AGORA);
+    expect(situacao(novo, naE1.id)).toBe('BANIDO');
+    expect(novo.salas[0].mesas[0].lugares.E1.whatsapp.situacao).toBe('NAO_TEM');
+  });
+
+  it('mudar de equipe, remover a mesa ou o celular: o banido continua banido', () => {
+    const { mapa, op1, celular, naE1 } = banirE1();
+    const dg = mapa.salas[0].mesas[1];
+    expect(situacao(mudarEquipe(mapa, celular.id, dg.id, AGORA), naE1.id)).toBe('BANIDO');
+    expect(situacao(removerMesaComCelulares(mapa, mapa.salas[0].id, op1.id, AGORA), naE1.id)).toBe('BANIDO');
+    expect(removerCelularNoMapa(mapa, celular.id, AGORA).salas[0].mesas[0].lugares.E1.whatsapp.situacao).toBe('NAO_TEM');
+  });
+
+  it('diminuir a mesa (via transferirSituacoes): a vaga da baia que sumiu leva a situação', () => {
+    const base = montarMapa();
+    const sala = base.salas[0];
+    const op1 = sala.mesas[0];
+    const { celular, mapa: m0 } = criar(base, 'MOTOROLA', op1.id);
+    const naE4 = celular.vagas.find((v) => v.baia === 'E4')!;
+    const mapa = alterarEstadoDaVaga(m0, celular.id, naE4.id, estado('BANIDO', AGORA), AGORA);
+    const { mesa } = formatarMesa(mapa.salas[0].mesas[0], { nome: op1.nome, sigla: 'OP1', supervisor: '', esq: 3, dir: 4, centro: 'SUP', inicio: 'sup', desativadas: [] }, AGORA);
+    const reduzido = transferirSituacoes(mapa, limparLigacoes(alterarMesaNoMapa(mapa, sala.id, op1.id, () => mesa, AGORA)), AGORA);
+    expect(vaga(reduzido, naE4.id).v.baia).toBeNull();
+    expect(situacao(reduzido, naE4.id)).toBe('BANIDO');
+  });
+
+  it('vaga nova numa baia mantém a situação da baia (primeiro cadastro dos celulares)', () => {
+    const base = montarMapa();
+    const op1 = base.salas[0].mesas[0];
+    op1.lugares.E1.whatsapp = estado('BANIDO', AGORA);
+    const { celular, mapa } = criar(base, 'MOTOROLA', op1.id);
+    const naE1 = celular.vagas.find((v) => v.baia === 'E1')!;
+    expect(situacao(transferirSituacoes(base, mapa, AGORA), naE1.id)).toBe('BANIDO');
   });
 });

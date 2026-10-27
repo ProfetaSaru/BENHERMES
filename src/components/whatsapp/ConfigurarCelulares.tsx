@@ -16,6 +16,7 @@ import {
   novoCelular,
   removerCelularNoMapa,
   removerVaga,
+  transferirSituacoes,
 } from '../../utils/celulares';
 import { codigoDoLugar, posicoesAtivas } from '../../utils/mapaMesas';
 import { MARCAS } from './Celulares';
@@ -63,7 +64,9 @@ export const ConfigurarCelulares: React.FC<ConfigurarCelularesProps> = ({ mapa, 
     setVagasAbertas(cel.id);
   };
 
-  const alterar = (id: string, mudar: (c: Celular) => Celular) => onMapa(alterarCelularNoMapa(mapa, id, mudar, agora()));
+  // Vagas que saem ou entram numa baia levam a situação junto (transferirSituacoes)
+  const alterar = (id: string, mudar: (c: Celular) => Celular) =>
+    onMapa(transferirSituacoes(mapa, alterarCelularNoMapa(mapa, id, mudar, agora()), agora()));
 
   const trocarEquipe = (cel: Celular, mesaId: string) => {
     const destino = mesas.find((x) => x.mesa.id === mesaId)?.mesa;
@@ -72,7 +75,8 @@ export const ConfigurarCelulares: React.FC<ConfigurarCelularesProps> = ({ mapa, 
     onMapa(mudarEquipe(mapa, cel.id, mesaId || null, agora()));
   };
 
-  const trocarMarcaOuUsuarios = (cel: Celular, marca: Marca, usuarios: number) => {
+  /** false quando a pessoa desistiu na confirmação */
+  const trocarMarcaOuUsuarios = (cel: Celular, marca: Marca, usuarios: number): boolean => {
     const { celular, removidas } = mudarMarcaOuUsuarios(cel, marca, usuarios, agora());
     const importantes = removidas.filter((v) => v.baia || v.whatsapp.situacao !== 'OK' || v.numero);
     if (
@@ -81,9 +85,10 @@ export const ConfigurarCelulares: React.FC<ConfigurarCelularesProps> = ({ mapa, 
         `Estas vagas deixam de existir:\n${importantes.map((v) => `${v.grupo} · ${v.rotulo}${v.baia ? ` (${v.baia})` : ''}${v.numero ? ` · ${v.numero}` : ''}`).join('\n')}\n\nContinuar?`
       )
     ) {
-      return;
+      return false;
     }
     alterar(cel.id, () => celular);
+    return true;
   };
 
   const remover = (cel: Celular) => {
@@ -227,8 +232,18 @@ export const ConfigurarCelulares: React.FC<ConfigurarCelularesProps> = ({ mapa, 
                         min={1}
                         max={8}
                         className="formatter-select"
-                        value={cel.usuarios}
-                        onChange={(e) => trocarMarcaOuUsuarios(cel, cel.marca, Math.min(8, Math.max(1, Number(e.target.value) || 1)))}
+                        defaultValue={cel.usuarios}
+                        key={`${cel.id}-${cel.usuarios}`}
+                        onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                        onBlur={(e) => {
+                          // Só ao sair do campo: apagar para digitar não pode virar "1 usuário" no meio
+                          const n = Math.round(Number(e.target.value));
+                          if (!Number.isFinite(n) || n < 1 || n > 8) {
+                            e.target.value = String(cel.usuarios);
+                            return;
+                          }
+                          if (n === cel.usuarios || !trocarMarcaOuUsuarios(cel, cel.marca, n)) e.target.value = String(cel.usuarios);
+                        }}
                         aria-label={`Usuários do celular ${nomeDoCelular(cel)}`}
                       />
                     </label>
@@ -255,6 +270,44 @@ export const ConfigurarCelulares: React.FC<ConfigurarCelularesProps> = ({ mapa, 
                   >
                     <Trash2 size={16} />
                   </button>
+                </div>
+                <div className="wpp-config-celular-linha">
+                  <label className="wpp-config-inline">
+                    Cor
+                    <input
+                      className="formatter-select"
+                      list="wpp-cores"
+                      defaultValue={cel.cor}
+                      key={`cor-${cel.cor}`}
+                      onBlur={(e) => {
+                        const cor = e.target.value.trim();
+                        if (!cor) e.target.value = cel.cor;
+                        else if (cor !== cel.cor) alterar(cel.id, (c) => ({ ...c, cor, hex: corDaCapinha(cor) === corDaCapinha('') ? c.hex : corDaCapinha(cor) }));
+                      }}
+                      aria-label={`Cor da capinha do celular ${nomeDoCelular(cel)}`}
+                    />
+                  </label>
+                  <input
+                    type="color"
+                    className="wpp-cor"
+                    value={cel.hex}
+                    onChange={(e) => alterar(cel.id, (c) => ({ ...c, hex: e.target.value }))}
+                    aria-label={`Amostra da cor do celular ${nomeDoCelular(cel)}`}
+                  />
+                  <label className="wpp-config-inline">
+                    Apelido
+                    <input
+                      className="formatter-select"
+                      defaultValue={cel.apelido}
+                      key={`apelido-${cel.apelido}`}
+                      placeholder="opcional"
+                      onBlur={(e) => {
+                        const apelido = e.target.value.trim();
+                        if (apelido !== cel.apelido) alterar(cel.id, (c) => ({ ...c, apelido }));
+                      }}
+                      aria-label={`Apelido do celular ${nomeDoCelular(cel)}`}
+                    />
+                  </label>
                 </div>
                 <div className="wpp-config-celular-linha">
                   <label className="wpp-config-inline">

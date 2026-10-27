@@ -235,7 +235,7 @@ export const App: React.FC = () => {
             </main>
           ) : activeToolId === 'whatsapp' ? (
             <main className="container" style={{ maxWidth: '1480px', padding: '0 16px' }}>
-              <WhatsappHub onNotify={notify} />
+              <WhatsappHub notification={notification} onNotify={notify} />
             </main>
           ) : activeToolId === 'relatorio-ura' ? (
             <main className="container" style={{ maxWidth: '1480px', padding: '0 16px' }}>
