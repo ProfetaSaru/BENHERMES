@@ -1,0 +1,991 @@
+/* ==========================================================================
+   WHATSAPP DAS BAIAS
+   Mapa no visual do protótipo do Sistema de Chamados; reaproveita os cards
+   e botões do formatador. Cores das situações pelos tokens do tema.
+   ========================================================================== */
+
+.wpp-root.com-painel {
+  padding-right: 380px;
+}
+
+@media (max-width: 1100px) {
+  .wpp-root.com-painel {
+    padding-right: 0;
+  }
+}
+
+/* Cores de cada situação (bolinha, borda e fundo) */
+.wpp-ok {
+  --wpp-cor: var(--green);
+  --wpp-fundo: var(--paper);
+  --wpp-borda: var(--line);
+}
+
+.wpp-banido {
+  --wpp-cor: var(--red);
+  --wpp-fundo: var(--red-soft);
+  --wpp-borda: var(--red);
+}
+
+.wpp-restringido {
+  --wpp-cor: var(--amber);
+  --wpp-fundo: var(--amber-soft);
+  --wpp-borda: var(--amber);
+}
+
+.wpp-analise {
+  --wpp-cor: #c2410c;
+  --wpp-fundo: #fff7ed;
+  --wpp-borda: #c2410c;
+}
+
+.wpp-permanente {
+  --wpp-cor: #111827;
+  --wpp-fundo: #f3f4f6;
+  --wpp-borda: #111827;
+}
+
+:root[data-theme='dark'] .wpp-analise {
+  --wpp-cor: #fb923c;
+  --wpp-fundo: rgba(251, 146, 60, 0.14);
+  --wpp-borda: #fb923c;
+}
+
+:root[data-theme='dark'] .wpp-permanente {
+  --wpp-cor: #e5e7eb;
+  --wpp-fundo: rgba(229, 231, 235, 0.08);
+  --wpp-borda: #e5e7eb;
+}
+
+/* Supervisor sem WhatsApp */
+.semwpp {
+  --wpp-cor: transparent;
+  --wpp-fundo: var(--paper-surface);
+  --wpp-borda: var(--line);
+}
+
+.wpp-nao_tem {
+  --wpp-cor: var(--muted);
+  --wpp-fundo: var(--paper-surface);
+  --wpp-borda: var(--line-strong);
+}
+
+.wpp-bolinha {
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--wpp-cor, var(--muted));
+}
+
+.vazia > .wpp-bolinha,
+.wpp-contagem.vazia::before {
+  background: transparent;
+  border: 2px dashed var(--muted);
+  box-sizing: border-box;
+}
+
+/* Resumo, legenda e filtros */
+.wpp-contagens,
+.wpp-legenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  font-size: 0.85rem;
+  color: var(--ink-secondary);
+}
+
+.wpp-contagem,
+.wpp-legenda > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.wpp-contagem.vazia::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.wpp-resumo-salas {
+  display: grid;
+  gap: 10px;
+}
+
+.wpp-resumo-salas > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.wpp-filtros {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  align-self: flex-start;
+}
+
+.wpp-filtro {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.wpp-filtro.ativo {
+  background: var(--blue);
+  color: #fff;
+}
+
+/* Sala e mesas */
+.wpp-mesas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 520px), 1fr));
+  gap: 18px;
+}
+
+.wpp-mesa-cartao {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.wpp-mesa-titulo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.wpp-mesa-titulo strong {
+  font-size: 1.05rem;
+  color: var(--blue-dark);
+}
+
+.wpp-mesa-titulo span {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.wpp-mesa-titulo:disabled {
+  cursor: default;
+}
+
+.wpp-mesa {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  background: var(--paper-surface);
+  border: 1px solid var(--line);
+}
+
+.wpp-mesa-centro {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.wpp-mesa-centro .wpp-baia {
+  width: min(220px, 48%);
+}
+
+.wpp-mesa-lados {
+  display: grid;
+  grid-template-columns: 1fr 10px 1fr;
+  gap: 10px;
+}
+
+.wpp-mesa-lado {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.wpp-mesa-corredor {
+  border-radius: 4px;
+  background: var(--line);
+}
+
+.wpp-mesa-rodape {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.wpp-mesa-inicio {
+  text-align: center;
+  font-size: 0.75rem;
+  font-style: italic;
+  color: var(--muted);
+}
+
+/* Baia */
+.wpp-baia {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  min-height: 66px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--wpp-borda, var(--line));
+  background: var(--wpp-fundo, var(--paper));
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: box-shadow var(--transition-fast), opacity var(--transition-fast), transform var(--transition-fast);
+  min-width: 0;
+}
+
+.wpp-baia:hover:not(:disabled) {
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+.wpp-baia:focus-visible,
+.wpp-vaga:focus-visible,
+.wpp-alerta:focus-visible,
+.wpp-situacao:focus-visible {
+  outline: 3px solid var(--yellow);
+  outline-offset: 2px;
+}
+
+.wpp-baia.selecionada,
+.wpp-vaga.selecionada {
+  border: 2px solid var(--blue);
+  box-shadow: 0 0 0 3px var(--yellow);
+}
+
+.wpp-baia.vazia {
+  border-style: dashed;
+  border-color: var(--line-strong);
+}
+
+.wpp-baia.vencida {
+  border-width: 2px;
+}
+
+.wpp-baia.apagada {
+  opacity: 0.28;
+}
+
+.wpp-baia.desativada {
+  background: repeating-linear-gradient(135deg, var(--paper-surface), var(--paper-surface) 8px, var(--paper) 8px, var(--paper) 16px);
+  border-style: dashed;
+  color: var(--muted);
+  cursor: default;
+}
+
+.wpp-baia.desativada:not(:disabled) {
+  cursor: pointer;
+}
+
+.wpp-baia-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.wpp-baia-codigo {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--blue-dark);
+}
+
+.wpp-baia-nome {
+  font-size: 0.85rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wpp-baia-nome em {
+  font-style: normal;
+  font-weight: 500;
+  color: var(--muted);
+  margin-right: 6px;
+}
+
+.wpp-baia.vazia .wpp-baia-nome {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.wpp-baia-situacao {
+  font-size: 0.75rem;
+  color: var(--ink-secondary);
+}
+
+.wpp-baia.wpp-banido .wpp-baia-situacao,
+.wpp-baia.wpp-restringido .wpp-baia-situacao {
+  font-weight: 700;
+  color: var(--wpp-cor);
+}
+
+/* Painel lateral de edição */
+.wpp-painel {
+  position: fixed;
+  top: calc(var(--topbar-height, 64px) + 12px);
+  right: 16px;
+  bottom: 16px;
+  width: 350px;
+  max-width: calc(100vw - 32px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 20px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 40;
+}
+
+@media (max-width: 1100px) {
+  .wpp-painel {
+    top: auto;
+    left: 16px;
+    width: auto;
+    max-height: 70vh;
+  }
+}
+
+.wpp-painel-topo {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wpp-painel-topo h2 {
+  margin: 0;
+  font-size: 1.3rem;
+  color: var(--blue-dark);
+}
+
+.wpp-painel-topo p {
+  margin: 2px 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.wpp-painel-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wpp-situacoes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.wpp-situacao {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.wpp-situacao.ativa {
+  border: 2px solid var(--wpp-borda);
+  background: var(--wpp-fundo);
+}
+
+.wpp-situacao.wpp-ok.ativa {
+  border-color: var(--green);
+  background: var(--green-soft);
+}
+
+.wpp-restricao-linha {
+  display: grid;
+  grid-template-columns: 80px 1fr auto;
+  gap: 8px;
+}
+
+.wpp-botao-pequeno {
+  width: auto;
+  align-self: flex-start;
+  padding: 8px 12px;
+}
+
+.wpp-erro {
+  margin: 0;
+  color: var(--red);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.wpp-prazo {
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  background: var(--amber-soft);
+  color: var(--ink);
+  font-size: 0.85rem;
+}
+
+.wpp-prazo p {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+}
+
+.wpp-prazo.vencida {
+  border: 2px solid var(--amber);
+}
+
+.wpp-painel-rodape {
+  margin: auto 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.wpp-previa p {
+  margin: 0;
+}
+
+/* Configurar salas e mesas */
+.wpp-config-abrir {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.wpp-config-abrir svg.girado {
+  transform: rotate(180deg);
+}
+
+.wpp-config-sala {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.wpp-config-sala-topo,
+.wpp-config-nova-sala {
+  display: grid;
+  grid-template-columns: minmax(0, 320px) auto auto;
+  align-items: center;
+  justify-content: start;
+  gap: 10px;
+}
+
+.wpp-config-nova-sala {
+  grid-template-columns: minmax(0, 320px) auto;
+}
+
+.wpp-config-mesas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.wpp-config-mesa {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.wpp-config-mesa.ativa {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+}
+
+.wpp-config-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+  gap: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 900px) {
+  .wpp-config-editor,
+  .wpp-config-sala-topo,
+  .wpp-config-nova-sala {
+    grid-template-columns: 1fr;
+  }
+}
+
+.wpp-config-form,
+.wpp-config-previa {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.wpp-stepper {
+  display: grid;
+  grid-template-columns: 1fr 44px 32px 44px;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.wpp-stepper .btn {
+  width: 44px;
+  padding: 0;
+  justify-content: center;
+}
+
+.wpp-stepper strong {
+  text-align: center;
+}
+
+.wpp-opcoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.wpp-opcoes .wpp-filtro {
+  border: 1px solid var(--line);
+}
+
+.wpp-perigo {
+  color: var(--red);
+}
+
+/* Onde está o WhatsApp da baia */
+.wpp-baia-local {
+  font-size: 0.7rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wpp-baia.semwpp .wpp-baia-situacao {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.wpp-baia.wpp-analise .wpp-baia-situacao,
+.wpp-baia.wpp-permanente .wpp-baia-situacao {
+  font-weight: 700;
+  color: var(--wpp-cor);
+}
+
+/* Alertas (Atenção) */
+.wpp-alertas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wpp-alertas-total {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: var(--red);
+  color: #fff;
+  font-size: 0.75rem;
+}
+
+.wpp-alertas-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wpp-alerta {
+  display: grid;
+  grid-template-columns: 12px minmax(130px, auto) minmax(0, 1.4fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--wpp-cor, var(--muted));
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wpp-alerta:hover {
+  background: var(--paper-surface);
+}
+
+.wpp-alerta-acao {
+  color: var(--wpp-cor);
+}
+
+.wpp-alerta-onde {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wpp-alerta-quem,
+.wpp-alerta-quando {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .wpp-alerta {
+    grid-template-columns: 12px minmax(0, 1fr) minmax(0, auto);
+    row-gap: 2px;
+  }
+
+  .wpp-alerta-acao {
+    grid-area: 1 / 2;
+  }
+
+  .wpp-alerta-quando {
+    grid-area: 1 / 3;
+    text-align: right;
+  }
+
+  .wpp-alerta-onde {
+    grid-area: 2 / 2;
+  }
+
+  .wpp-alerta-quem {
+    grid-area: 2 / 3;
+    text-align: right;
+  }
+
+  .wpp-vagas .wpp-vaga {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 2px;
+  }
+
+  .wpp-vagas .wpp-vaga-dono {
+    grid-area: 2 / 1 / 3 / 3;
+  }
+}
+
+/* Ciclo do banimento no painel */
+.wpp-ciclo {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--wpp-cor);
+  background: var(--wpp-fundo);
+  color: var(--ink);
+  font-size: 0.85rem;
+}
+
+.wpp-ciclo p {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+}
+
+.wpp-ciclo.vencida {
+  border-left-width: 6px;
+}
+
+.wpp-painel-local {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wpp-situacoes {
+  grid-template-columns: 1fr 1fr;
+}
+
+/* Celulares */
+.wpp-celulares {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.wpp-celular {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.wpp-celular.aberto {
+  grid-column: 1 / -1;
+}
+
+.wpp-celular.aberto .wpp-vagas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+  column-gap: 24px;
+}
+
+.wpp-celular.aberto .wpp-vagas-grupo {
+  grid-column: 1 / -1;
+}
+
+.wpp-celular-topo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.wpp-celular-topo svg.girado,
+.wpp-config-abrir svg.girado {
+  transform: rotate(180deg);
+}
+
+.wpp-celular-nome {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.wpp-celular-nome span {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.wpp-celular-amostra {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1px solid var(--line-strong);
+}
+
+.wpp-vagas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.wpp-vagas-grupo {
+  padding: 10px 0 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.wpp-vaga {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 4px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.82rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wpp-vaga:hover {
+  background: var(--paper-surface);
+}
+
+.wpp-vaga.selecionada {
+  border-radius: var(--radius-sm);
+}
+
+.wpp-vaga-dono {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wpp-vaga-dono em {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--blue-dark);
+  margin-right: 6px;
+}
+
+.wpp-vaga-dono.backup {
+  color: var(--muted);
+}
+
+.wpp-vaga-situacao {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: var(--wpp-cor);
+}
+
+/* Configurar celulares */
+.wpp-config-celular-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.wpp-config-celular-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wpp-cor {
+  width: 56px;
+  height: 40px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+}
+
+.wpp-config-celular {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.wpp-config-celular-topo,
+.wpp-config-celular-linha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.wpp-config-celular-topo .formatter-select {
+  width: auto;
+  min-width: 150px;
+}
+
+.wpp-config-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+
+.wpp-config-inline .formatter-select {
+  width: auto;
+  max-width: 220px;
+}
+
+.wpp-config-inline input[type='number'] {
+  max-width: 72px;
+}
+
+.wpp-config-vagas .formatter-select {
+  min-width: 160px;
+}
+
+.wpp-config-grupo {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.wpp-config-vaga-nova {
+  display: grid;
+  grid-template-columns: 1fr 140px 1fr auto;
+  gap: 8px;
+}
+
+/* Aviso flutuante (ligar uma baia já usada, erros de importação…) */
+.wpp-aviso {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 60;
+  transform: translateX(-50%);
+  max-width: calc(100vw - 32px);
+  padding: 10px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+}
+
+.wpp-aviso .form-message {
+  margin: 0;
+  min-height: 0;
+}
