@@ -21,3 +21,13 @@ pnpm-debug.log*
 Thumbs.db
 .idea/
 .vscode/
+
+# Environment variables & Secrets
+.env
+.env.local
+.env.*
+!.env.example
+
+# Antigravity local rules and agent artifacts
+.agents/
+AGENTS.md
