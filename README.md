@@ -216,7 +216,8 @@ desenho do mapa do **Sistema de Chamados**: supervisor no topo, baias do lado es
 - O bloco **Atenção** mostra, nesta ordem: banidos sem análise pedida (o mais antigo primeiro), análises com
   **mais de 24 h**, restrições que já terminaram, números perdidos, restringidos (pelo fim do prazo) e quem não tem.
 - **Restringido** pede **por quanto tempo** (horas ou dias). Quando o prazo acaba, a baia **não volta sozinha** para OK.
-- **A situação é da baia** (do número daquele lugar): esvaziar a baia não muda a situação.
+- **A situação é do número:** esvaziar a baia (trocar o operador) não muda a situação; trocar o celular/vaga da baia
+  leva a situação junto (o banido continua banido como backup) e a baia que fica sem número vira NÃO TEM.
 - Supervisor **sem WhatsApp** fica fora das contagens e dos alertas.
 
 </details>
@@ -238,8 +239,9 @@ fica numa **equipe** ou **guardado**. As **vagas** (cada WhatsApp do aparelho) n
 - Ao entrar numa equipe, as vagas se **ligam sozinhas** às baias: **Messenger** no lado esquerdo, **Business** no
   direito, pulando baias já ligadas a outro celular da equipe. As que sobram são **backup** ("Benconsig Comercial").
 - Na mesa **Digital** o celular é **compartilhado**: todas as vagas são backup "Digital Benconsig".
-- A baia ligada mostra o celular (📱 Azul · Usuário 2 · Messenger 1); a situação da vaga é a situação da baia.
-- **Configurar celulares**: mudar marca, usuários (vagas que somem com baia, número ou problema pedem confirmação),
+- A baia ligada mostra o celular (📱 Azul · Usuário 2 · Messenger 1). Ligar uma baia já usada passa a outra vaga
+  para backup e avisa.
+- **Configurar celulares**: mudar cor, apelido, marca, usuários (vagas que somem com baia, número ou problema pedem confirmação),
   equipe, ligar cada vaga a uma baia ou ao backup e anotar o **número do chip**.
 
 </details>
