@@ -188,9 +188,13 @@ export const importarPlanilhaWhatsapp = (grade: string[][], agora: Date): Result
 
   return {
     mapa: {
-      versao: 2,
+      versao: 3,
       salas: salas.filter((s) => s.mesas.length > 0).map(({ linha: _linha, ...sala }) => sala),
       celulares: [],
+      historico: [],
+      manutencoes: [],
+      manutencaoAtual: null,
+      inicioDoHistorico: agora.toISOString(),
       atualizadoEm: agora.toISOString(),
     },
     avisos,
@@ -205,5 +209,5 @@ export const lerArquivoDoMapa = (livro: XLSX.WorkBook, agora: Date): ResultadoIm
   const aba = livro.SheetNames.find((n) => normalizarNome(n) === 'DADOS');
   if (!aba) return importarPlanilhaWhatsapp(gradeDaPlanilha(livro), agora);
   const linhas = XLSX.utils.sheet_to_json<unknown[]>(livro.Sheets[aba], { header: 1, defval: '', raw: true });
-  return { mapa: importarMapa(linhas.map((l) => String(l[0] ?? '')).join('')), avisos: [] };
+  return { mapa: importarMapa(linhas.map((l) => String(l[0] ?? '')).join(''), agora), avisos: [] };
 };

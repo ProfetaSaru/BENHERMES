@@ -32,9 +32,9 @@ const AGORA = new Date('2026-10-27T10:00:00');
 const depois = (minutos: number) => new Date(AGORA.getTime() + minutos * 60_000);
 
 describe('mapa inicial', () => {
-  it('versão 2: uma sala, a 1º Equipe 4 + 4 só com supervisor (no PC), sem celulares', () => {
+  it('versão 3: uma sala, a 1º Equipe 4 + 4 só com supervisor (no PC), sem celulares', () => {
     const mapa = mapaInicial(AGORA);
-    expect(mapa.versao).toBe(2);
+    expect(mapa.versao).toBe(3);
     expect(mapa.celulares).toEqual([]);
     expect(mapa.salas.map((s) => s.nome)).toEqual(['Comercial 1']);
     const mesa = mapa.salas[0].mesas[0];
@@ -114,8 +114,9 @@ describe('migração da versão 1', () => {
   });
 
   it('um .json da versão 1 é importado já migrado', () => {
-    expect(importarMapa(JSON.stringify({ tipo: 'benhermes-whatsapp-baias', ...v1 }))).toEqual(migrarMapa(v1));
-    expect(carregarMapa(JSON.stringify(v1), AGORA)).toEqual(migrarMapa(v1));
+    const v3 = { ...migrarMapa(v1), versao: 3, historico: [], manutencoes: [], manutencaoAtual: null, inicioDoHistorico: AGORA.toISOString() };
+    expect(importarMapa(JSON.stringify({ tipo: 'benhermes-whatsapp-baias', ...v1 }), AGORA)).toEqual(v3);
+    expect(carregarMapa(JSON.stringify(v1), AGORA)).toEqual(v3);
   });
 });
 
@@ -178,21 +179,21 @@ describe('arquivo do mapa (.json)', () => {
 
   it('exportar e importar devolve o mesmo mapa', () => {
     const texto = exportarMapa(mapa, AGORA);
-    expect(JSON.parse(texto)).toMatchObject({ tipo: 'benhermes-whatsapp-baias', versao: 2, exportadoEm: AGORA.toISOString() });
-    expect(importarMapa(texto)).toEqual(mapa);
+    expect(JSON.parse(texto)).toMatchObject({ tipo: 'benhermes-whatsapp-baias', versao: 3, exportadoEm: AGORA.toISOString() });
+    expect(importarMapa(texto, AGORA)).toEqual(mapa);
   });
 
   it('arquivo salvo com BOM (Bloco de Notas, Excel) também é aceito', () => {
-    expect(importarMapa('\uFEFF' + exportarMapa(mapa, AGORA))).toEqual(mapa);
+    expect(importarMapa('\uFEFF' + exportarMapa(mapa, AGORA), AGORA)).toEqual(mapa);
   });
 
   it('arquivo inválido é recusado com mensagem', () => {
     const errado = JSON.parse(exportarMapa(mapa, AGORA));
-    expect(() => importarMapa('x')).toThrow();
-    expect(() => importarMapa('{}')).toThrow();
-    expect(() => importarMapa(JSON.stringify({ ...errado, tipo: 'outra-coisa' }))).toThrow();
+    expect(() => importarMapa('x', AGORA)).toThrow();
+    expect(() => importarMapa('{}', AGORA)).toThrow();
+    expect(() => importarMapa(JSON.stringify({ ...errado, tipo: 'outra-coisa' }), AGORA)).toThrow();
     errado.salas[0].mesas[0].lugares.E1.whatsapp.situacao = 'TALVEZ';
-    expect(() => importarMapa(JSON.stringify(errado))).toThrow();
+    expect(() => importarMapa(JSON.stringify(errado), AGORA)).toThrow();
   });
 
   it('dados salvos ilegíveis são sinalizados para guardar uma cópia antes de sobrescrever', () => {
@@ -274,5 +275,51 @@ describe('configurar salas e mesas', () => {
     const reativada = alternarDesativada(desativada, 'D2', depois(2));
     expect(reativada.desativadas).toEqual([]);
     expect(reativada.lugares.D2.operador).toBe('ANA');
+  });
+});
+
+describe('versão 3', () => {
+  const DEPOIS = depois(60);
+  const evento = {
+    em: AGORA.toISOString(), chave: 'l:m1:E1', tipo: 'SITUACAO' as const, de: 'OK', para: 'BANIDO',
+    codigo: 'OP1-E1', operador: 'ANA', equipe: 'OP1', celular: '', vaga: '',
+  };
+  const manutencao = (fim: string | null) => ({
+    id: fim ? 'man1' : 'man2', inicio: AGORA.toISOString(), fim, janela: 'MANHA' as const, conferidos: ['c1'],
+    acoes: [{ em: AGORA.toISOString(), acao: 'PEDIU_ANALISE' as const, chave: 'l:m1:E1', codigo: 'OP1-E1', operador: 'ANA', celular: '', vaga: '' }],
+    observacao: '', texto: fim ? 'texto' : '',
+  });
+
+  it('mapa inicial já é v3, com histórico vazio contando de agora', () => {
+    expect(mapaInicial(AGORA)).toMatchObject({
+      versao: 3, historico: [], manutencoes: [], manutencaoAtual: null, inicioDoHistorico: AGORA.toISOString(),
+    });
+  });
+
+  it('um .json da versão 2 vira v3 com o histórico começando na importação', () => {
+    const { historico: _h, manutencoes: _m, manutencaoAtual: _a, inicioDoHistorico: _i, ...v2 } = mapaInicial(AGORA);
+    const lido = importarMapa(JSON.stringify({ tipo: 'benhermes-whatsapp-baias', ...v2, versao: 2 }), DEPOIS);
+    expect(lido).toMatchObject({ versao: 3, historico: [], manutencoes: [], manutencaoAtual: null, inicioDoHistorico: DEPOIS.toISOString() });
+    expect(lido.salas).toEqual(v2.salas);
+  });
+
+  it('histórico, manutenções e a manutenção aberta voltam iguais no .json', () => {
+    const m: MapaWhatsapp = { ...mapaInicial(AGORA), historico: [evento, { ...evento, manutencaoId: 'man1' }], manutencoes: [manutencao(DEPOIS.toISOString())], manutencaoAtual: manutencao(null) };
+    expect(importarMapa(exportarMapa(m, AGORA), DEPOIS)).toEqual(m);
+    expect(carregarMapa(JSON.stringify(m), DEPOIS)).toEqual(m);
+  });
+
+  it('evento ou manutenção inválidos recusam o arquivo', () => {
+    const base = mapaInicial(AGORA);
+    const ruins = [
+      { ...base, historico: [{ ...evento, tipo: 'XYZ' }] },
+      { ...base, historico: [{ ...evento, operador: 3 }] },
+      { ...base, manutencoes: [{ ...manutencao('x'), acoes: undefined }] },
+      { ...base, manutencaoAtual: { ...manutencao(null), janela: 'NOITE' } },
+      { ...base, inicioDoHistorico: undefined },
+    ];
+    for (const r of ruins) {
+      expect(() => importarMapa(exportarMapa(r as MapaWhatsapp, AGORA), AGORA)).toThrow('não é um mapa do WhatsApp das Baias válido');
+    }
   });
 });

@@ -163,7 +163,7 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({ notification, onNotify
     e.target.value = '';
     if (!arquivo) return;
     try {
-      const lido = importarMapa(await arquivo.text());
+      const lido = importarMapa(await arquivo.text(), new Date());
       if (!window.confirm(`Substituir o mapa atual pelo do arquivo ${arquivo.name}?`)) return;
       wpp.substituir(lido);
       setSelecao(null);
