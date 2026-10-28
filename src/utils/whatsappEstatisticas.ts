@@ -33,6 +33,8 @@ export interface Linha {
   codigo: string;
   operador: string;
   celular: string;
+  /** Nome da vaga ('Usuário 2 · Messenger 1'); identifica o backup */
+  vaga: string;
   quedas: number;
 }
 
@@ -41,6 +43,7 @@ export interface Estavel {
   codigo: string;
   operador: string;
   celular: string;
+  vaga: string;
   dias: number;
   /** Sem mudança desde o início do histórico: mostrar "≥" */
   desdeOInicio: boolean;
@@ -200,7 +203,7 @@ export const calcularEstatisticas = (mapa: MapaWhatsapp, periodo: Periodo, agora
 
   const retratoDe = (chave: string) => {
     const r = atuais.get(chave) ?? (eventos.get(chave) ?? []).slice(-1)[0];
-    return { codigo: r?.codigo ?? '', operador: r?.operador ?? '', celular: r?.celular ?? '' };
+    return { codigo: r?.codigo ?? '', operador: r?.operador ?? '', celular: r?.celular ?? '', vaga: r?.vaga ?? '' };
   };
 
   const contagem = new Map<string, number>();
@@ -212,7 +215,7 @@ export const calcularEstatisticas = (mapa: MapaWhatsapp, periodo: Periodo, agora
 
   const maisEstaveis = [...atuais.entries()]
     .filter(([, r]) => r.situacao === 'OK')
-    .map(([chave, r]) => ({ chave, codigo: r.codigo, operador: r.operador, celular: r.celular, ...sequencia(chave) }))
+    .map(([chave, r]) => ({ chave, codigo: r.codigo, operador: r.operador, celular: r.celular, vaga: r.vaga, ...sequencia(chave) }))
     .sort((a, b) => b.dias - a.dias)
     .slice(0, 10);
 

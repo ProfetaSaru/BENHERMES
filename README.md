@@ -46,7 +46,7 @@ tudo no navegador, sem instalar nada.
 |:-:|---|---|---|
 | 🎲 | **Escala de Bases** | Rodízio diário das bases do INSS entre os grupos dos supervisores do Ativo 2 | Todo dia útil, de manhã |
 | 📞 | **Relatório URA** | TMA, TMO, leads, custo, vendas e clientes por operador e equipe, com setas e cores | Todo dia útil (relatório do dia anterior) |
-| 💬 | **WhatsApp das Baias** | Mapa das mesas com a situação do WhatsApp de cada baia, os celulares corporativos, o ciclo do banimento e a planilha de resumo | Ao longo do dia, sempre que um número cair ou voltar |
+| 💬 | **WhatsApp das Baias** | Mapa das mesas com a situação do WhatsApp de cada baia, os celulares, o ciclo do banimento, a manutenção com o texto do grupo, as estatísticas e a planilha | Na manutenção (manhã e almoço) e sempre que um número cair ou voltar |
 | 📊 | **Formatador de Planilhas** | Converte qualquer planilha no CSV de mailing `CPF;BENEFICIO;NOME;TELEFONE1..5` | Quando chega uma base nova |
 | 📋 | **Central de Relatórios** | Relatórios de atividades e formulários a partir de modelos Markdown | No fim do expediente |
 | 🗂️ | **Histórico & Arquivos** | Relatórios de atividades salvos, com restauração completa | Quando precisar rever um dia |
@@ -66,11 +66,15 @@ flowchart LR
     E --> G[▶️ Gerar relatório]
     F --> G
     G --> H[📋 Copiar tabela<br/>ou ⬇️ Baixar planilha]
+    A --> I[💬 WhatsApp das Baias<br/>🔧 manutenção 9h e 13h]
+    I --> J[📋 Copiar texto<br/>e mandar com os vídeos]
 ```
 
 - [ ] **Escala:** abrir **Escala de Bases**, clicar nos nomes de quem faltou e em **Gerar escala do dia**. Depois, **Copiar texto** para o chat.
 - [ ] **Relatório:** abrir **Relatório URA** (a data já vem como o dia útil anterior), clicar em **Baixar do Argus**, arrastar a tarifação e a esteira, digitar o **valor real da fatura** de cada tarifação (se já tiver) e clicar em **Gerar relatório**.
 - [ ] **Entregar:** **Copiar tabela** (cola com as cores no Excel e no Outlook) ou **Baixar planilha**.
+- [ ] **Manutenção dos WhatsApps (manhã e almoço da operação):** **WhatsApp das Baias** → **🔧 Iniciar manutenção** →
+  conferir celular por celular → **Concluir** → **📋 Copiar** o texto e mandar no grupo com os vídeos.
 
 > [!TIP]
 > Os arquivos são reconhecidos **pelas colunas**: o nome do arquivo não importa, e dá para arrastar todos de uma vez.
@@ -198,7 +202,10 @@ desenho do mapa do **Sistema de Chamados**: supervisor no topo, baias do lado es
 2. **No dia a dia:** clique numa baia para trocar o **operador** e a **situação**; clique no nome da equipe para trocar o
    **supervisor** e dizer onde ele usa o WhatsApp (PC, celular ou não tem). Tudo salva na hora, neste navegador.
 3. **Atenção:** o bloco do resumo lista o que precisa de ação, do mais urgente ao menos. Clique para abrir a baia.
-4. **Para enviar:** **Baixar planilha** gera o `.xlsx` novo (Painel, Mapa, Celulares, Lista).
+4. **Manutenção (manhã e almoço da operação):** **🔧 Iniciar manutenção** → celular por celular, os botões do que
+   aconteceu → **Concluir** → **📋 Copiar** o texto do grupo e mandar antes dos vídeos.
+5. **Para enviar:** **Baixar planilha** gera o `.xlsx` (Painel, Mapa, Celulares, Lista, Estatísticas, Histórico).
+6. **📊 Estatísticas** (aba ao lado do Mapa): quem cai mais, quanto tempo fica OK, por operador, celular e equipe.
 
 | Situação | Na tela | O que fazer |
 |---|---|---|
@@ -247,6 +254,53 @@ fica numa **equipe** ou **guardado**. As **vagas** (cada WhatsApp do aparelho) n
 </details>
 
 <details>
+<summary><b>🔧 Manutenção e texto do grupo</b></summary>
+
+- A janela vem pela hora de início: **Manhã** (8:00–11:59), **Almoço** (12:00–14:59) ou **Fora do horário** (dá para
+  trocar). Se a página fechar no meio, aparece **Continuar manutenção**.
+- Cada WhatsApp mostra só os botões que fazem sentido: OK → ⛔ Caiu / ⏳ Restringido (discretos); BANIDO →
+  📨 Pedi análise; EM ANÁLISE → 🟢 Liberado / ✖️ Perdido; PERDIDO → 🔁 Troquei o chip (número novo opcional);
+  restrição vencida → 🟢 Voltou. **✅ Celular conferido** passa para o próximo; as baias sem celular e o supervisor
+  ficam no grupo **Sem celular**.
+- **Concluir** (com observação opcional) gera o texto, por exemplo:
+
+```
+🔧 *REGISTRO DE MANUTENÇÃO — WHATSAPP*
+📅 28/10/2026 · Manhã (09:12–09:48)
+✅ 8 celulares conferidos · 96 WhatsApps OK
+
+*O que foi feito*
+📨 Pedi análise: OP1-E2 (CARLA CRUZ) · Azul
+🟢 Liberado: OP2-D1 (NINA NUNES) · Vermelho
+
+*Como ficou*
+⛔ 1 banido · 🔎 2 em análise
+
+📱 Azul (OP1) ✅ · Vermelho (OP2) ✅ · Sem celular ⬜
+🎥 Vídeos a seguir
+```
+
+- **Cancelar** descarta só o registro; as mudanças de situação feitas continuam. Os textos antigos ficam em
+  **📊 Estatísticas → Manutenções anteriores**.
+
+</details>
+
+<details>
+<summary><b>📊 Histórico e estatísticas</b></summary>
+
+- **Toda** mudança de situação ou de operador fica gravada sozinha (painel, manutenção, configurações), com o código
+  da baia, o operador, o celular e se foi na manutenção. Trocar o celular de baia não conta como queda. O histórico
+  guarda **12 meses** e vai junto no `.json` e na planilha.
+- **Queda** = um número OK que passou para banido, restringido ou perdido. **Tempo OK** = % do tempo em OK (sem contar
+  "não tem"). **Tempo até voltar** = da queda até ficar OK de novo.
+- A aba **📊 Estatísticas** (7 / 30 / 90 dias / 12 meses) mostra os números grandes, quedas por dia, os que mais caíram,
+  os mais estáveis, por operador (ordenável), por celular e por equipe, o calendário das manutenções (manhã e almoço
+  de cada dia útil, com os feriados das Configurações) e o histórico com filtros. Clicar num número abre a baia.
+- O histórico começa a contar no dia em que esta versão entra no navegador: quedas antigas não existem.
+
+</details>
+
+<details>
 <summary><b>📊 Planilha nova</b></summary>
 
 | Aba | O que tem |
@@ -255,6 +309,8 @@ fica numa **equipe** ou **guardado**. As **vagas** (cada WhatsApp do aparelho) n
 | **Mapa** | as mesas em pares, cada baia com operador e situação, pronta para imprimir |
 | **Celulares** | cada celular com as vagas, quem usa e a situação |
 | **Lista** | uma linha por WhatsApp, com filtro |
+| **Estatísticas** | últimos 30 dias: tempo OK, quedas, até voltar, perdidos, manutenções, rankings, por operador e equipe, calendário |
+| **Histórico** | as mudanças dos últimos 30 dias (tabela com filtro) e as manutenções do período |
 | `dados` (oculta) | o mapa completo: **importar esta planilha devolve o mapa exatamente igual** |
 
 </details>
@@ -529,7 +585,7 @@ repetir coluna), completa o CPF que perdeu o zero à esquerda e gera UTF-8 com B
 | `benhermes_relatorio_ura` | Cadastro de operadores (sem CPF/e-mail), apelidos, metas e **totais** de cada dia |
 | `benhermes_argus` | Token e endereço da API do Argus |
 | `benhermes_feriados` | Feriados locais |
-| `benhermes_whatsapp` | Mapa do WhatsApp das Baias (salas, mesas, operadores, situações e celulares) |
+| `benhermes_whatsapp` | Mapa do WhatsApp das Baias (salas, mesas, operadores, situações, celulares, histórico de 12 meses e manutenções) |
 | `benhermes_template_tasks` e outras | Central de Relatórios (tarefas, rascunhos e histórico) |
 
 > [!WARNING]
@@ -563,7 +619,10 @@ testes e o build. **PR vermelho não deve ir para a `main`.**
 | [`whatsappPlanilha.test.ts`](src/utils/whatsappPlanilha.test.ts) | Leitura da planilha antiga (variações de texto, Digital, linhas em branco, virada do ano) e da nova pela aba `dados` |
 | [`celulares.test.ts`](src/utils/celulares.test.ts) | Vagas por marca, ligação automática às baias, compartilhado, mudar equipe/marca/usuários, ligar baia, remover mesa |
 | [`whatsappAlertas.test.ts`](src/utils/whatsappAlertas.test.ts) | Contagens por sala, geral e por celular; ordem e tipos dos alertas |
-| [`whatsappResumo.test.ts`](src/utils/whatsappResumo.test.ts) | Abas da planilha nova, números do Painel, Lista com filtro e ida e volta exata |
+| [`whatsappResumo.test.ts`](src/utils/whatsappResumo.test.ts) | Abas da planilha nova, números do Painel e das Estatísticas, Lista e Histórico com filtro, ida e volta exata (com emoji na divisa da aba `dados`) |
+| [`whatsappHistorico.test.ts`](src/utils/whatsappHistorico.test.ts) | O que gera evento (painel, celular, operador, entrou/saiu) e o que não gera (trocar celular de baia), relógio que voltou, poda de 12 meses |
+| [`whatsappManutencao.test.ts`](src/utils/whatsappManutencao.test.ts) | Janela pela hora, botões por situação, ações em sequência, texto do grupo exato, celular apagado no meio |
+| [`whatsappEstatisticas.test.ts`](src/utils/whatsappEstatisticas.test.ts) | Linha do tempo, quedas, tempo OK, até voltar, troca de operador, período que corta, calendário com feriados |
 | [`argusProxy.test.ts`](server/argusProxy.test.ts) | A ponte descarta CPF/e-mail, só aceita os 3 endereços e exige https e token |
 
 </details>

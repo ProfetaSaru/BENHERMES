@@ -490,7 +490,7 @@ const abaLista = (livro: Workbook, mapa: MapaWhatsapp) => {
 
 const PERIODO_DA_PLANILHA = 30;
 const diaCurto = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
-const ondeDa = (l: { codigo: string; celular: string }) => l.codigo || (l.celular ? `backup · ${l.celular}` : 'backup');
+const ondeDa = (l: { codigo: string; celular: string; vaga: string }) => l.codigo || [l.vaga || 'backup', l.celular].filter(Boolean).join(' · ');
 
 /** Cabeçalho de uma tabela simples (sem filtro); devolve a próxima linha */
 const titulos = (ws: Worksheet, r: number, nomes: string[], direita: number[] = []): number => {

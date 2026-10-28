@@ -44,7 +44,7 @@ describe('trechos e queda simples', () => {
     expect(e.tempoOk).toBeCloseTo((observado - 24 * HORA) / observado, 6);
     expect(e.perdidos).toBe(0);
     expect(e.quedasPorDia.find((d) => d.dia === '2026-10-10')!.quedas).toBe(1);
-    expect(e.maisCairam).toEqual([{ chave: k, codigo: 'OP1-E1', operador: 'ANA', celular: '', quedas: 1 }]);
+    expect(e.maisCairam).toEqual([{ chave: k, codigo: 'OP1-E1', operador: 'ANA', celular: '', vaga: '', quedas: 1 }]);
   });
 
   it('mais estáveis: dias desde a volta para OK', () => {
@@ -147,5 +147,17 @@ describe('duração', () => {
     expect(formatarDuracao(3 * HORA + 20 * 60_000)).toBe('3h 20min');
     expect(formatarDuracao(52 * HORA)).toBe('2d 4h');
     expect(formatarDuracao(48 * HORA)).toBe('2d');
+  });
+});
+
+describe('backups no ranking', () => {
+  it('dois backups do mesmo celular aparecem com o nome da vaga', () => {
+    const mapa = umaBaia();
+    const roxo = (vaga: string) => ({ codigo: '', operador: '', celular: 'Roxo', vaga, equipe: 'OP1' });
+    mapa.historico = [
+      ev('2026-10-20T09:00:00', 'v:c9:v1', 'SITUACAO', 'OK', 'BANIDO', roxo('Usuário 2 · Messenger 1')),
+      ev('2026-10-21T09:00:00', 'v:c9:v2', 'SITUACAO', 'OK', 'BANIDO', roxo('Usuário 2 · Messenger 2')),
+    ];
+    expect(calcularEstatisticas(mapa, 30, AGORA, []).maisCairam.map((l) => l.vaga).sort()).toEqual(['Usuário 2 · Messenger 1', 'Usuário 2 · Messenger 2']);
   });
 });

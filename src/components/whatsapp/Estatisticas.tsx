@@ -33,7 +33,7 @@ const dataHora = (iso: string) => {
   return `${dois(d.getDate())}/${dois(d.getMonth() + 1)} ${dois(d.getHours())}:${dois(d.getMinutes())}`;
 };
 const pct = (v: number | null) => (v === null ? '—' : `${(v * 100).toFixed(1).replace('.', ',')}%`);
-const ondeDe = (l: { codigo: string; celular: string }) => l.codigo || (l.celular ? `backup · ${l.celular}` : 'backup');
+const ondeDe = (l: { codigo: string; celular: string; vaga: string }) => l.codigo || [l.vaga || 'backup', l.celular].filter(Boolean).join(' · ');
 
 /** Alvo para abrir no mapa a partir da chave do número */
 const alvoDaChave = (mapa: MapaWhatsapp, chave: string): AlvoAlerta | null => {
