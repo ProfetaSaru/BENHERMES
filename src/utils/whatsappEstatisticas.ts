@@ -58,7 +58,7 @@ export interface Grupo {
 
 export interface DiaDoCalendario {
   dia: string;
-  /** null = a janela ainda não terminou */
+  /** null = não conta (ainda não terminou, ou terminou antes do início do histórico) */
   manha: boolean | null;
   almoco: boolean | null;
 }
@@ -206,6 +206,10 @@ export const calcularEstatisticas = (mapa: MapaWhatsapp, periodo: Periodo, agora
     return { codigo: r?.codigo ?? '', operador: r?.operador ?? '', celular: r?.celular ?? '', vaga: r?.vaga ?? '' };
   };
 
+  // A queda conta para quem o trecho que ela abre aponta (mesma atribuição do tempo OK)
+  const daQueda = (q: EventoWhatsapp): { operador: string; equipe: string } =>
+    lista.find((x) => x.chave === q.chave && x.inicio === ms(q.em)) ?? q;
+
   const contagem = new Map<string, number>();
   quedas.forEach((q) => contagem.set(q.chave, (contagem.get(q.chave) ?? 0) + 1));
   const maisCairam = [...contagem.entries()]
@@ -220,13 +224,13 @@ export const calcularEstatisticas = (mapa: MapaWhatsapp, periodo: Periodo, agora
     .slice(0, 10);
 
   const porOperador = ordenar(
-    agrupar(lista, quedas, (x) => x.operador, (e) => e.operador).map((g) => {
+    agrupar(lista, quedas, (x) => x.operador, (e) => daQueda(e).operador).map((g) => {
       const atual = [...atuais.entries()].find(([, r]) => r.operador === g.nome && r.situacao === 'OK');
       return { ...g, sequenciaDias: atual ? sequencia(atual[0]).dias : null };
     })
   );
 
-  const porEquipe = ordenar(agrupar(lista, quedas, (x) => x.equipe, (e) => e.equipe).map((g) => ({ ...g, sequenciaDias: null })));
+  const porEquipe = ordenar(agrupar(lista, quedas, (x) => x.equipe, (e) => daQueda(e).equipe).map((g) => ({ ...g, sequenciaDias: null })));
 
   const idsDeCelular = new Set([...lista.map((x) => x.celularId), ...quedas.map((q) => celularDaChave(q.chave))].filter((c): c is string => !!c));
   const porCelular = ordenar(
@@ -245,16 +249,18 @@ export const calcularEstatisticas = (mapa: MapaWhatsapp, periodo: Periodo, agora
 
   const feitas = (dia: string, janela: 'MANHA' | 'ALMOCO') =>
     mapa.manutencoes.some((m) => m.fim && m.janela === janela && isoDoDia(new Date(m.inicio)) === dia);
-  const terminou = (dia: string, hora: number) => {
+  /** A janela conta se já terminou e terminou depois do início do histórico */
+  const conta = (dia: string, hora: number) => {
     const [a, mes, d] = dia.split('-').map(Number);
-    return new Date(a, mes - 1, d, hora).getTime() <= agora.getTime();
+    const fim = new Date(a, mes - 1, d, hora).getTime();
+    return fim <= agora.getTime() && fim > inicioHist.getTime();
   };
   const calendario = diasEntre(desde, agora)
     .filter((dia) => !ehFimDeSemana(dia) && !feriado(dia, feriados))
     .map((dia) => ({
       dia,
-      manha: terminou(dia, 12) ? feitas(dia, 'MANHA') : null,
-      almoco: terminou(dia, 15) ? feitas(dia, 'ALMOCO') : null,
+      manha: conta(dia, 12) ? feitas(dia, 'MANHA') : null,
+      almoco: conta(dia, 15) ? feitas(dia, 'ALMOCO') : null,
     }));
   const janelas = calendario.flatMap((d) => [d.manha, d.almoco]).filter((j): j is boolean => j !== null);
 

@@ -257,11 +257,11 @@ fica numa **equipe** ou **guardado**. As **vagas** (cada WhatsApp do aparelho) n
 <summary><b>🔧 Manutenção e texto do grupo</b></summary>
 
 - A janela vem pela hora de início: **Manhã** (8:00–11:59), **Almoço** (12:00–14:59) ou **Fora do horário** (dá para
-  trocar). Se a página fechar no meio, aparece **Continuar manutenção**.
+  trocar). Se a página fechar no meio, a manutenção continua aberta no topo do mapa, de onde parou.
 - Cada WhatsApp mostra só os botões que fazem sentido: OK → ⛔ Caiu / ⏳ Restringido (discretos); BANIDO →
   📨 Pedi análise; EM ANÁLISE → 🟢 Liberado / ✖️ Perdido; PERDIDO → 🔁 Troquei o chip (número novo opcional);
   restrição vencida → 🟢 Voltou. **✅ Celular conferido** passa para o próximo; as baias sem celular e o supervisor
-  ficam no grupo **Sem celular**.
+  ficam no grupo **Sem celular**. O que for mudado pelo painel da baia durante a manutenção também entra no texto.
 - **Concluir** (com observação opcional) gera o texto, por exemplo:
 
 ```

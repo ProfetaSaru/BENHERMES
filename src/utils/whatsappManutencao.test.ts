@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { adicionarCelularNoMapa, alterarEstadoDaVaga, corDaCapinha, estadoDaVaga, novoCelular, removerCelularNoMapa } from './celulares';
 import { alterarLugarNoMapa, estado, mapaInicial, pedirAnalise, restringir } from './whatsappBaias';
+import { gravarAlteracao } from './whatsappHistorico';
 import {
   GRUPO_SEM_CELULAR,
   acoesPossiveis,
@@ -100,7 +101,7 @@ describe('manutenção', () => {
     const m = aplicarAcao(iniciarManutencao(mapa, INICIO), alvo, 'RESTRINGIDO', INICIO, { restricao: { quantidade: 2, unidade: 'horas' } });
     expect(m.salas[0].mesas[0].lugares.D3.whatsapp.situacao).toBe('RESTRINGIDO');
     expect(m.manutencaoAtual!.acoes[0].ate).toBe(em('11:12').toISOString());
-    expect(() => aplicarAcao(m, alvo, 'RESTRINGIDO', INICIO, { restricao: { quantidade: 0, unidade: 'horas' } })).toThrow();
+    expect(() => aplicarAcao(mapa, alvo, 'RESTRINGIDO', INICIO, { restricao: { quantidade: 0, unidade: 'horas' } })).toThrow();
   });
 
   it('sem manutenção aberta, a ação só muda a situação', () => {
@@ -211,5 +212,34 @@ describe('texto do grupo', () => {
     const cancelada = cancelarManutencao(outra);
     expect(cancelada.manutencaoAtual).toBeNull();
     expect(cancelada.manutencoes).toEqual(concluida.manutencoes);
+  });
+});
+
+describe('revisão final', () => {
+  it('linha 📱: conferidos primeiro, não conferidos no fim', () => {
+    const { mapa, vermelho } = montar();
+    const m = alternarConferido(iniciarManutencao(mapa, INICIO), vermelho.id);
+    expect(textoDaManutencao(m.manutencaoAtual!, m, em('09:40'))).toContain('📱 Vermelho ✅ · Azul (OP1) ⬜ · Sem celular ⬜');
+  });
+
+  it('mudança feita pelo painel durante a manutenção entra no texto, sem repetir as dos botões', () => {
+    const { mapa, salaId, mesaId, azul, naE1 } = montar();
+    let m = iniciarManutencao(mapa, INICIO);
+    const pelaTela = (mudar: (x: typeof m) => typeof m, quando: Date) => (m = gravarAlteracao(m, mudar(m), quando));
+    // No app o hook grava o histórico com o próprio relógio, alguns ms depois do botão
+    pelaTela((x) => aplicarAcao(x, { tipo: 'vaga', celularId: azul.id, vagaId: naE1.id }, 'BANIDO', em('09:20')), new Date(em('09:20').getTime() + 7));
+    pelaTela((x) => alterarLugarNoMapa(x, salaId, mesaId, 'D3', { whatsapp: estado('BANIDO', em('09:25')) }, em('09:25')), em('09:25'));
+    const linhas = textoDaManutencao(m.manutencaoAtual!, m, em('09:40')).split('\n');
+    expect(linhas.slice(5, 7)).toEqual(['⛔ Caiu: OP1-E1 (ANA) · Azul', '⛔ Caiu: OP1-D3 (GABI)']);
+    expect(linhas[7]).toBe('');
+  });
+
+  it('ação que não vale mais para a situação atual é ignorada (duplo clique)', () => {
+    const { mapa, salaId, mesaId } = montar();
+    const alvo = { tipo: 'lugar' as const, salaId, mesaId, posicao: 'D3' };
+    let m = aplicarAcao(iniciarManutencao(mapa, INICIO), alvo, 'BANIDO', em('09:20'));
+    m = aplicarAcao(m, alvo, 'BANIDO', em('09:20'));
+    m = aplicarAcao(m, alvo, 'LIBERADO', em('09:20'));
+    expect(m.manutencaoAtual!.acoes.map((a) => a.acao)).toEqual(['BANIDO']);
   });
 });

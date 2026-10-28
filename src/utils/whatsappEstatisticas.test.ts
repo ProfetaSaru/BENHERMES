@@ -161,3 +161,22 @@ describe('backups no ranking', () => {
     expect(calcularEstatisticas(mapa, 30, AGORA, []).maisCairam.map((l) => l.vaga).sort()).toEqual(['Usuário 2 · Messenger 1', 'Usuário 2 · Messenger 2']);
   });
 });
+
+describe('revisão final', () => {
+  it('Por equipe: equipe renomeada conta quedas e tempo OK na mesma linha', () => {
+    const mapa = umaBaia();
+    const k = chaveE1(mapa);
+    mapa.historico = [ev('2026-10-05T08:00:00', k, 'SITUACAO', 'OK', 'BANIDO'), ev('2026-10-06T08:00:00', k, 'SITUACAO', 'BANIDO', 'OK')];
+    mapa.salas[0].mesas[0].sigla = 'VND';
+    const { porEquipe } = calcularEstatisticas(mapa, 30, AGORA, []);
+    expect(porEquipe.map((g) => [g.nome, g.quedas])).toEqual([['VND', 1]]);
+    expect(porEquipe[0].tempoOk).toBeLessThan(1);
+  });
+
+  it('Calendário: janelas que terminaram antes do início do histórico não contam', () => {
+    const mapa = { ...umaBaia(), inicioDoHistorico: t('2026-10-28T16:00:00').toISOString() };
+    const e = calcularEstatisticas(mapa, 30, t('2026-10-28T16:30:00'), []);
+    expect(e.calendario).toEqual([{ dia: '2026-10-28', manha: null, almoco: null }]);
+    expect(e.manutencoes).toEqual({ feitas: 0, total: 0 });
+  });
+});

@@ -346,7 +346,7 @@ export const Estatisticas: React.FC<EstatisticasProps> = ({ mapa, agora, feriado
         <p className="wpp-est-legenda">
           <span className="wpp-dia-marca feita" aria-hidden="true" /> feita
           <span className="wpp-dia-marca nao" aria-hidden="true" /> não feita
-          <span className="wpp-dia-marca futura" aria-hidden="true" /> ainda não chegou · M = manhã, A = almoço
+          <span className="wpp-dia-marca futura" aria-hidden="true" /> não conta (ainda não chegou ou antes do início) · M = manhã, A = almoço
         </p>
         {e.calendario.length === 0 ? (
           <p className="ura-ajuda">Sem dias úteis no período.</p>
@@ -354,7 +354,7 @@ export const Estatisticas: React.FC<EstatisticasProps> = ({ mapa, agora, feriado
           <div className="wpp-calendario">
             {e.calendario.map((d) => {
               const marca = (v: boolean | null) => (v === null ? 'futura' : v ? 'feita' : 'nao');
-              const texto = (v: boolean | null) => (v === null ? 'ainda não chegou' : v ? 'feita' : 'não feita');
+              const texto = (v: boolean | null) => (v === null ? 'não conta' : v ? 'feita' : 'não feita');
               return (
                 <div key={d.dia} className="wpp-dia" title={`${diaCurto(d.dia)}: manhã ${texto(d.manha)}, almoço ${texto(d.almoco)}`}>
                   <span className="wpp-dia-data">

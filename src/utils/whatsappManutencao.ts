@@ -181,7 +181,8 @@ export interface ExtraDaAcao {
  */
 export const aplicarAcao = (mapa: MapaWhatsapp, alvo: AlvoAlerta, acao: Acao, agora: Date, extra?: ExtraDaAcao): MapaWhatsapp => {
   const atual = estadoDoAlvo(mapa, alvo);
-  if (!atual) return mapa;
+  // Só ações que valem para a situação de agora (um duplo clique não registra duas vezes)
+  if (!atual || !acoesPossiveis(atual, agora).includes(acao)) return mapa;
   const chave = chaveDoAlvo(mapa, alvo);
   const retrato = numerosDoMapa(mapa).get(chave);
   const estado = novoEstado(atual, acao, agora, extra);
@@ -228,6 +229,39 @@ const linhaDaAcao = (a: AcaoFeita): string => {
   return `${ACAO[a.acao].emoji} ${ACAO[a.acao].rotulo}: ${onde}${celular}${ate}`;
 };
 
+/** Ação que corresponde a uma mudança de situação feita fora dos botões (painel do mapa) */
+const acaoDaMudanca = (de: string, para: string): Acao | null => {
+  if (para === 'BANIDO') return 'BANIDO';
+  if (para === 'RESTRINGIDO') return 'RESTRINGIDO';
+  if (para === 'ANALISE') return 'PEDIU_ANALISE';
+  if (para === 'PERMANENTE') return 'PERDIDO';
+  if (para !== 'OK') return null;
+  return de === 'PERMANENTE' ? 'TROCOU_CHIP' : de === 'RESTRINGIDO' ? 'VOLTOU' : 'LIBERADO';
+};
+
+/**
+ * As ações dos botões e, junto, as mudanças de situação feitas pelo painel enquanto a manutenção
+ * estava aberta (eventos do histórico com o id dela que não vieram de um botão), em ordem.
+ */
+const acoesDaManutencao = (m: Manutencao, mapa: MapaWhatsapp): AcaoFeita[] => {
+  // O histórico é gravado pelo hook com o próprio relógio (alguns ms depois do botão): o evento é
+  // do botão quando há uma ação igual no mesmo número até 5 s antes ou depois; cada ação vale uma vez
+  const livres = [...m.acoes];
+  const pelaTela = mapa.historico
+    .filter((e) => e.manutencaoId === m.id && e.tipo === 'SITUACAO')
+    .flatMap((e): AcaoFeita[] => {
+      const acao = acaoDaMudanca(e.de, e.para);
+      if (!acao) return [];
+      const i = livres.findIndex((a) => a.chave === e.chave && a.acao === acao && Math.abs(Date.parse(a.em) - Date.parse(e.em)) <= 5000);
+      if (i >= 0) {
+        livres.splice(i, 1);
+        return [];
+      }
+      return [{ em: e.em, acao, chave: e.chave, codigo: e.codigo, operador: e.operador, celular: e.celular, vaga: e.vaga }];
+    });
+  return [...m.acoes, ...pelaTela].sort((a, b) => a.em.localeCompare(b.em));
+};
+
 /** O texto "REGISTRO DE MANUTENÇÃO — WHATSAPP" no formato do grupo (negrito com *) */
 export const textoDaManutencao = (m: Manutencao, mapa: MapaWhatsapp, agora: Date): string => {
   const inicio = new Date(m.inicio);
@@ -243,9 +277,11 @@ export const textoDaManutencao = (m: Manutencao, mapa: MapaWhatsapp, agora: Date
     r.restringido && `⏳ ${plural(r.restringido, 'restringido', 'restringidos')}`,
   ].filter(Boolean);
 
-  const celulares = etapas
-    .map((e) => `${e.titulo}${e.equipe ? ` (${e.equipe})` : ''} ${m.conferidos.includes(e.id) ? '✅' : '⬜'}`)
+  const conferido = (id: string) => m.conferidos.includes(id);
+  const celulares = [...etapas.filter((e) => conferido(e.id)), ...etapas.filter((e) => !conferido(e.id))]
+    .map((e) => `${e.titulo}${e.equipe ? ` (${e.equipe})` : ''} ${conferido(e.id) ? '✅' : '⬜'}`)
     .join(' · ');
+  const acoes = acoesDaManutencao(m, mapa);
 
   return [
     '🔧 *REGISTRO DE MANUTENÇÃO — WHATSAPP*',
@@ -253,7 +289,7 @@ export const textoDaManutencao = (m: Manutencao, mapa: MapaWhatsapp, agora: Date
     `✅ ${plural(conferidos, 'celular conferido', 'celulares conferidos')} · ${r.ok} WhatsApps OK`,
     '',
     '*O que foi feito*',
-    ...(m.acoes.length ? m.acoes.map(linhaDaAcao) : ['Tudo conferido, nenhuma ação necessária.']),
+    ...(acoes.length ? acoes.map(linhaDaAcao) : ['Tudo conferido, nenhuma ação necessária.']),
     '',
     '*Como ficou*',
     comoFicou.length ? comoFicou.join(' · ') : 'Tudo OK',

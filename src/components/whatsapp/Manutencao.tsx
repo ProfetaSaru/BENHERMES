@@ -70,6 +70,8 @@ export const Manutencao: React.FC<ManutencaoProps> = ({ mapa, agora, onMapa, onN
   const [observacao, setObservacao] = useState('');
   const [resultado, setResultado] = useState<string | null>(null);
   const textoRef = useRef<HTMLPreElement>(null);
+  // Duplo clique: depois de uma ação, o botão seguinte aparece no mesmo lugar; ignora o 2º clique
+  const ultimaAcao = useRef<{ chave: string; quando: number } | null>(null);
 
   const conferidos = aberta?.conferidos ?? [];
   const pendente = etapas.find((e) => !conferidos.includes(e.id));
@@ -152,6 +154,8 @@ export const Manutencao: React.FC<ManutencaoProps> = ({ mapa, agora, onMapa, onN
   const numeros = etapa ? numerosDaEtapa(mapa, etapa.id) : [];
 
   const agir = (n: NumeroDaEtapa, acao: Acao, extra?: ExtraDaAcao) => {
+    const agoraMs = Date.now();
+    if (!extra && ultimaAcao.current?.chave === n.chave && agoraMs - ultimaAcao.current.quando < 700) return;
     if (acao === 'RESTRINGIDO' && !extra) {
       setFormulario({ chave: n.chave, acao });
       return;
@@ -170,6 +174,7 @@ export const Manutencao: React.FC<ManutencaoProps> = ({ mapa, agora, onMapa, onN
       }
     }
     setFormulario(null);
+    ultimaAcao.current = { chave: n.chave, quando: agoraMs };
     onMapa((m) => aplicarAcao(m, n.alvo as AlvoAlerta, acao, new Date(), extra));
   };
 
