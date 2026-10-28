@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Download, FileJson, FileUp, MessageCircle, Upload, Users } from 'lucide-react';
+import { BarChart3, Download, FileJson, FileUp, Map as MapIcon, MessageCircle, Upload, Users } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { NotificationState, NotificationType } from '../../types/task';
 import { NotificationToast } from '../common/NotificationToast';
@@ -20,6 +20,7 @@ import { ConfigurarMesas } from './ConfigurarMesas';
 import { Celulares } from './Celulares';
 import { ConfigurarCelulares } from './ConfigurarCelulares';
 import { Manutencao } from './Manutencao';
+import { Estatisticas } from './Estatisticas';
 
 interface WhatsappHubProps {
   /** Aviso atual do app: aparece flutuando, porque as ações acontecem em qualquer ponto da página */
@@ -81,6 +82,7 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({ notification, onNotify
   const [agora, setAgora] = useState(() => new Date());
   const [filtro, setFiltro] = useState<FiltroMapa>('todas');
   const [selecao, setSelecao] = useState<Selecao | null>(null);
+  const [aba, setAba] = useState<'mapa' | 'estatisticas'>('mapa');
   const [previa, setPrevia] = useState<{ arquivo: string; mapa: MapaWhatsapp; avisos: string[] } | null>(null);
   const planilhaRef = useRef<HTMLInputElement>(null);
   const jsonRef = useRef<HTMLInputElement>(null);
@@ -252,6 +254,36 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({ notification, onNotify
         </div>
       )}
 
+      <div className="wpp-abas" role="tablist" aria-label="Telas do WhatsApp das Baias">
+        <button type="button" role="tab" aria-selected={aba === 'mapa'} className={`wpp-aba ${aba === 'mapa' ? 'ativa' : ''}`} onClick={() => setAba('mapa')}>
+          <MapIcon size={16} />
+          Mapa
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={aba === 'estatisticas'}
+          className={`wpp-aba ${aba === 'estatisticas' ? 'ativa' : ''}`}
+          onClick={() => setAba('estatisticas')}
+        >
+          <BarChart3 size={16} />
+          Estatísticas
+        </button>
+      </div>
+
+      {aba === 'estatisticas' ? (
+        <Estatisticas
+          mapa={mapa}
+          agora={agora}
+          feriados={feriados}
+          onAbrir={(alvo) => {
+            setAba('mapa');
+            abrir(alvo);
+          }}
+          onNotify={onNotify}
+        />
+      ) : (
+        <>
       <Manutencao mapa={mapa} agora={agora} onMapa={wpp.alterarMapa} onNotify={onNotify} />
 
       <input type="file" ref={planilhaRef} accept=".xlsx,.xls" onChange={handleImportarPlanilha} style={{ display: 'none' }} />
@@ -402,6 +434,8 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({ notification, onNotify
 
       <ConfigurarMesas mapa={mapa} onMapa={wpp.substituir} onNotify={onNotify} />
       <ConfigurarCelulares mapa={mapa} onMapa={wpp.substituir} onNotify={onNotify} />
+        </>
+      )}
 
       {painel}
 
