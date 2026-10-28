@@ -1,10 +1,11 @@
 import * as XLSX from 'xlsx';
 import { describe, expect, it } from 'vitest';
 import type { Cell, Workbook } from 'exceljs';
-import { EstadoWhatsapp, MapaWhatsapp, Situacao } from '../types/whatsapp';
+import { EstadoWhatsapp, EventoWhatsapp, Manutencao, MapaWhatsapp, Situacao } from '../types/whatsapp';
 import { adicionarCelularNoMapa, alterarEstadoDaVaga, corDaCapinha, novoCelular } from './celulares';
 import { alertas, resumoGeral } from './whatsappAlertas';
-import { mapaInicial } from './whatsappBaias';
+import { exportarMapa, mapaInicial } from './whatsappBaias';
+import { calcularEstatisticas } from './whatsappEstatisticas';
 import { lerArquivoDoMapa } from './whatsappPlanilha';
 import { gerarResumoWhatsapp, nomeDoResumoWhatsapp } from './whatsappResumo';
 
@@ -71,9 +72,9 @@ describe('planilha nova', () => {
 
   it('abas na ordem, dados oculta e sem linhas de grade', async () => {
     const { livro } = await gerar(mapa);
-    expect(livro.worksheets.map((w) => w.name)).toEqual(['Painel', 'Mapa', 'Celulares', 'Lista', 'dados']);
+    expect(livro.worksheets.map((w) => w.name)).toEqual(['Painel', 'Mapa', 'Celulares', 'Lista', 'Estatísticas', 'Histórico', 'dados']);
     expect(livro.getWorksheet('dados')!.state).toBe('hidden');
-    for (const aba of ['Painel', 'Mapa', 'Celulares', 'Lista']) expect(livro.getWorksheet(aba)!.views[0]?.showGridLines).toBe(false);
+    for (const aba of ['Painel', 'Mapa', 'Celulares', 'Lista', 'Estatísticas', 'Histórico']) expect(livro.getWorksheet(aba)!.views[0]?.showGridLines).toBe(false);
   });
 
   it('Painel: os 8 números são os do resumo', async () => {
@@ -139,6 +140,89 @@ describe('planilha nova', () => {
   });
 
   it('ida e volta: importar a planilha baixada devolve o mesmo mapa', async () => {
+    const { buffer } = await gerar(mapa);
+    expect(lerArquivoDoMapa(XLSX.read(buffer, { type: 'array' }), AGORA).mapa).toEqual(mapa);
+  });
+});
+
+describe('abas Estatísticas e Histórico', () => {
+  const evento = (horas: number, tipo: EventoWhatsapp['tipo'], de: string, para: string, extra: Partial<EventoWhatsapp> = {}): EventoWhatsapp => ({
+    em: antes(horas), chave: 'x', tipo, de, para, codigo: 'OP1-E1', operador: 'ANA', equipe: 'OP1', celular: '', vaga: '', ...extra,
+  });
+  const manutencao = (horas: number, extra: Partial<Manutencao> = {}): Manutencao => ({
+    id: `man-${horas}`, inicio: antes(horas), fim: antes(horas - 0.5), janela: 'MANHA', conferidos: ['c1', 'sem-celular'],
+    acoes: [{ em: antes(horas), acao: 'PEDIU_ANALISE', chave: 'x', codigo: 'OP1-E1', operador: 'ANA', celular: '', vaga: '' }],
+    observacao: '', texto: '🔧 *REGISTRO DE MANUTENÇÃO — WHATSAPP*', ...extra,
+  });
+  const comHistorico = (): MapaWhatsapp => {
+    const m = montar();
+    const k = `l:${m.salas[0].mesas[0].id}:E1`;
+    return {
+      ...m,
+      inicioDoHistorico: antes(60 * 24),
+      historico: [
+        evento(40 * 24, 'SITUACAO', 'OK', 'BANIDO', { chave: k }),
+        evento(48, 'SITUACAO', 'BANIDO', 'OK', { chave: k }),
+        evento(5, 'SITUACAO', 'OK', 'BANIDO', { chave: k, manutencaoId: 'man-6' }),
+        evento(1, 'OPERADOR', 'BIA', 'ANA', { codigo: 'OP1-D2', chave: 'y' }),
+      ],
+      manutencoes: [manutencao(40 * 24), manutencao(6)],
+    };
+  };
+
+  it('Estatísticas: os números grandes são os de calcularEstatisticas (30 dias)', async () => {
+    const mapa = comHistorico();
+    const e = calcularEstatisticas(mapa, 30, AGORA, []);
+    const { livro } = await gerar(mapa);
+    const acima = (rotulo: string) => {
+      const c = achar(livro, 'Estatísticas', rotulo);
+      return livro.getWorksheet('Estatísticas')!.getCell(Number(c.row) - 1, Number(c.col)).value;
+    };
+    expect(acima('Tempo OK')).toBeCloseTo(e.tempoOk!, 6);
+    expect(acima('Quedas')).toBe(e.quedas);
+    expect(acima('Perdidos')).toBe(e.perdidos);
+    expect(acima('Manutenções')).toBe(`${e.manutencoes.feitas} de ${e.manutencoes.total}`);
+    achar(livro, 'Estatísticas', /Últimos 30 dias/);
+  });
+
+  it('Estatísticas: sem tempo observado mostra "—"', async () => {
+    const mapa = { ...montar(), inicioDoHistorico: AGORA.toISOString() };
+    const { livro } = await gerar(mapa);
+    const c = achar(livro, 'Estatísticas', 'Tempo OK');
+    expect(livro.getWorksheet('Estatísticas')!.getCell(Number(c.row) - 1, Number(c.col)).value).toBe('—');
+  });
+
+  it('Histórico: tabela com filtro, só os últimos 30 dias, mais recente primeiro, e as manutenções', async () => {
+    const { livro } = await gerar(comHistorico());
+    const ws = livro.getWorksheet('Histórico')!;
+    const tabelas = ws.getTables() as any[];
+    const t = tabelas[0].table ?? tabelas[0];
+    expect(t.autoFilterRef).toBeTruthy();
+    expect(t.columns.map((c: any) => c.name)).toEqual(['Data e hora', 'Tipo', 'Código', 'Operador', 'Equipe', 'Celular', 'Vaga', 'De', 'Para', 'Manutenção']);
+    expect([2, 3, 4].map((r) => textoDe(ws.getCell(r, 2)))).toEqual(['Operador', 'Situação', 'Situação']);
+    expect(textoDe(ws.getCell(3, 9))).toBe('BANIDO');
+    expect(textoDe(ws.getCell(3, 10))).toMatch(/^Manhã \d\d\/\d\d$/);
+    expect(textoDe(ws.getCell(5, 1))).toBe('');
+    achar(livro, 'Histórico', 'MANUTENÇÕES');
+    expect(celulas(livro, 'Histórico').filter((c) => textoDe(c) === 'Manhã')).toHaveLength(1);
+  });
+
+  it('ida e volta com histórico e manutenção aberta', async () => {
+    const mapa = { ...comHistorico(), manutencaoAtual: { ...manutencao(0.5), fim: null, texto: '' } };
+    const { buffer } = await gerar(mapa);
+    expect(lerArquivoDoMapa(XLSX.read(buffer, { type: 'array' }), AGORA).mapa).toEqual(mapa);
+  });
+
+  it('emoji bem na divisa de 30 000 caracteres da aba dados não se parte', async () => {
+    const base = comHistorico();
+    const comObs = (n: number): MapaWhatsapp => ({ ...base, manutencoes: [manutencao(6, { observacao: 'x'.repeat(n), texto: '🔧 fim' })] });
+    const posicao = (m: MapaWhatsapp) => {
+      const texto = JSON.stringify(JSON.parse(exportarMapa(m, AGORA)));
+      return texto.indexOf('🔧 fim');
+    };
+    const p0 = posicao(comObs(0));
+    const mapa = comObs(29_999 - p0);
+    expect(posicao(mapa)).toBe(29_999);
     const { buffer } = await gerar(mapa);
     expect(lerArquivoDoMapa(XLSX.read(buffer, { type: 'array' }), AGORA).mapa).toEqual(mapa);
   });

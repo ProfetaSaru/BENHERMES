@@ -45,7 +45,7 @@ export const novaMesa = (
 };
 
 export const mapaInicial = (agora: Date): MapaWhatsapp => ({
-  versao: 2,
+  versao: 3,
   salas: [
     {
       id: crypto.randomUUID(),
@@ -54,6 +54,10 @@ export const mapaInicial = (agora: Date): MapaWhatsapp => ({
     },
   ],
   celulares: [],
+  historico: [],
+  manutencoes: [],
+  manutencaoAtual: null,
+  inicioDoHistorico: agora.toISOString(),
   atualizadoEm: agora.toISOString(),
 });
 
@@ -273,7 +277,11 @@ const celularValido = (c: any): boolean =>
  * Versão 1 → 2: mantém salas, mesas e lugares; tira o backup (SUB) e os celulares antigos;
  * supervisor com NÃO TEM passa a ser "sem WhatsApp".
  */
-export const migrarMapa = (dados: any): MapaWhatsapp => ({
+type MapaV2 = Omit<MapaWhatsapp, 'versao' | 'historico' | 'manutencoes' | 'manutencaoAtual' | 'inicioDoHistorico'> & {
+  versao: 2;
+};
+
+export const migrarMapa = (dados: any): MapaV2 => ({
   versao: 2,
   atualizadoEm: dados.atualizadoEm,
   celulares: [],
@@ -293,22 +301,73 @@ export const migrarMapa = (dados: any): MapaWhatsapp => ({
   })),
 });
 
-/** Valida a estrutura (migrando a versão 1) e devolve só os campos do mapa */
-const lerMapa = (bruto: any): MapaWhatsapp => {
-  const dados = bruto?.versao === 1 && Array.isArray(bruto.salas) ? migrarMapa(bruto) : bruto;
+const TIPOS_EVENTO = ['SITUACAO', 'OPERADOR', 'ENTROU', 'SAIU'];
+const ACOES = ['BANIDO', 'RESTRINGIDO', 'PEDIU_ANALISE', 'LIBERADO', 'PERDIDO', 'TROCOU_CHIP', 'VOLTOU'];
+
+const eventoValido = (e: any): boolean =>
+  !!e &&
+  ['em', 'chave', 'de', 'para', 'codigo', 'operador', 'equipe', 'celular', 'vaga'].every((k) => ehTexto(e[k])) &&
+  TIPOS_EVENTO.includes(e.tipo) &&
+  (e.manutencaoId === undefined || ehTexto(e.manutencaoId));
+
+const acaoValida = (a: any): boolean =>
+  !!a &&
+  ['em', 'chave', 'codigo', 'operador', 'celular', 'vaga'].every((k) => ehTexto(a[k])) &&
+  ACOES.includes(a.acao) &&
+  (a.numeroNovo === undefined || ehTexto(a.numeroNovo)) &&
+  (a.ate === undefined || ehTexto(a.ate));
+
+const manutencaoValida = (m: any): boolean =>
+  !!m &&
+  ehTexto(m.id) &&
+  ehTexto(m.inicio) &&
+  (m.fim === null || ehTexto(m.fim)) &&
+  ['MANHA', 'ALMOCO', 'FORA'].includes(m.janela) &&
+  Array.isArray(m.conferidos) &&
+  m.conferidos.every(ehTexto) &&
+  Array.isArray(m.acoes) &&
+  m.acoes.every(acaoValida) &&
+  ehTexto(m.observacao) &&
+  ehTexto(m.texto);
+
+/**
+ * Valida a estrutura e devolve só os campos do mapa. Versão 1 → 2 → 3; da 2 para a 3 o histórico
+ * começa vazio, contando de `agora`.
+ */
+const lerMapa = (bruto: any, agora: Date): MapaWhatsapp => {
+  const v2 = bruto?.versao === 1 && Array.isArray(bruto.salas) ? migrarMapa(bruto) : bruto;
+  const dados =
+    v2?.versao === 2
+      ? { ...v2, versao: 3, historico: [], manutencoes: [], manutencaoAtual: null, inicioDoHistorico: agora.toISOString() }
+      : v2;
   const valido =
     !!dados &&
-    dados.versao === 2 &&
+    dados.versao === 3 &&
     Array.isArray(dados.salas) &&
     dados.salas.every((s: any) => !!s && ehTexto(s.id) && ehTexto(s.nome) && Array.isArray(s.mesas) && s.mesas.every(mesaValida)) &&
     Array.isArray(dados.celulares) &&
     dados.celulares.every(celularValido) &&
+    Array.isArray(dados.historico) &&
+    dados.historico.every(eventoValido) &&
+    Array.isArray(dados.manutencoes) &&
+    dados.manutencoes.every(manutencaoValida) &&
+    (dados.manutencaoAtual === null || manutencaoValida(dados.manutencaoAtual)) &&
+    ehTexto(dados.inicioDoHistorico) &&
     ehTexto(dados.atualizadoEm);
   if (!valido) throw new Error('O arquivo não é um mapa do WhatsApp das Baias válido.');
-  return { versao: 2, salas: dados.salas, celulares: dados.celulares, atualizadoEm: dados.atualizadoEm };
+  return {
+    versao: 3,
+    salas: dados.salas,
+    celulares: dados.celulares,
+    historico: dados.historico,
+    manutencoes: dados.manutencoes,
+    manutencaoAtual: dados.manutencaoAtual,
+    inicioDoHistorico: dados.inicioDoHistorico,
+    atualizadoEm: dados.atualizadoEm,
+  };
 };
 
-export const importarMapa = (texto: string): MapaWhatsapp => {
+export const importarMapa = (texto: string, agora: Date): MapaWhatsapp => {
   let dados: any;
   try {
     dados = JSON.parse(texto.replace(/^\uFEFF/, ''));
@@ -316,7 +375,7 @@ export const importarMapa = (texto: string): MapaWhatsapp => {
     throw new Error('O arquivo não é um .json válido.');
   }
   if (dados?.tipo !== TIPO_ARQUIVO) throw new Error('Este arquivo não foi exportado pelo WhatsApp das Baias.');
-  return lerMapa(dados);
+  return lerMapa(dados, agora);
 };
 
 /**
@@ -326,7 +385,7 @@ export const importarMapa = (texto: string): MapaWhatsapp => {
 export const lerMapaSalvo = (texto: string | null, agora: Date): { mapa: MapaWhatsapp; ilegivel: boolean } => {
   if (texto === null) return { mapa: mapaInicial(agora), ilegivel: false };
   try {
-    return { mapa: lerMapa(JSON.parse(texto)), ilegivel: false };
+    return { mapa: lerMapa(JSON.parse(texto), agora), ilegivel: false };
   } catch {
     return { mapa: mapaInicial(agora), ilegivel: true };
   }

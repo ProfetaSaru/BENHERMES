@@ -129,7 +129,7 @@ describe('importar a planilha de status dos WhatsApps', () => {
 
   it('celulares da planilha antiga não são importados: aviso na prévia', () => {
     expect(mapa.celulares).toEqual([]);
-    expect(mapa.versao).toBe(2);
+    expect(mapa.versao).toBe(3);
     expect(avisos).toContain('Os celulares não são importados da planilha antiga; cadastre-os em Configurar.');
   });
 

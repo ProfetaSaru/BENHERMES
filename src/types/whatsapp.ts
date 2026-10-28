@@ -95,9 +95,72 @@ export interface Celular {
   vagas: VagaWhatsapp[];
 }
 
+/** Janela da manutenção: manhã (8:00–11:59), almoço da operação (12:00–14:59) ou fora */
+export type Janela = 'MANHA' | 'ALMOCO' | 'FORA';
+
+export type TipoEvento = 'SITUACAO' | 'OPERADOR' | 'ENTROU' | 'SAIU';
+
+/**
+ * Uma mudança de um "número": vaga de celular ('v:<celularId>:<vagaId>') ou baia sem vaga
+ * ligada ('l:<mesaId>:<posicao>'). Guarda o retrato do momento para exibir mesmo depois de
+ * o celular ou a baia mudarem.
+ */
+export interface EventoWhatsapp {
+  em: string;
+  chave: string;
+  tipo: TipoEvento;
+  /** Situação ou nome do operador antes ('' em ENTROU) */
+  de: string;
+  /** Depois ('' em SAIU) */
+  para: string;
+  codigo: string;
+  operador: string;
+  equipe: string;
+  celular: string;
+  vaga: string;
+  manutencaoId?: string;
+}
+
+export type Acao = 'BANIDO' | 'RESTRINGIDO' | 'PEDIU_ANALISE' | 'LIBERADO' | 'PERDIDO' | 'TROCOU_CHIP' | 'VOLTOU';
+
+export interface AcaoFeita {
+  em: string;
+  acao: Acao;
+  chave: string;
+  codigo: string;
+  operador: string;
+  celular: string;
+  vaga: string;
+  /** Só TROCOU_CHIP, opcional */
+  numeroNovo?: string;
+  /** Só RESTRINGIDO: até quando (ISO) */
+  ate?: string;
+}
+
+export interface Manutencao {
+  id: string;
+  inicio: string;
+  /** null enquanto aberta */
+  fim: string | null;
+  janela: Janela;
+  /** Ids dos celulares conferidos ('sem-celular' para o grupo das baias sem celular) */
+  conferidos: string[];
+  acoes: AcaoFeita[];
+  observacao: string;
+  /** Texto do grupo, gerado ao concluir */
+  texto: string;
+}
+
 export interface MapaWhatsapp {
-  versao: 2;
+  versao: 3;
   salas: Sala[];
   celulares: Celular[];
+  /** Mais antigo primeiro; até 12 meses */
+  historico: EventoWhatsapp[];
+  /** Concluídas, mais antiga primeiro */
+  manutencoes: Manutencao[];
+  manutencaoAtual: Manutencao | null;
+  /** Desde quando o histórico conta */
+  inicioDoHistorico: string;
   atualizadoEm: string;
 }

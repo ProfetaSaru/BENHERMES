@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Download, FileJson, FileUp, MessageCircle, Upload, Users } from 'lucide-react';
+import { BarChart3, Download, FileJson, FileUp, Map as MapIcon, MessageCircle, Upload, Users } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { NotificationState, NotificationType } from '../../types/task';
 import { NotificationToast } from '../common/NotificationToast';
 import { MapaWhatsapp } from '../../types/whatsapp';
 import { useWhatsappBaias } from '../../hooks/useWhatsappBaias';
+import { useFeriados } from '../../hooks/useFeriados';
 import { nomeDoCelular, ondeEstaABaia, textoDoLocal } from '../../utils/celulares';
 import { codigoDoLugar } from '../../utils/mapaMesas';
 import { baixarPlanilha } from '../../utils/planilhaColorida';
@@ -18,6 +19,8 @@ import { PainelLugar } from './PainelLugar';
 import { ConfigurarMesas } from './ConfigurarMesas';
 import { Celulares } from './Celulares';
 import { ConfigurarCelulares } from './ConfigurarCelulares';
+import { Manutencao } from './Manutencao';
+import { Estatisticas } from './Estatisticas';
 
 interface WhatsappHubProps {
   /** Aviso atual do app: aparece flutuando, porque as ações acontecem em qualquer ponto da página */
@@ -75,9 +78,11 @@ const Contagens: React.FC<{ resumo: ResumoWhatsapp; celulares?: boolean }> = ({ 
 export const WhatsappHub: React.FC<WhatsappHubProps> = ({ notification, onNotify }) => {
   const wpp = useWhatsappBaias();
   const { mapa } = wpp;
+  const { feriados } = useFeriados();
   const [agora, setAgora] = useState(() => new Date());
   const [filtro, setFiltro] = useState<FiltroMapa>('todas');
   const [selecao, setSelecao] = useState<Selecao | null>(null);
+  const [aba, setAba] = useState<'mapa' | 'estatisticas'>('mapa');
   const [previa, setPrevia] = useState<{ arquivo: string; mapa: MapaWhatsapp; avisos: string[] } | null>(null);
   const planilhaRef = useRef<HTMLInputElement>(null);
   const jsonRef = useRef<HTMLInputElement>(null);
@@ -117,7 +122,7 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({ notification, onNotify
   const handleBaixarPlanilha = async () => {
     try {
       const momento = new Date();
-      await baixarPlanilha(await gerarResumoWhatsapp(mapa, momento), nomeDoResumoWhatsapp(momento));
+      await baixarPlanilha(await gerarResumoWhatsapp(mapa, momento, feriados), nomeDoResumoWhatsapp(momento));
       onNotify('Download da planilha iniciado!', 'success');
     } catch (err: any) {
       onNotify(`Erro ao gerar a planilha: ${err.message}`, 'error');
@@ -139,7 +144,7 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({ notification, onNotify
 
   const handleSubstituir = () => {
     if (!previa) return;
-    wpp.substituir(previa.mapa);
+    wpp.importar(previa.mapa);
     setSelecao(null);
     setPrevia(null);
     onNotify(`Mapa atualizado pela planilha ${previa.arquivo}.`, 'success');
@@ -163,9 +168,9 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({ notification, onNotify
     e.target.value = '';
     if (!arquivo) return;
     try {
-      const lido = importarMapa(await arquivo.text());
+      const lido = importarMapa(await arquivo.text(), new Date());
       if (!window.confirm(`Substituir o mapa atual pelo do arquivo ${arquivo.name}?`)) return;
-      wpp.substituir(lido);
+      wpp.importar(lido);
       setSelecao(null);
       onNotify('Mapa importado.', 'success');
     } catch (err: any) {
@@ -241,6 +246,45 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({ notification, onNotify
           <span className="task-count-label">com problema</span>
         </div>
       </header>
+
+      {wpp.erroAoSalvar && (
+        <div className="escala-aviso wpp-armazenamento" role="alert">
+          Armazenamento cheio: exporte o mapa e baixe a planilha. As mudanças continuam na tela, mas não estão sendo salvas
+          neste navegador.
+        </div>
+      )}
+
+      <div className="wpp-abas" role="tablist" aria-label="Telas do WhatsApp das Baias">
+        <button type="button" role="tab" aria-selected={aba === 'mapa'} className={`wpp-aba ${aba === 'mapa' ? 'ativa' : ''}`} onClick={() => setAba('mapa')}>
+          <MapIcon size={16} />
+          Mapa
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={aba === 'estatisticas'}
+          className={`wpp-aba ${aba === 'estatisticas' ? 'ativa' : ''}`}
+          onClick={() => setAba('estatisticas')}
+        >
+          <BarChart3 size={16} />
+          Estatísticas
+        </button>
+      </div>
+
+      {aba === 'estatisticas' ? (
+        <Estatisticas
+          mapa={mapa}
+          agora={agora}
+          feriados={feriados}
+          onAbrir={(alvo) => {
+            setAba('mapa');
+            abrir(alvo);
+          }}
+          onNotify={onNotify}
+        />
+      ) : (
+        <>
+      <Manutencao mapa={mapa} agora={agora} onMapa={wpp.alterarMapa} onNotify={onNotify} />
 
       <input type="file" ref={planilhaRef} accept=".xlsx,.xls" onChange={handleImportarPlanilha} style={{ display: 'none' }} />
       <input type="file" ref={jsonRef} accept=".json,application/json" onChange={handleImportarMapa} style={{ display: 'none' }} />
@@ -390,6 +434,8 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({ notification, onNotify
 
       <ConfigurarMesas mapa={mapa} onMapa={wpp.substituir} onNotify={onNotify} />
       <ConfigurarCelulares mapa={mapa} onMapa={wpp.substituir} onNotify={onNotify} />
+        </>
+      )}
 
       {painel}
 
