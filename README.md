@@ -631,7 +631,7 @@ testes e o build. **PR vermelho não deve ir para a `main`.**
 
 ## 🚀 Como executar localmente
 
-> **Pré-requisitos:** [Node.js](https://nodejs.org/) 18 ou superior (recomendado 22) e `npm`.
+> **Pré-requisitos:** [Node.js](https://nodejs.org/) 22 ou superior e `npm`.
 
 ```bash
 git clone https://github.com/ProfetaSaru/BENHERMES.git
@@ -642,10 +642,19 @@ npm run dev        # http://localhost:5173/
 
 | Comando | O que faz |
 |---|---|
-| `npm run dev` | Servidor de desenvolvimento (com a ponte do Argus) |
-| `npm test` | Testes |
-| `npm run build` | Confere os tipos e gera o site em `dist/` |
+| `npm run dev` | Servidor de desenvolvimento Vite (com proxy para `/api` e ponte do Argus) |
+| `npm run start` | Servidor de produção Node.js com SQLite nativo (`node:sqlite`) e autenticação |
+| `npm test` | Executa todos os testes unitários (19 suites, 209 testes) |
+| `npm run build` | Confere os tipos e compila o frontend em `dist/` |
 | `npm run preview` | Abre o site gerado (também com a ponte do Argus) |
+
+### Modo Servidor & Docker (Produção com SQLite & RBAC)
+Para hospedar o servidor central com autenticação multi-usuário e persistência em banco SQLite:
+```bash
+docker compose up -d --build
+```
+O servidor sobe na porta `3000` (`http://localhost:3000`) com o banco persistido no volume local `./data/benhermes.db`.
+- **Credenciais padrão de primeiro acesso (Admin):** Usuário: `admin` | Senha: `admin` (solicita alteração de senha no primeiro login).
 
 A cada merge na `main`, a **Vercel publica sozinha** em [benhermes.vercel.app](https://benhermes.vercel.app).
 
