@@ -37,11 +37,13 @@ const agenteCompativel = new https.Agent({
 });
 
 class ErroArgus extends Error {
+  public status: number;
   constructor(
     mensagem: string,
-    public status = 502
+    status = 502
   ) {
     super(mensagem);
+    this.status = status;
   }
 }
 
