@@ -20,8 +20,10 @@ import {
   AlertTriangle,
   UserCheck,
   Radio,
+  Users,
 } from 'lucide-react';
 import { SavedReport } from '../../types/task';
+import { AuthUser, canDeleteReports, ROLE_LABELS } from '../../types/auth';
 
 interface ReportsHistoryHubProps {
   savedReports: SavedReport[];
@@ -31,6 +33,7 @@ interface ReportsHistoryHubProps {
   onRestoreReport: (report: SavedReport) => void;
   onNotify: (message: string, type: 'success' | 'error' | '') => void;
   onNavigateToGenerator: () => void;
+  currentUser?: AuthUser | null;
 }
 
 type FilterCategory = 'all' | 'atividades' | 'incidentes' | 'rh' | 'plantao' | 'custom';
@@ -111,15 +114,45 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
   onRestoreReport,
   onNotify,
   onNavigateToGenerator,
+  currentUser,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<FilterCategory>('all');
+  const [selectedSupervisor, setSelectedSupervisor] = useState<string>('all');
+  const [selectedAuthor, setSelectedAuthor] = useState<string>('all');
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Edição inline de título
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitleValue, setEditTitleValue] = useState('');
+
+  const userCanDelete = currentUser ? canDeleteReports(currentUser.role) : true;
+  const showHierarchyFilters = currentUser && currentUser.role !== 'operador';
+
+  // Opções únicas de Supervisores e Autores presentes nos relatórios visíveis
+  const supervisorOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const r of savedReports) {
+      if (r.supervisorId && r.supervisorName) {
+        map.set(r.supervisorId, r.supervisorName);
+      } else if (r.authorRole === 'supervisor' && r.userId && r.authorName) {
+        map.set(r.userId, r.authorName);
+      }
+    }
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [savedReports]);
+
+  const authorOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const r of savedReports) {
+      if (r.userId && r.authorName) {
+        const roleLabel = r.authorRole ? ` (${ROLE_LABELS[r.authorRole]})` : '';
+        map.set(r.userId, `${r.authorName}${roleLabel}`);
+      }
+    }
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [savedReports]);
 
   // Contadores por categoria
   const categoryCounts = useMemo(() => {
@@ -133,7 +166,7 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
     };
   }, [savedReports]);
 
-  // Filtragem combinada (categoria + busca textual)
+  // Filtragem combinada (categoria + supervisor + autor + busca textual)
   const filteredReports = useMemo(() => {
     let list = savedReports;
 
@@ -141,11 +174,25 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
       list = list.filter((r) => matchesCategory(r, selectedCategory));
     }
 
+    if (selectedSupervisor !== 'all') {
+      list = list.filter(
+        (r) => r.supervisorId === selectedSupervisor || r.userId === selectedSupervisor
+      );
+    }
+
+    if (selectedAuthor !== 'all') {
+      list = list.filter((r) => r.userId === selectedAuthor);
+    }
+
     const q = searchQuery.trim().toLowerCase();
     if (!q) return list;
 
     return list.filter((report) => {
       const matchTitle = report.title.toLowerCase().includes(q);
+      const matchAuthor = report.authorName ? report.authorName.toLowerCase().includes(q) : false;
+      const matchSupervisor = report.supervisorName
+        ? report.supervisorName.toLowerCase().includes(q)
+        : false;
       const matchTemplateTitle = report.templateTitle?.toLowerCase().includes(q);
       const matchNote = report.note ? report.note.toLowerCase().includes(q) : false;
       const matchDate = report.displayDate.includes(q);
@@ -156,13 +203,15 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
           t.description.toLowerCase().includes(q)
       );
       const matchFields = report.fieldValues
-        ? Object.values(report.fieldValues).some((v) =>
-            typeof v === 'string' && v.toLowerCase().includes(q)
+        ? Object.values(report.fieldValues).some(
+            (v) => typeof v === 'string' && v.toLowerCase().includes(q)
           )
         : false;
 
       return (
         matchTitle ||
+        matchAuthor ||
+        matchSupervisor ||
         matchTemplateTitle ||
         matchNote ||
         matchDate ||
@@ -171,7 +220,7 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
         matchFields
       );
     });
-  }, [savedReports, selectedCategory, searchQuery]);
+  }, [savedReports, selectedCategory, selectedSupervisor, selectedAuthor, searchQuery]);
 
   const toggleExpand = (id: string) => {
     setExpandedIds((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -251,7 +300,11 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
             Histórico & Arquivos de Relatórios
           </h2>
           <p>
-            Consolidação de todos os relatórios e modelos salvos. Restaure para o Gerador com 1 clique para continuar editando.
+            {currentUser?.role === 'admin' || currentUser?.role === 'gerente'
+              ? 'Visualizando relatórios de todos os supervisores e operadores (salvamento automático ativo).'
+              : currentUser?.role === 'supervisor'
+              ? 'Visualizando seus relatórios e todos os relatórios dos operadores associados a você.'
+              : 'Consolidação de todos os seus relatórios salvos automaticamente.'}
           </p>
         </div>
 
@@ -260,7 +313,7 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
             {savedReports.length} {savedReports.length === 1 ? 'relatório salvo' : 'relatórios salvos'}
           </span>
 
-          {savedReports.length > 0 && (
+          {userCanDelete && savedReports.length > 0 && (
             <button
               type="button"
               className="btn btn-secondary"
@@ -340,15 +393,18 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
         )}
       </div>
 
-      {/* Barra de Busca Textual */}
+      {/* Barra de Busca Textual e Filtros de Hierarquia (Supervisor / Operador) */}
       {savedReports.length > 0 && (
-        <div className="history-toolbar">
-          <div className="history-search-wrapper">
+        <div
+          className="history-toolbar"
+          style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}
+        >
+          <div className="history-search-wrapper" style={{ flex: '1 1 280px' }}>
             <Search size={16} className="history-search-icon" />
             <input
               type="text"
               className="history-search-input"
-              placeholder="Pesquisar por título, colaborador, sistema, modelo ou conteúdo do relatório..."
+              placeholder="Pesquisar por título, autor, supervisor, colaborador, modelo ou conteúdo..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -364,6 +420,38 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
               </button>
             )}
           </div>
+
+          {showHierarchyFilters && supervisorOptions.length > 0 && (
+            <select
+              className="formatter-select"
+              value={selectedSupervisor}
+              onChange={(e) => setSelectedSupervisor(e.target.value)}
+              aria-label="Filtrar por Supervisor"
+            >
+              <option value="all">Todos os Supervisores</option>
+              {supervisorOptions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  Sup.: {s.name}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {showHierarchyFilters && authorOptions.length > 0 && (
+            <select
+              className="formatter-select"
+              value={selectedAuthor}
+              onChange={(e) => setSelectedAuthor(e.target.value)}
+              aria-label="Filtrar por Operador / Autor"
+            >
+              <option value="all">Todos os Autores</option>
+              {authorOptions.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       )}
 
@@ -377,7 +465,7 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
             <>
               <h3>Nenhum relatório salvo ainda</h3>
               <p>
-                Quando você finalizar ou quiser pausar um relatório ou modelo, clique no botão <strong>"Salvar"</strong> ou <strong>"Salvar como..."</strong> para arquivá-lo aqui.
+                Os relatórios são salvos automaticamente na <strong>Central de Relatórios</strong> assim que tarefas ou campos são preenchidos.
               </p>
               <button
                 type="button"
@@ -398,6 +486,8 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
                 style={{ width: 'auto', marginTop: '0.5rem' }}
                 onClick={() => {
                   setSelectedCategory('all');
+                  setSelectedSupervisor('all');
+                  setSelectedAuthor('all');
                   setSearchQuery('');
                 }}
               >
@@ -414,8 +504,10 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
             const isEditing = editingId === report.id;
             const catBadge = getCategoryBadgeInfo(report);
             const fieldHighlights = getKeyFieldHighlights(report);
+            const isOwnReport =
+              !report.userId || !currentUser || report.userId === currentUser.id;
+            const canEditThisReport = isOwnReport || currentUser?.role === 'admin';
 
-            // Formatação amigável da data exibida
             const [yyyy, mm, dd] = report.displayDate.split('-');
             const formattedDateBR = dd && mm && yyyy ? `${dd}/${mm}/${yyyy}` : report.displayDate;
 
@@ -431,6 +523,19 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
                         <Tag size={11} style={{ marginRight: 3, verticalAlign: 'middle' }} />
                         {report.templateTitle || 'Relatório'}
                       </span>
+                      {report.authorName && (
+                        <span className="history-model-badge" style={{ fontWeight: 600 }}>
+                          <UserCheck size={11} style={{ marginRight: 3, verticalAlign: 'middle' }} />
+                          {report.authorName}
+                          {report.authorRole ? ` · ${ROLE_LABELS[report.authorRole]}` : ''}
+                        </span>
+                      )}
+                      {report.supervisorName && (
+                        <span className="history-model-badge">
+                          <Users size={11} style={{ marginRight: 3, verticalAlign: 'middle' }} />
+                          Sup.: {report.supervisorName}
+                        </span>
+                      )}
                     </div>
 
                     {isEditing ? (
@@ -460,15 +565,17 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
                     ) : (
                       <h3>
                         <span>{report.title}</span>
-                        <button
-                          type="button"
-                          className="field-icon-btn"
-                          style={{ position: 'static', padding: 2 }}
-                          onClick={() => handleStartRename(report)}
-                          title="Renomear título"
-                        >
-                          <Edit2 size={13} />
-                        </button>
+                        {canEditThisReport && (
+                          <button
+                            type="button"
+                            className="field-icon-btn"
+                            style={{ position: 'static', padding: 2 }}
+                            onClick={() => handleStartRename(report)}
+                            title="Renomear título"
+                          >
+                            <Edit2 size={13} />
+                          </button>
+                        )}
                       </h3>
                     )}
 
@@ -497,7 +604,6 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
                       )}
                     </div>
 
-                    {/* Destaques de campos principais do modelo */}
                     {fieldHighlights.length > 0 && (
                       <div className="history-card-highlights">
                         {fieldHighlights.map((fh, idx) => (
@@ -537,34 +643,28 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
                       .txt
                     </button>
 
-                    <button
-                      type="button"
-                      className="btn-history-action"
-                      onClick={() => handleDownloadFile(report, 'md')}
-                      title="Baixar como arquivo .md"
-                    >
-                      <Download size={14} />
-                      .md
-                    </button>
+                    {isOwnReport && (
+                      <button
+                        type="button"
+                        className="btn-history-action restore highlight-restore"
+                        onClick={() => handleRestore(report)}
+                        title="Restaurar este relatório no Gerador: carrega o modelo e preenche todos os campos para edição"
+                      >
+                        <RotateCcw size={14} />
+                        Restaurar no Gerador
+                      </button>
+                    )}
 
-                    <button
-                      type="button"
-                      className="btn-history-action restore highlight-restore"
-                      onClick={() => handleRestore(report)}
-                      title="Restaurar este relatório no Gerador: carrega o modelo e preenche todos os campos para edição"
-                    >
-                      <RotateCcw size={14} />
-                      Restaurar no Gerador
-                    </button>
-
-                    <button
-                      type="button"
-                      className="btn-history-action delete"
-                      onClick={() => handleDelete(report)}
-                      title="Excluir este relatório do histórico"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    {userCanDelete && (
+                      <button
+                        type="button"
+                        className="btn-history-action delete"
+                        onClick={() => handleDelete(report)}
+                        title="Excluir este relatório do histórico"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
                   </div>
                 </div>
 

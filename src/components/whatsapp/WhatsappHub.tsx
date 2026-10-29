@@ -2,6 +2,12 @@ import React, { useEffect, useRef, useState } from 'react';
 import { BarChart3, Download, FileJson, FileUp, Map as MapIcon, MessageCircle, Upload, Users } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { NotificationState, NotificationType } from '../../types/task';
+import {
+  UserRole,
+  canDeleteWhatsappItems,
+  canImportOverwriteWhatsappMap,
+  canManageWhatsappMaintenance,
+} from '../../types/auth';
 import { NotificationToast } from '../common/NotificationToast';
 import { MapaWhatsapp } from '../../types/whatsapp';
 import { useWhatsappBaias } from '../../hooks/useWhatsappBaias';
@@ -26,6 +32,7 @@ interface WhatsappHubProps {
   /** Aviso atual do app: aparece flutuando, porque as ações acontecem em qualquer ponto da página */
   notification: NotificationState;
   onNotify: (message: string, type?: NotificationType) => void;
+  userRole?: UserRole;
 }
 
 type Selecao = AlvoAlerta;
@@ -75,7 +82,14 @@ const Contagens: React.FC<{ resumo: ResumoWhatsapp; celulares?: boolean }> = ({ 
   </div>
 );
 
-export const WhatsappHub: React.FC<WhatsappHubProps> = ({ notification, onNotify }) => {
+export const WhatsappHub: React.FC<WhatsappHubProps> = ({
+  notification,
+  onNotify,
+  userRole = 'admin',
+}) => {
+  const canMaintenance = canManageWhatsappMaintenance(userRole);
+  const canDelete = canDeleteWhatsappItems(userRole);
+  const canImportOverwrite = canImportOverwriteWhatsappMap(userRole);
   const wpp = useWhatsappBaias();
   const { mapa } = wpp;
   const { feriados } = useFeriados();
@@ -205,11 +219,11 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({ notification, onNotify
     const nome = ehSup
       ? { rotulo: 'Supervisor', valor: mesa.supervisor, podeEsvaziar: false, onChange: (v: string) => wpp.alterarMesa(sala.id, mesa.id, { supervisor: v }) }
       : {
-          rotulo: 'Operador',
-          valor: lugar.operador,
-          podeEsvaziar: true,
-          onChange: (v: string) => wpp.alterarLugar(sala.id, mesa.id, posicao, { operador: v }),
-        };
+        rotulo: 'Operador',
+        valor: lugar.operador,
+        podeEsvaziar: true,
+        onChange: (v: string) => wpp.alterarLugar(sala.id, mesa.id, posicao, { operador: v }),
+      };
     const onde = ondeEstaABaia(mapa, mesa.id, posicao);
     return (
       <PainelLugar
@@ -284,156 +298,166 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({ notification, onNotify
         />
       ) : (
         <>
-      <Manutencao mapa={mapa} agora={agora} onMapa={wpp.alterarMapa} onNotify={onNotify} />
+          {canMaintenance && (
+            <Manutencao mapa={mapa} agora={agora} onMapa={wpp.alterarMapa} onNotify={onNotify} />
+          )}
 
-      <input type="file" ref={planilhaRef} accept=".xlsx,.xls" onChange={handleImportarPlanilha} style={{ display: 'none' }} />
-      <input type="file" ref={jsonRef} accept=".json,application/json" onChange={handleImportarMapa} style={{ display: 'none' }} />
+          {canImportOverwrite && (
+            <>
+              <input type="file" ref={planilhaRef} accept=".xlsx,.xls" onChange={handleImportarPlanilha} style={{ display: 'none' }} />
+              <input type="file" ref={jsonRef} accept=".json,application/json" onChange={handleImportarMapa} style={{ display: 'none' }} />
+            </>
+          )}
 
-      <div className="formatter-card">
-        <div className="formatter-card-header">
-          <h2 className="formatter-card-title">
-            <Users size={20} />
-            Resumo
-          </h2>
-          <div className="formatter-actions-buttons escala-acoes">
-            <button type="button" className="btn btn-primary" onClick={handleBaixarPlanilha}>
-              <Download size={16} />
-              Baixar planilha
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={() => planilhaRef.current?.click()}>
-              <Upload size={16} />
-              Importar planilha
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={handleExportarMapa}>
-              <FileJson size={16} />
-              Exportar mapa
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={() => jsonRef.current?.click()}>
-              <FileUp size={16} />
-              Importar mapa
-            </button>
-          </div>
-        </div>
-
-        <Contagens resumo={geral} celulares />
-        <Alertas itens={listaDeAlertas} agora={agora} onAbrir={abrir} />
-        {mapa.salas.length > 1 && (
-          <div className="wpp-resumo-salas">
-            {mapa.salas.map((s) => (
-              <div key={s.id}>
-                <strong>{s.nome}</strong>
-                <Contagens resumo={resumoDaSala(s, agora)} />
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="wpp-filtros" role="group" aria-label="Filtro do mapa">
-          {FILTROS.map(([id, rotulo]) => (
-            <button
-              key={id}
-              type="button"
-              className={`wpp-filtro ${filtro === id ? 'ativo' : ''}`}
-              aria-pressed={filtro === id}
-              onClick={() => setFiltro(id)}
-            >
-              {rotulo}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {previa && (
-        <div className="formatter-card wpp-previa">
-          <div className="formatter-card-header">
-            <h2 className="formatter-card-title">
-              <Upload size={20} />
-              Importar {previa.arquivo}
-            </h2>
-          </div>
-          <p>
-            {previa.mapa.salas.map((s) => `${s.nome}: ${s.mesas.length} equipe(s)`).join(' · ')} ·{' '}
-            {previa.mapa.celulares.length} celular(es) · {previa.avisos.length} aviso(s)
-          </p>
-          {previa.avisos.map((a) => (
-            <div key={a} className="escala-aviso">
-              {a}
-            </div>
-          ))}
-          <p className="ura-ajuda">O mapa atual (operadores, situações e mesas) será substituído pelo da planilha.</p>
-          <div className="formatter-actions-buttons escala-acoes">
-            <button type="button" className="btn btn-primary" onClick={handleSubstituir}>
-              Substituir mapa
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={() => setPrevia(null)}>
-              Cancelar
-            </button>
-          </div>
-        </div>
-      )}
-
-      {mapa.salas.map((sala) => (
-        <section key={sala.id} className="formatter-card wpp-sala" aria-label={sala.nome}>
-          <div className="formatter-card-header">
-            <h2 className="formatter-card-title">{sala.nome}</h2>
-            <Contagens resumo={resumoDaSala(sala, agora)} />
-          </div>
-          <div className="wpp-legenda" aria-hidden="true">
-            <span className="wpp-ok"><span className="wpp-bolinha" />OK</span>
-            <span className="wpp-banido"><span className="wpp-bolinha" />Banido — pedir análise</span>
-            <span className="wpp-analise"><span className="wpp-bolinha" />Em análise</span>
-            <span className="wpp-permanente"><span className="wpp-bolinha" />Perdido</span>
-            <span className="wpp-restringido"><span className="wpp-bolinha" />Restringido</span>
-            <span className="wpp-nao_tem"><span className="wpp-bolinha" />Não tem</span>
-            <span className="vazia"><span className="wpp-bolinha" />Vaga vazia</span>
-          </div>
-          <div className="wpp-mesas">
-            {sala.mesas.map((mesa) => (
-              <div key={mesa.id} className="wpp-mesa-cartao">
-                <button
-                  type="button"
-                  className="wpp-mesa-titulo"
-                  onClick={() => setSelecao({ tipo: 'lugar', salaId: sala.id, mesaId: mesa.id, posicao: 'SUP' })}
-                  title="Editar o supervisor"
-                  disabled={!mesa.lugares.SUP}
-                >
-                  <strong>{mesa.nome}</strong>
-                  <span>
-                    {mesa.sigla} · {mesa.supervisor || 'sem supervisor'}
-                  </span>
+          <div className="formatter-card">
+            <div className="formatter-card-header">
+              <h2 className="formatter-card-title">
+                <Users size={20} />
+                Resumo
+              </h2>
+              <div className="formatter-actions-buttons escala-acoes">
+                <button type="button" className="btn btn-primary" onClick={handleBaixarPlanilha}>
+                  <Download size={16} />
+                  Baixar planilha
                 </button>
-                <MapaMesa
-                  mesa={mesa}
-                  filtro={filtro}
-                  agora={agora}
-                  selecionado={
-                    selecao?.tipo === 'lugar' && selecao.mesaId === mesa.id ? selecao.posicao : null
-                  }
-                  onSelecionar={(posicao) => setSelecao({ tipo: 'lugar', salaId: sala.id, mesaId: mesa.id, posicao })}
-                  localDe={
-                    mapa.celulares.length > 0
-                      ? (posicao) => {
-                          const onde = ondeEstaABaia(mapa, mesa.id, posicao);
-                          return onde ? `📱 ${textoDoLocal(onde.celular, onde.vaga)}` : 'sem celular';
-                        }
-                      : undefined
-                  }
-                />
+                {canImportOverwrite && (
+                  <button type="button" className="btn btn-secondary" onClick={() => planilhaRef.current?.click()}>
+                    <Upload size={16} />
+                    Importar planilha
+                  </button>
+                )}
+                <button type="button" className="btn btn-secondary" onClick={handleExportarMapa}>
+                  <FileJson size={16} />
+                  Exportar mapa
+                </button>
+                {canImportOverwrite && (
+                  <button type="button" className="btn btn-secondary" onClick={() => jsonRef.current?.click()}>
+                    <FileUp size={16} />
+                    Importar mapa
+                  </button>
+                )}
               </div>
-            ))}
+            </div>
+
+            <Contagens resumo={geral} celulares />
+            <Alertas itens={listaDeAlertas} agora={agora} onAbrir={abrir} />
+            {mapa.salas.length > 1 && (
+              <div className="wpp-resumo-salas">
+                {mapa.salas.map((s) => (
+                  <div key={s.id}>
+                    <strong>{s.nome}</strong>
+                    <Contagens resumo={resumoDaSala(s, agora)} />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="wpp-filtros" role="group" aria-label="Filtro do mapa">
+              {FILTROS.map(([id, rotulo]) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={`wpp-filtro ${filtro === id ? 'ativo' : ''}`}
+                  aria-pressed={filtro === id}
+                  onClick={() => setFiltro(id)}
+                >
+                  {rotulo}
+                </button>
+              ))}
+            </div>
           </div>
-        </section>
-      ))}
 
-      <Celulares
-        mapa={mapa}
-        agora={agora}
-        selecionado={selecao?.tipo === 'vaga' ? { celularId: selecao.celularId, vagaId: selecao.vagaId } : null}
-        onSelecionar={(celularId, vagaId) => abrir({ tipo: 'vaga', celularId, vagaId })}
-      />
+          {previa && (
+            <div className="formatter-card wpp-previa">
+              <div className="formatter-card-header">
+                <h2 className="formatter-card-title">
+                  <Upload size={20} />
+                  Importar {previa.arquivo}
+                </h2>
+              </div>
+              <p>
+                {previa.mapa.salas.map((s) => `${s.nome}: ${s.mesas.length} equipe(s)`).join(' · ')} ·{' '}
+                {previa.mapa.celulares.length} celular(es) · {previa.avisos.length} aviso(s)
+              </p>
+              {previa.avisos.map((a) => (
+                <div key={a} className="escala-aviso">
+                  {a}
+                </div>
+              ))}
+              <p className="ura-ajuda">O mapa atual (operadores, situações e mesas) será substituído pelo da planilha.</p>
+              <div className="formatter-actions-buttons escala-acoes">
+                <button type="button" className="btn btn-primary" onClick={handleSubstituir}>
+                  Substituir mapa
+                </button>
+                <button type="button" className="btn btn-secondary" onClick={() => setPrevia(null)}>
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
 
-      <ConfigurarMesas mapa={mapa} onMapa={wpp.substituir} onNotify={onNotify} />
-      <ConfigurarCelulares mapa={mapa} onMapa={wpp.substituir} onNotify={onNotify} />
+          {mapa.salas.map((sala) => (
+            <section key={sala.id} className="formatter-card wpp-sala" aria-label={sala.nome}>
+              <div className="formatter-card-header">
+                <h2 className="formatter-card-title">{sala.nome}</h2>
+                <Contagens resumo={resumoDaSala(sala, agora)} />
+              </div>
+              <div className="wpp-legenda" aria-hidden="true">
+                <span className="wpp-ok"><span className="wpp-bolinha" />OK</span>
+                <span className="wpp-banido"><span className="wpp-bolinha" />Banido — pedir análise</span>
+                <span className="wpp-analise"><span className="wpp-bolinha" />Em análise</span>
+                <span className="wpp-permanente"><span className="wpp-bolinha" />Perdido</span>
+                <span className="wpp-restringido"><span className="wpp-bolinha" />Restringido</span>
+                <span className="wpp-nao_tem"><span className="wpp-bolinha" />Não tem</span>
+                <span className="vazia"><span className="wpp-bolinha" />Vaga vazia</span>
+              </div>
+              <div className="wpp-mesas">
+                {sala.mesas.map((mesa) => (
+                  <div key={mesa.id} className="wpp-mesa-cartao">
+                    <button
+                      type="button"
+                      className="wpp-mesa-titulo"
+                      onClick={() => setSelecao({ tipo: 'lugar', salaId: sala.id, mesaId: mesa.id, posicao: 'SUP' })}
+                      title="Editar o supervisor"
+                      disabled={!mesa.lugares.SUP}
+                    >
+                      <strong>{mesa.nome}</strong>
+                      <span>
+                        {mesa.sigla} · {mesa.supervisor || 'sem supervisor'}
+                      </span>
+                    </button>
+                    <MapaMesa
+                      mesa={mesa}
+                      filtro={filtro}
+                      agora={agora}
+                      selecionado={
+                        selecao?.tipo === 'lugar' && selecao.mesaId === mesa.id ? selecao.posicao : null
+                      }
+                      onSelecionar={(posicao) => setSelecao({ tipo: 'lugar', salaId: sala.id, mesaId: mesa.id, posicao })}
+                      localDe={
+                        mapa.celulares.length > 0
+                          ? (posicao) => {
+                            const onde = ondeEstaABaia(mapa, mesa.id, posicao);
+                            return onde ? `📱 ${textoDoLocal(onde.celular, onde.vaga)}` : 'sem celular';
+                          }
+                          : undefined
+                      }
+                    />
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
+
+          <Celulares
+            mapa={mapa}
+            agora={agora}
+            selecionado={selecao?.tipo === 'vaga' ? { celularId: selecao.celularId, vagaId: selecao.vagaId } : null}
+            onSelecionar={(celularId, vagaId) => abrir({ tipo: 'vaga', celularId, vagaId })}
+          />
+
+          <ConfigurarMesas mapa={mapa} onMapa={wpp.substituir} onNotify={onNotify} canDelete={canDelete} />
+          <ConfigurarCelulares mapa={mapa} onMapa={wpp.substituir} onNotify={onNotify} canDelete={canDelete} />
         </>
       )}
 

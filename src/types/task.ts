@@ -1,3 +1,5 @@
+import { UserRole } from './auth';
+
 export interface Task {
   id: string;
   start: string;
@@ -18,8 +20,14 @@ export interface NotificationState {
 
 export interface SavedReport {
   id: string;
+  userId?: string;
+  authorName?: string;
+  authorRole?: UserRole;
+  supervisorId?: string | null;
+  supervisorName?: string | null;
   title: string;
   createdAt: string; // ISO string
+  updatedAt?: string; // ISO string
   displayDate: string; // YYYY-MM-DD
   displayTime: string; // HH:mm
   templateId: string; // ID do modelo (ex: 'atividades-padrao', 'relatorio-incidente', etc.)
@@ -36,6 +44,7 @@ export interface SavedReport {
 }
 
 export interface SaveReportParams {
+  id?: string;
   templateId: string;
   templateTitle: string;
   templateCategory?: string;

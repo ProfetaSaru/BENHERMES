@@ -1,42 +1,58 @@
 import { useState, useEffect, useCallback } from 'react';
 import { FeriadoLocal } from '../utils/calendario';
-
-export const STORAGE_FERIADOS_KEY = 'benhermes_feriados';
-
-const carregar = (): FeriadoLocal[] => {
-  try {
-    const dados = JSON.parse(localStorage.getItem(STORAGE_FERIADOS_KEY) ?? '[]');
-    return Array.isArray(dados) ? dados.filter((f) => f && typeof f.data === 'string') : [];
-  } catch {
-    return [];
-  }
-};
+import { apiRequest } from '../utils/apiClient';
 
 /**
- * Feriados locais (estaduais, municipais e pontos facultativos), guardados no navegador.
- * Valem para a Escala de Bases e para o Relatório URA (dia útil anterior e avisos).
+ * Feriados locais (estaduais, municipais e pontos facultativos), sincronizados com o servidor (/api/feriados).
  */
 export function useFeriados() {
-  const [feriados, setFeriados] = useState<FeriadoLocal[]>(carregar);
+  const [feriados, setFeriados] = useState<FeriadoLocal[]>([]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_FERIADOS_KEY, JSON.stringify(feriados));
-    } catch (error) {
-      console.error('Falha ao salvar os feriados no localStorage:', error);
-    }
-  }, [feriados]);
+    let ativo = true;
+    apiRequest<{ feriados: FeriadoLocal[] }>('/api/feriados')
+      .then((res) => {
+        if (ativo && Array.isArray(res.feriados)) {
+          setFeriados(res.feriados);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      ativo = false;
+    };
+  }, []);
+
+  const sincronizar = useCallback((lista: FeriadoLocal[]) => {
+    void apiRequest('/api/feriados', {
+      method: 'PUT',
+      body: { feriados: lista },
+    }).catch(() => {});
+  }, []);
 
   /** Inclui (ou troca a descrição de) um feriado, mantendo a lista em ordem de data */
-  const adicionar = useCallback((novo: FeriadoLocal) => {
-    setFeriados((atuais) =>
-      [...atuais.filter((f) => f.data !== novo.data), novo].sort((a, b) => a.data.localeCompare(b.data))
-    );
-  }, []);
+  const adicionar = useCallback(
+    (novo: FeriadoLocal) => {
+      setFeriados((atuais) => {
+        const proximo = [...atuais.filter((f) => f.data !== novo.data), novo].sort((a, b) =>
+          a.data.localeCompare(b.data)
+        );
+        sincronizar(proximo);
+        return proximo;
+      });
+    },
+    [sincronizar]
+  );
 
-  const remover = useCallback((data: string) => {
-    setFeriados((atuais) => atuais.filter((f) => f.data !== data));
-  }, []);
+  const remover = useCallback(
+    (data: string) => {
+      setFeriados((atuais) => {
+        const proximo = atuais.filter((f) => f.data !== data);
+        sincronizar(proximo);
+        return proximo;
+      });
+    },
+    [sincronizar]
+  );
 
   return { feriados, adicionar, remover };
 }
