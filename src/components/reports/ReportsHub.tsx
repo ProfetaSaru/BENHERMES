@@ -1,25 +1,21 @@
-import React, { useState, useRef, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   RotateCcw,
-  Download,
-  Edit3,
-  Trash2,
   FolderKanban,
+  CheckCircle2,
+  FilePlus2,
 } from 'lucide-react';
 import { Task, TaskFormData, NotificationState, NotificationType, SaveReportParams } from '../../types/task';
 import { VerticalReportSelector } from './VerticalReportSelector';
 import { TaskForm } from '../task/TaskForm';
 import { ReportPanel } from '../task/ReportPanel';
 import { MarkdownTemplateRunner } from '../templates/MarkdownTemplateRunner';
-import { MarkdownTemplateEditorModal } from '../templates/MarkdownTemplateEditorModal';
-import { AiPromptModal } from '../templates/AiPromptModal';
 import { NotificationToast } from '../common/NotificationToast';
 import { Panel } from '../common/Panel';
 import { SectionHeading } from '../common/SectionHeading';
 import { Button } from '../common/Button';
 import { useMarkdownTemplates } from '../../hooks/useMarkdownTemplates';
 import { renderTemplate } from '../../utils/markdownTemplateParser';
-import { MarkdownTemplateMeta } from '../../types/markdownTemplate';
 
 interface Props {
   tasks: Task[];
@@ -37,6 +33,9 @@ interface Props {
   onNotify: (message: string, type?: NotificationType) => void;
   templateControls: ReturnType<typeof useMarkdownTemplates>;
   getTemplateTaskCount?: (templateId: string) => number;
+  autoSaveStatus?: 'idle' | 'saving' | 'saved';
+  lastAutoSavedTime?: string | null;
+  onStartNewReport?: () => void;
 }
 
 export const ReportsHub: React.FC<Props> = ({
@@ -55,28 +54,19 @@ export const ReportsHub: React.FC<Props> = ({
   onNotify,
   templateControls,
   getTemplateTaskCount,
+  autoSaveStatus = 'idle',
+  lastAutoSavedTime,
+  onStartNewReport,
 }) => {
   const {
     templates,
     activeTemplateId,
-    activeTemplate,
     parsedActiveTemplate,
     fieldValues,
     setFieldValue,
     resetFieldValues,
     selectTemplate,
-    addCustomTemplate,
-    updateCustomTemplate,
-    deleteCustomTemplate,
-    importTemplateFromFile,
-    exportTemplateToFile,
-    downloadExampleBase,
   } = templateControls;
-
-  // Modais
-  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
-  const [isEditorModalOpen, setIsEditorModalOpen] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState<MarkdownTemplateMeta | null>(null);
 
   // Drawer do Seletor de Modelos (escondido por padrão até o usuário clicar)
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
@@ -90,57 +80,6 @@ export const ReportsHub: React.FC<Props> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isSelectorOpen]);
-
-  // Input oculto para upload de .md
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleOpenNewModal = () => {
-    setEditingTemplate(null);
-    setIsEditorModalOpen(true);
-  };
-
-  const handleOpenEditModal = () => {
-    if (!activeTemplate.isBuiltin) {
-      setEditingTemplate(activeTemplate);
-      setIsEditorModalOpen(true);
-    }
-  };
-
-  const handleSaveModal = (title: string, content: string) => {
-    if (editingTemplate) {
-      updateCustomTemplate(editingTemplate.id, title, content);
-    } else {
-      addCustomTemplate(title, content);
-    }
-  };
-
-  const handleDeleteActiveTemplate = () => {
-    if (activeTemplate.isBuiltin) return;
-    const confirm = window.confirm(`Excluir o modelo customizado "${activeTemplate.title}"?`);
-    if (confirm) {
-      deleteCustomTemplate(activeTemplate.id);
-      onNotify('Modelo excluído com sucesso.', 'success');
-    }
-  };
-
-  const handleTriggerUpload = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const newId = await importTemplateFromFile(file);
-      selectTemplate(newId);
-      onNotify(`Modelo "${file.name}" importado com sucesso!`, 'success');
-    } catch {
-      onNotify('Falha ao importar arquivo .md.', 'error');
-    } finally {
-      if (e.target) e.target.value = '';
-    }
-  };
 
   const isExpandable = parsedActiveTemplate.meta.expandable === true;
 
@@ -160,16 +99,7 @@ export const ReportsHub: React.FC<Props> = ({
         <NotificationToast message={notification.message} type={notification.type} />
       )}
 
-      {/* Input oculto para upload */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileUpload}
-        accept=".md,text/markdown,text/plain"
-        style={{ display: 'none' }}
-      />
-
-      {/* Drawer / Painel Suspenso com o Seletor de Modelos (escondido até o usuário clicar) */}
+      {/* Drawer / Painel Suspenso com o Seletor de Modelos */}
       {isSelectorOpen && (
         <div
           className="selector-drawer-backdrop"
@@ -186,19 +116,6 @@ export const ReportsHub: React.FC<Props> = ({
                 setIsSelectorOpen(false);
               }}
               onClose={() => setIsSelectorOpen(false)}
-              onOpenNewTemplateModal={() => {
-                setIsSelectorOpen(false);
-                handleOpenNewModal();
-              }}
-              onOpenAiPromptModal={() => {
-                setIsSelectorOpen(false);
-                setIsAiModalOpen(true);
-              }}
-              onImportTemplateFile={() => {
-                setIsSelectorOpen(false);
-                handleTriggerUpload();
-              }}
-              onDownloadExampleBase={downloadExampleBase}
               taskCount={tasks.length}
               getTemplateTaskCount={getTemplateTaskCount}
             />
@@ -207,12 +124,10 @@ export const ReportsHub: React.FC<Props> = ({
       )}
 
       <div className="reports-hub-main-split">
-        {/* ÁREA DE TRABALHO ATIVA */}
         <section className="reports-hub-content-area">
           {isExpandable ? (
             /* VISÃO PARA MODELOS EXPANSÍVEIS (Integrados com tarefas diárias) */
             <div className="expandable-workspace-wrapper">
-              {/* Barra superior de informações do modelo selecionado */}
               <div className="report-active-header-banner">
                 <div className="active-header-info">
                   <div className="active-header-tags-row">
@@ -221,59 +136,49 @@ export const ReportsHub: React.FC<Props> = ({
                     <span className="active-header-badge tasks-count">
                       {tasks.length} {tasks.length === 1 ? 'tarefa' : 'tarefas'}
                     </span>
-                    {!activeTemplate.isBuiltin && (
-                      <span className="active-header-badge custom">Customizado</span>
+                    {autoSaveStatus === 'saving' && (
+                      <span className="active-header-badge" style={{ opacity: 0.85 }}>
+                        Salvando automaticamente...
+                      </span>
+                    )}
+                    {autoSaveStatus === 'saved' && lastAutoSavedTime && (
+                      <span
+                        className="active-header-badge expandable"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        <CheckCircle2 size={12} />
+                        Salvo automaticamente às {lastAutoSavedTime}
+                      </span>
                     )}
                   </div>
                   <p className="active-header-desc">{parsedActiveTemplate.meta.description}</p>
                 </div>
 
                 <div className="active-header-actions">
+                  {onStartNewReport && (
+                    <Button
+                      variant="secondary"
+                      onClick={onStartNewReport}
+                      title="Iniciar um novo relatório limpo (mantendo o atual salvo no Histórico)"
+                      style={{ padding: '6px 12px', fontSize: '0.82rem' }}
+                    >
+                      <FilePlus2 size={14} />
+                      Novo Relatório
+                    </Button>
+                  )}
                   <Button
                     variant="primary"
                     onClick={() => setIsSelectorOpen(true)}
-                    title="Abrir catálogo para mudar de modelo ou relatório"
+                    title="Abrir catálogo para mudar de modelo de relatório"
                     style={{ padding: '6px 14px', fontSize: '0.85rem' }}
                   >
                     <FolderKanban size={15} />
                     Mudar Modelo
                   </Button>
-
-                  <Button
-                    variant="secondary"
-                    onClick={() => exportTemplateToFile(activeTemplate)}
-                    title="Baixar arquivo deste modelo (.md)"
-                    style={{ padding: '6px 12px', fontSize: '0.82rem' }}
-                  >
-                    <Download size={14} />
-                    Template (.md)
-                  </Button>
-
-                  {!activeTemplate.isBuiltin && (
-                    <>
-                      <Button
-                        variant="secondary"
-                        onClick={handleOpenEditModal}
-                        title="Editar código deste modelo"
-                        style={{ padding: '6px 12px', fontSize: '0.82rem' }}
-                      >
-                        <Edit3 size={14} />
-                        Editar
-                      </Button>
-                      <Button
-                        variant="danger"
-                        onClick={handleDeleteActiveTemplate}
-                        title="Excluir este modelo customizado"
-                        style={{ padding: '6px 12px', fontSize: '0.82rem' }}
-                      >
-                        <Trash2 size={14} />
-                      </Button>
-                    </>
-                  )}
                 </div>
               </div>
 
-              {/* Bloco de Campos Adicionais do Modelo (se houver variáveis manuais além das tarefas) */}
+              {/* Bloco de Campos Adicionais do Modelo */}
               {manualFieldsForExpandable.length > 0 && (
                 <Panel className="expandable-extra-fields-panel">
                   <div className="extra-fields-header">
@@ -382,7 +287,7 @@ export const ReportsHub: React.FC<Props> = ({
               </div>
             </div>
           ) : (
-            /* VISÃO PARA MODELOS NÃO EXPANSÍVEIS (Formulários Diretos, Comunicados, Novo Colaborador, etc.) */
+            /* VISÃO PARA MODELOS NÃO EXPANSÍVEIS (Formulários Diretos) */
             <div className="non-expandable-workspace-wrapper">
               <MarkdownTemplateRunner
                 template={parsedActiveTemplate}
@@ -391,9 +296,6 @@ export const ReportsHub: React.FC<Props> = ({
                 onFieldChange={setFieldValue}
                 onResetFields={resetFieldValues}
                 onOpenSelector={() => setIsSelectorOpen(true)}
-                onEditTemplate={!activeTemplate.isBuiltin ? handleOpenEditModal : undefined}
-                onDeleteTemplate={!activeTemplate.isBuiltin ? handleDeleteActiveTemplate : undefined}
-                onExportTemplateFile={() => exportTemplateToFile(activeTemplate)}
                 onSaveQuick={onSaveReportQuick}
                 onSaveCustom={onSaveReportCustom}
                 onNotify={onNotify}
@@ -402,22 +304,6 @@ export const ReportsHub: React.FC<Props> = ({
           )}
         </section>
       </div>
-
-      {/* Modal de Criação / Edição de Modelo Markdown */}
-      <MarkdownTemplateEditorModal
-        isOpen={isEditorModalOpen}
-        editingTemplate={editingTemplate}
-        onClose={() => setIsEditorModalOpen(false)}
-        onSave={handleSaveModal}
-        onNotify={onNotify}
-      />
-
-      {/* Modal de Prompt de IA */}
-      <AiPromptModal
-        isOpen={isAiModalOpen}
-        onClose={() => setIsAiModalOpen(false)}
-        onNotify={onNotify}
-      />
     </div>
   );
 };

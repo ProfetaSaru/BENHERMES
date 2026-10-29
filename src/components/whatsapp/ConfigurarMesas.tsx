@@ -22,6 +22,7 @@ interface ConfigurarMesasProps {
   mapa: MapaWhatsapp;
   onMapa: (mapa: MapaWhatsapp) => void;
   onNotify: (message: string, type?: NotificationType) => void;
+  canDelete?: boolean;
 }
 
 /** Mesa em edição: rascunho completo (para a prévia) e onde ela fica */
@@ -39,7 +40,12 @@ const CENTROS: [Centro, string][] = [
 const MAX_BAIAS = 8;
 
 /** Salas e mesas: adicionar, renomear, mudar formato, desativar baias, remover */
-export const ConfigurarMesas: React.FC<ConfigurarMesasProps> = ({ mapa, onMapa, onNotify }) => {
+export const ConfigurarMesas: React.FC<ConfigurarMesasProps> = ({
+  mapa,
+  onMapa,
+  onNotify,
+  canDelete = true,
+}) => {
   const [aberto, setAberto] = useState(false);
   const [novaSala, setNovaSala] = useState('');
   const [edicao, setEdicao] = useState<Edicao | null>(null);
@@ -209,15 +215,17 @@ export const ConfigurarMesas: React.FC<ConfigurarMesasProps> = ({ mapa, onMapa, 
                   <Plus size={16} />
                   Nova mesa
                 </button>
-                <button
-                  type="button"
-                  className="ura-arquivo-remover"
-                  onClick={() => removerSala(sala.id, sala.nome, sala.mesas.length)}
-                  aria-label={`Remover a sala ${sala.nome}`}
-                  title="Remover sala"
-                >
-                  <Trash2 size={16} />
-                </button>
+                {canDelete && (
+                  <button
+                    type="button"
+                    className="ura-arquivo-remover"
+                    onClick={() => removerSala(sala.id, sala.nome, sala.mesas.length)}
+                    aria-label={`Remover a sala ${sala.nome}`}
+                    title="Remover sala"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
               </div>
               <div className="wpp-config-mesas">
                 {sala.mesas.map((m) => (
@@ -328,7 +336,7 @@ export const ConfigurarMesas: React.FC<ConfigurarMesasProps> = ({ mapa, onMapa, 
                   <button type="button" className="btn btn-secondary" onClick={() => setEdicao(null)}>
                     Cancelar
                   </button>
-                  {!edicao.nova && (
+                  {!edicao.nova && canDelete && (
                     <button type="button" className="btn btn-secondary wpp-perigo" onClick={removerMesa}>
                       <Trash2 size={16} />
                       Remover mesa

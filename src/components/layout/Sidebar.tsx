@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { NavigationItem } from '../../types/navigation';
 import { ThemeMode } from '../../hooks/useTheme';
+import { AuthUser, ROLE_LABELS } from '../../types/auth';
 
 interface SidebarProps {
   items: NavigationItem[];
@@ -20,6 +21,7 @@ interface SidebarProps {
   onCloseMobile: () => void;
   theme: ThemeMode;
   onToggleTheme: () => void;
+  currentUser?: AuthUser | null;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -32,6 +34,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCloseMobile,
   theme,
   onToggleTheme,
+  currentUser,
 }) => {
   const automationItems = items.filter((item) => item.category === 'automacoes');
   const systemItems = items.filter((item) => item.category === 'sistema');
@@ -69,7 +72,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </div>
                 )}
 
-                {/* Minified badge dot when collapsed */}
                 {isCollapsed && item.badge && (
                   <span
                     className={`sidebar-collapsed-dot dot-${item.badgeVariant || 'muted'}`}
@@ -86,7 +88,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <>
-      {/* Backdrop for mobile devices */}
       {isMobileOpen && (
         <div
           className="sidebar-backdrop"
@@ -99,7 +100,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         className={`app-sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobileOpen ? 'mobile-open' : ''}`}
         aria-label="Navegação de Ferramentas"
       >
-        {/* Header da Sidebar */}
         <div className="sidebar-header">
           <div className="sidebar-brand">
             <div className="sidebar-brand-icon">
@@ -113,7 +113,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
           </div>
 
-          {/* Botão de Fechar no Mobile */}
           <button
             type="button"
             className="sidebar-mobile-close"
@@ -123,7 +122,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <X size={20} />
           </button>
 
-          {/* Botão de Recolher no Desktop */}
           <button
             type="button"
             className="sidebar-collapse-btn"
@@ -135,32 +133,41 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
 
-        {/* Corpo com a lista de itens */}
         <div className="sidebar-scrollable">
           {renderNavGroup('Ferramentas & Automação', automationItems)}
           {renderNavGroup('Sistema & Apoio', systemItems)}
         </div>
 
-        {/* Rodapé da Sidebar */}
         <div className="sidebar-footer">
           {!isCollapsed ? (
             <div className="sidebar-status-box">
               <div className="status-indicator-dot" />
               <div className="status-indicator-text">
-                <span className="status-label">Ambiente Ativo</span>
-                <span className="status-sub">Dados locais (Offline)</span>
+                <span className="status-label">
+                  {currentUser ? currentUser.displayName : 'Servidor Local'}
+                </span>
+                <span className="status-sub">
+                  {currentUser
+                    ? `${ROLE_LABELS[currentUser.role]}${
+                        currentUser.supervisorName ? ` · Sup. ${currentUser.supervisorName}` : ''
+                      }`
+                    : 'Sincronizado'}
+                </span>
               </div>
             </div>
           ) : (
             <div
               className="sidebar-status-mini"
-              title="Ambiente Local Ativo"
+              title={
+                currentUser
+                  ? `${currentUser.displayName} (${ROLE_LABELS[currentUser.role]})`
+                  : 'Servidor Local Ativo'
+              }
             >
               <div className="status-indicator-dot" />
             </div>
           )}
 
-          {/* Botão de Alternância de Tema */}
           <button
             type="button"
             className="sidebar-theme-btn"
