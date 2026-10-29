@@ -5,6 +5,12 @@ node_modules/
 dist/
 dist-ssr/
 
+# Local SQLite database & volume data
+data/
+*.db
+*.db-shm
+*.db-wal
+
 # Logs
 logs/
 *.log
