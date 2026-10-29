@@ -6,8 +6,6 @@ import {
   Bookmark,
   BookmarkPlus,
   RotateCcw,
-  Edit3,
-  Trash2,
   Eye,
   EyeOff,
   Code,
@@ -25,7 +23,6 @@ import { Panel } from '../common/Panel';
 import { SectionHeading } from '../common/SectionHeading';
 import { SaveReportModal } from '../common/SaveReportModal';
 import { renderTemplate } from '../../utils/markdownTemplateParser';
-import { downloadMarkdownFile } from '../../utils/aiPromptTemplate';
 import { generateBenhubEmail, formatToTitleCase } from '../../utils/templateHelpers';
 
 interface Props {
@@ -35,9 +32,6 @@ interface Props {
   onFieldChange: (fieldId: string, value: string) => void;
   onResetFields: () => void;
   onOpenSelector?: () => void;
-  onEditTemplate?: () => void;
-  onDeleteTemplate?: () => void;
-  onExportTemplateFile: () => void;
   onSaveQuick: (params: SaveReportParams) => void;
   onSaveCustom: (params: SaveReportParams) => void;
   onNotify: (message: string, type?: 'success' | 'error' | '') => void;
@@ -50,9 +44,6 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
   onFieldChange,
   onResetFields,
   onOpenSelector,
-  onEditTemplate,
-  onDeleteTemplate,
-  onExportTemplateFile,
   onSaveQuick,
   onSaveCustom,
   onNotify,
@@ -82,7 +73,6 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
 
     onFieldChange(fieldId, value);
 
-    // Se o usuário digitou diretamente em nome_benhub ou email_benhub, marca como customizado
     if (fieldId === 'nome_benhub') {
       setIsNomeBenhubCustom(value.trim().length > 0);
       return;
@@ -93,7 +83,6 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
       return;
     }
 
-    // Sugestão automática de e-mail e formatação se estiver digitando o nome do colaborador
     if (isNameField) {
       const suggestedEmail = generateBenhubEmail(rawValue);
       const titleCased = formatToTitleCase(rawValue);
@@ -114,14 +103,14 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
     onResetFields();
   };
 
-  // Gera o texto Markdown substituindo as variáveis
-  const renderedMarkdown = useMemo(() => {
+  // Gera o texto substituindo as variáveis
+  const renderedText = useMemo(() => {
     return renderTemplate(template.templateBody, fieldValues, tasks);
   }, [template.templateBody, fieldValues, tasks]);
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(renderedMarkdown);
+      await navigator.clipboard.writeText(renderedText);
       setCopied(true);
       onNotify('Relatório copiado com sucesso para a área de transferência!', 'success');
       setTimeout(() => setCopied(false), 2000);
@@ -130,12 +119,20 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
     }
   };
 
-  const handleDownloadFilled = () => {
-    const filename = `${template.meta.title.toLowerCase().replace(/\s+/g, '-')}-${new Date()
-      .toISOString()
-      .slice(0, 10)}`;
-    downloadMarkdownFile(filename, renderedMarkdown);
-    onNotify('Download do relatório em .md realizado!', 'success');
+  const handleDownloadTxt = () => {
+    const filename = `${template.meta.title
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]+/gi, '-')}-${new Date().toISOString().slice(0, 10)}.txt`;
+    const blob = new Blob([renderedText], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    onNotify('Download do relatório em .txt realizado!', 'success');
   };
 
   const handleQuickSave = () => {
@@ -146,7 +143,7 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
       isExpandable: false,
       fieldValues,
       tasks: [],
-      reportText: renderedMarkdown,
+      reportText: renderedText,
     });
     onNotify('Relatório salvo no Histórico com sucesso!', 'success');
   };
@@ -163,7 +160,7 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
       isExpandable: false,
       fieldValues,
       tasks: [],
-      reportText: renderedMarkdown,
+      reportText: renderedText,
       title: data.title,
       date: data.date,
       time: data.time,
@@ -179,7 +176,6 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
     return `${template.meta.title} - ${dd}/${mm}`;
   }, [template.meta.title]);
 
-  // Separa campos manuais dos campos que possuem preenchimento automático pelo sistema
   const manualFields = template.fields.filter((f) => !f.isSystemAuto);
   const systemFields = template.fields.filter((f) => f.isSystemAuto);
 
@@ -193,11 +189,7 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
             <span className={`runner-category-tag cat-${template.meta.category}`}>
               {template.meta.category}
             </span>
-            {template.meta.isBuiltin ? (
-              <span className="runner-origin-badge builtin">Padrão</span>
-            ) : (
-              <span className="runner-origin-badge custom">Customizado</span>
-            )}
+            <span className="runner-origin-badge builtin">Padrão</span>
           </div>
           <p className="runner-desc">{template.meta.description}</p>
         </div>
@@ -207,44 +199,11 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
             <Button
               variant="primary"
               onClick={onOpenSelector}
-              title="Abrir catálogo para escolher outro modelo ou relatório"
+              title="Abrir catálogo para escolher outro modelo de relatório"
               style={{ padding: '6px 14px', fontSize: '0.85rem' }}
             >
               <FolderKanban size={15} />
               Mudar Modelo
-            </Button>
-          )}
-
-          <Button
-            variant="secondary"
-            onClick={onExportTemplateFile}
-            title="Baixar arquivo de template (.md) original"
-            style={{ padding: '6px 12px', fontSize: '0.85rem' }}
-          >
-            <Download size={15} />
-            Baixar Template
-          </Button>
-
-          {onEditTemplate && (
-            <Button
-              variant="secondary"
-              onClick={onEditTemplate}
-              title="Editar código deste modelo"
-              style={{ padding: '6px 12px', fontSize: '0.85rem' }}
-            >
-              <Edit3 size={15} />
-              Editar
-            </Button>
-          )}
-
-          {onDeleteTemplate && (
-            <Button
-              variant="danger"
-              onClick={onDeleteTemplate}
-              title="Excluir este modelo customizado"
-              style={{ padding: '6px 12px', fontSize: '0.85rem' }}
-            >
-              <Trash2 size={15} />
             </Button>
           )}
         </div>
@@ -269,7 +228,6 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
               )}
             </div>
 
-            {/* Informações de variáveis automáticas do sistema */}
             {systemFields.length > 0 && (
               <div className="system-auto-chips-box">
                 <span className="system-auto-title">
@@ -293,7 +251,6 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
               </div>
             )}
 
-            {/* Campos Manuais */}
             {manualFields.length === 0 ? (
               <div className="empty-fields-note">
                 <p>Este modelo utiliza apenas dados automáticos ou texto fixo.</p>
@@ -382,26 +339,24 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
                   type="button"
                   className={`view-toggle-btn ${viewMode === 'raw' ? 'active' : ''}`}
                   onClick={() => setViewMode('raw')}
-                  title="Código Markdown bruto"
+                  title="Texto puro para cópia"
                 >
                   <Code size={14} />
-                  Markdown Bruto
+                  Texto Puro
                 </button>
               </div>
             </div>
 
-            {/* Caixa de visualização */}
             <div className="runner-preview-content-box">
               {viewMode === 'raw' ? (
-                <pre className="raw-markdown-view">{renderedMarkdown}</pre>
+                <pre className="raw-markdown-view">{renderedText}</pre>
               ) : (
                 <div className="formatted-markdown-view">
-                  <FormattedMarkdownRenderer content={renderedMarkdown} />
+                  <FormattedReportRenderer content={renderedText} />
                 </div>
               )}
             </div>
 
-            {/* Barra de Ações do Relatório Final */}
             <div className="runner-footer-actions">
               <Button
                 variant="primary"
@@ -432,11 +387,11 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
 
               <Button
                 variant="secondary"
-                onClick={handleDownloadFilled}
-                title="Baixar este relatório em arquivo .md"
+                onClick={handleDownloadTxt}
+                title="Baixar este relatório em arquivo .txt"
               >
                 <Download size={16} />
-                Baixar .md
+                Baixar .txt
               </Button>
             </div>
           </Panel>
@@ -453,8 +408,7 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
   );
 };
 
-// Renderizador visual elegante de Markdown puro (sem dependências externas)
-const FormattedMarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
+const FormattedReportRenderer: React.FC<{ content: string }> = ({ content }) => {
   const lines = content.split('\n');
 
   return (
@@ -495,7 +449,6 @@ const FormattedMarkdownRenderer: React.FC<{ content: string }> = ({ content }) =
         }
 
         if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
-          // Renderização de linha de tabela
           const cells = trimmed
             .split('|')
             .slice(1, -1)

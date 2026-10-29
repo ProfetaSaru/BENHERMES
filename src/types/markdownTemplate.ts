@@ -8,8 +8,8 @@ export type SystemAutoSource =
   | 'hora_atual';
 
 export interface TemplateField {
-  id: string; // ex: 'cliente', 'tarefas_tabela'
-  label: string; // ex: 'Cliente', 'Tabela de Tarefas'
+  id: string;
+  label: string;
   type: TemplateFieldType;
   defaultValue?: string;
   isSystemAuto: boolean;
@@ -28,6 +28,8 @@ export interface MarkdownTemplateMeta {
   categories?: string[];
   itemLabel?: string;
   createdAt?: string;
+  fields?: TemplateField[];
+  templateBody?: string;
   rawContent: string;
 }
 
