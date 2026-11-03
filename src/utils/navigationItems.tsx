@@ -7,6 +7,7 @@ import {
   History,
   Settings,
   Users,
+  StickyNote,
 } from 'lucide-react';
 import { NavigationItem } from '../types/navigation';
 import { canSeeTool, UserRole } from '../types/auth';
@@ -14,14 +15,15 @@ import { canSeeTool, UserRole } from '../types/auth';
 export const getNavigationItems = (
   taskCount: number,
   savedReportsCount = 0,
-  role: UserRole = 'admin'
+  role: UserRole = 'admin',
+  unreadNotesCount = 0
 ): NavigationItem[] => {
   const allItems: NavigationItem[] = [
     {
       id: 'relatorios',
-      name: 'Central de Relatórios',
-      shortName: 'Relatórios',
-      description: 'Central unificada de relatórios diários expansíveis e modelos dinâmicos.',
+      name: 'Central de RelatÃ³rios',
+      shortName: 'RelatÃ³rios',
+      description: 'Central unificada de relatÃ³rios diÃ¡rios expansÃ­veis e modelos dinÃ¢micos.',
       category: 'automacoes',
       badge: taskCount > 0 ? `${taskCount} tarefas` : 'Ativo',
       badgeVariant: taskCount > 0 ? 'primary' : 'success',
@@ -32,7 +34,7 @@ export const getNavigationItems = (
       id: 'escala',
       name: 'Escala de Bases',
       shortName: 'Escala',
-      description: 'Sorteio diário das bases do Ativo 2 entre os grupos dos supervisores.',
+      description: 'Sorteio diÃ¡rio das bases do Ativo 2 entre os grupos dos supervisores.',
       category: 'automacoes',
       badge: 'Novo',
       badgeVariant: 'success',
@@ -41,9 +43,9 @@ export const getNavigationItems = (
     },
     {
       id: 'relatorio-ura',
-      name: 'Relatório URA',
+      name: 'RelatÃ³rio URA',
       shortName: 'URA',
-      description: 'Relatório diário de produtividade da URA a partir das exportações do Argus e do Vanguard.',
+      description: 'RelatÃ³rio diÃ¡rio de produtividade da URA a partir das exportaÃ§Ãµes do Argus e do Vanguard.',
       category: 'automacoes',
       badge: 'Novo',
       badgeVariant: 'success',
@@ -54,7 +56,7 @@ export const getNavigationItems = (
       id: 'whatsapp',
       name: 'WhatsApp das Baias',
       shortName: 'WhatsApp',
-      description: 'Mapa das baias com a situação do WhatsApp de cada lugar.',
+      description: 'Mapa das baias com a situaÃ§Ã£o do WhatsApp de cada lugar.',
       category: 'automacoes',
       badge: 'Novo',
       badgeVariant: 'success',
@@ -63,9 +65,9 @@ export const getNavigationItems = (
     },
     {
       id: 'metricas',
-      name: 'Métricas & Produtividade',
-      shortName: 'Métricas',
-      description: 'Análise de tempo consumido por tipo de atividade e indicadores de foco.',
+      name: 'MÃ©tricas & Produtividade',
+      shortName: 'MÃ©tricas',
+      description: 'AnÃ¡lise de tempo consumido por tipo de atividade e indicadores de foco.',
       category: 'automacoes',
       badge: 'Em breve',
       badgeVariant: 'muted',
@@ -73,10 +75,21 @@ export const getNavigationItems = (
       icon: <BarChart3 size={20} />,
     },
     {
+      id: 'anotacoes',
+      name: 'Mural de Anotações',
+      shortName: 'Anotações',
+      description: 'Anotações e recados com suporte a comentários e filtros por pessoa.',
+      category: 'sistema',
+      badge: unreadNotesCount > 0 ? `${unreadNotesCount} novos` : 'Ativo',
+      badgeVariant: unreadNotesCount > 0 ? 'warning' : 'success',
+      isReady: true,
+      icon: <StickyNote size={20} />,
+    },
+    {
       id: 'historico',
-      name: 'Histórico & Arquivos',
-      shortName: 'Histórico',
-      description: 'Consolidação de atividades anteriores e relatórios salvos no servidor.',
+      name: 'HistÃ³rico & Arquivos',
+      shortName: 'HistÃ³rico',
+      description: 'ConsolidaÃ§Ã£o de atividades anteriores e relatÃ³rios salvos no servidor.',
       category: 'sistema',
       badge: savedReportsCount > 0 ? `${savedReportsCount} salvos` : 'Ativo',
       badgeVariant: savedReportsCount > 0 ? 'primary' : 'success',
@@ -85,9 +98,9 @@ export const getNavigationItems = (
     },
     {
       id: 'usuarios',
-      name: 'Gestão de Contas',
+      name: 'GestÃ£o de Contas',
       shortName: 'Contas',
-      description: 'Criação de logins (Admin, Gerente, Supervisor, Operador) e vínculo de equipes.',
+      description: 'CriaÃ§Ã£o de logins (Admin, Gerente, Supervisor, Operador) e vÃ­nculo de equipes.',
       category: 'sistema',
       badge: 'Admin',
       badgeVariant: 'primary',
@@ -96,7 +109,7 @@ export const getNavigationItems = (
     },
     {
       id: 'configuracoes',
-      name: 'Configurações do Hub',
+      name: 'ConfiguraÃ§Ãµes do Hub',
       shortName: 'Ajustes',
       description: 'Dados da conta, feriados locais e ajustes que valem para todas as ferramentas.',
       category: 'sistema',

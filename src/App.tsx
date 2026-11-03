@@ -23,7 +23,7 @@ import { getNavigationItems } from './utils/navigationItems';
 import { renderTemplate } from './utils/markdownTemplateParser';
 import { apiRequest, setStoredAuthToken } from './utils/apiClient';
 
-// Lazy loading das ferramentas secundárias para otimização de bundle e code-splitting
+// Lazy loading das ferramentas secundÃ¡rias para otimizaÃ§Ã£o de bundle e code-splitting
 const ReportsHistoryHub = lazy(() =>
   import('./components/history/ReportsHistoryHub').then((m) => ({ default: m.ReportsHistoryHub }))
 );
@@ -41,6 +41,9 @@ const WhatsappHub = lazy(() =>
 );
 const UsersManagementHub = lazy(() =>
   import('./components/users/UsersManagementHub').then((m) => ({ default: m.UsersManagementHub }))
+);
+const NotesHub = lazy(() =>
+  import('./components/notes/NotesHub').then((m) => ({ default: m.NotesHub }))
 );
 
 interface ServerUserDrafts {
@@ -99,6 +102,7 @@ export const App: React.FC = () => {
   const [isNewReportChoiceModalOpen, setIsNewReportChoiceModalOpen] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [lastAutoSavedTime, setLastAutoSavedTime] = useState<string | null>(null);
+  const [unreadNotesCount, setUnreadNotesCount] = useState(0);
   const lastSignatureByTemplateRef = useRef<Record<string, string>>({});
 
   const clearWorkingReportState = useCallback(() => {
@@ -181,7 +185,7 @@ export const App: React.FC = () => {
         }
       })
       .catch(() => {
-        // Inicia com estado limpo caso servidor de rascunhos não responda (ex.: ambiente de teste)
+        // Inicia com estado limpo caso servidor de rascunhos nÃ£o responda (ex.: ambiente de teste)
       })
       .finally(() => {
         if (active) {
@@ -194,7 +198,7 @@ export const App: React.FC = () => {
     };
   }, [currentUser?.id, clearWorkingReportState, templateControls.hydrateDrafts, replaceAllTasksByTemplate, setTheme]);
 
-  // Sincroniza o rascunho exclusivo do usuário logado no servidor (/api/drafts)
+  // Sincroniza o rascunho exclusivo do usuÃ¡rio logado no servidor (/api/drafts)
   useEffect(() => {
     if (!currentUser || draftsHydratedForUser !== currentUser.id) return;
 
@@ -233,7 +237,7 @@ export const App: React.FC = () => {
     setCurrentUser(null);
   }, [clearWorkingReportState]);
 
-  // Reseta o formulário de cadastro de tarefas ao mudar de modelo
+  // Reseta o formulÃ¡rio de cadastro de tarefas ao mudar de modelo
   useEffect(() => {
     resetForm();
   }, [templateControls.activeTemplateId, resetForm]);
@@ -241,7 +245,7 @@ export const App: React.FC = () => {
   const { notification, notify } = useNotification();
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
 
-  // Navegação e Layout
+  // NavegaÃ§Ã£o e Layout
   const [activeToolId, setActiveToolId] = useState<string>('relatorios');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -253,14 +257,14 @@ export const App: React.FC = () => {
     }
   }, [currentUser, activeToolId]);
 
-  // Atualiza a lista de relatórios sempre que abrir a aba Histórico
+  // Atualiza a lista de relatÃ³rios sempre que abrir a aba HistÃ³rico
   useEffect(() => {
     if (currentUser && activeToolId === 'historico') {
       void refreshReports();
     }
   }, [currentUser, activeToolId, refreshReports]);
 
-  // --- SALVAMENTO AUTOMÁTICO DE RELATÓRIOS (ISOLADO POR CONTA LOGADA) ---
+  // --- SALVAMENTO AUTOMÃTICO DE RELATÃ“RIOS (ISOLADO POR CONTA LOGADA) ---
   const getOrAssignActiveReportId = useCallback(
     (templateId: string): string => {
       if (activeReportIds[templateId]) {
@@ -280,7 +284,7 @@ export const App: React.FC = () => {
     const fields = templateControls.fieldValues;
     const signature = JSON.stringify({ tasks, fields });
 
-    // Inicializa a assinatura na primeira leitura do modelo para só salvar quando houver alteração
+    // Inicializa a assinatura na primeira leitura do modelo para sÃ³ salvar quando houver alteraÃ§Ã£o
     if (lastSignatureByTemplateRef.current[tplId] === undefined) {
       lastSignatureByTemplateRef.current[tplId] = signature;
       return;
@@ -378,7 +382,7 @@ export const App: React.FC = () => {
     });
     lastSignatureByTemplateRef.current[tplId] = JSON.stringify({ tasks: [], fields: {} });
     setAutoSaveStatus('idle');
-    notify('Novo relatório pronto para preenchimento!', 'info');
+    notify('Novo relatÃ³rio pronto para preenchimento!', 'info');
   }, [
     templateControls.activeTemplateId,
     templateControls.fieldValues,
@@ -397,7 +401,7 @@ export const App: React.FC = () => {
     });
     lastSignatureByTemplateRef.current[tplId] = '';
     notify(
-      'Novo relatório iniciado mantendo os dados atuais como base. Ao salvar, um novo relatório será criado no Histórico.',
+      'Novo relatÃ³rio iniciado mantendo os dados atuais como base. Ao salvar, um novo relatÃ³rio serÃ¡ criado no HistÃ³rico.',
       'success'
     );
   }, [templateControls.activeTemplateId, notify]);
@@ -416,7 +420,7 @@ export const App: React.FC = () => {
     resetForm();
     lastSignatureByTemplateRef.current[tplId] = JSON.stringify({ tasks: [], fields: {} });
     setAutoSaveStatus('idle');
-    notify('Novo relatório em branco iniciado!', 'info');
+    notify('Novo relatÃ³rio em branco iniciado!', 'info');
   }, [
     templateControls,
     clearAllTasks,
@@ -424,10 +428,29 @@ export const App: React.FC = () => {
     notify,
   ]);
 
+  const refreshUnreadNotes = useCallback(() => {
+    if (!currentUser) {
+      setUnreadNotesCount(0);
+      return;
+    }
+    apiRequest<{ unreadCount: number }>('/api/notes/unread-count')
+      .then((res) => {
+        setUnreadNotesCount(res.unreadCount || 0);
+      })
+      .catch(() => {});
+  }, [currentUser]);
+
+  useEffect(() => {
+    refreshUnreadNotes();
+    const interval = setInterval(refreshUnreadNotes, 30000);
+    return () => clearInterval(interval);
+  }, [refreshUnreadNotes]);
+
   const navItems = getNavigationItems(
     tasks.length,
     savedReports.length,
-    currentUser?.role || 'admin'
+    currentUser?.role || 'admin',
+    unreadNotesCount
   );
   const activeItem = navItems.find((item) => item.id === activeToolId) || navItems[0];
 
@@ -462,7 +485,7 @@ export const App: React.FC = () => {
     saveReportQuick({ ...params, id: reportId, title: reportTitle });
     setAutoSaveStatus('saved');
     setLastAutoSavedTime(getFormattedTime(now));
-    notify('Relatório salvo com sucesso no Histórico!', 'success');
+    notify('RelatÃ³rio salvo com sucesso no HistÃ³rico!', 'success');
   };
 
   const handleSaveReportCustom = (params: SaveReportParams) => {
@@ -475,17 +498,17 @@ export const App: React.FC = () => {
     });
     setAutoSaveStatus('saved');
     setLastAutoSavedTime(getFormattedTime(new Date()));
-    notify('Novo relatório salvo no Histórico com sucesso!', 'success');
+    notify('Novo relatÃ³rio salvo no HistÃ³rico com sucesso!', 'success');
   };
 
   /**
-   * Restauração universal de um relatório no gerador da conta atual.
-   * Se o relatório pertencer a outro usuário (ex.: Admin/Supervisor visualizando histórico),
-   * gera um novo ID próprio para não sobrescrever o relatório da outra conta.
+   * RestauraÃ§Ã£o universal de um relatÃ³rio no gerador da conta atual.
+   * Se o relatÃ³rio pertencer a outro usuÃ¡rio (ex.: Admin/Supervisor visualizando histÃ³rico),
+   * gera um novo ID prÃ³prio para nÃ£o sobrescrever o relatÃ³rio da outra conta.
    */
   const handleRestoreReport = (report: SavedReport) => {
     if (currentUser?.role === 'operador' && !isTemplateAllowedForRole('operador', report.templateId)) {
-      notify('Operadores só têm acesso aos relatórios de Atividades e TMA.', 'error');
+      notify('Operadores sÃ³ tÃªm acesso aos relatÃ³rios de Atividades e TMA.', 'error');
       return;
     }
 
@@ -494,7 +517,7 @@ export const App: React.FC = () => {
 
     if (hasCurrentData) {
       const confirmed = window.confirm(
-        `Deseja restaurar o relatório "${report.title}" no Gerador?\n\nO modelo correspondente ("${report.templateTitle}") será selecionado e os dados atuais do formulário serão substituídos.`
+        `Deseja restaurar o relatÃ³rio "${report.title}" no Gerador?\n\nO modelo correspondente ("${report.templateTitle}") serÃ¡ selecionado e os dados atuais do formulÃ¡rio serÃ£o substituÃ­dos.`
       );
       if (!confirmed) return;
     }
@@ -519,7 +542,7 @@ export const App: React.FC = () => {
     restoreTasks(report.templateId, report.tasks || []);
     resetForm();
     setActiveToolId('relatorios');
-    notify(`Relatório "${report.title}" restaurado com sucesso!`, 'success');
+    notify(`RelatÃ³rio "${report.title}" restaurado com sucesso!`, 'success');
   };
 
   const handleSubmit = (event: React.FormEvent) => {
@@ -527,7 +550,7 @@ export const App: React.FC = () => {
 
     const validationResult = validate();
     if (!validationResult.valid) {
-      notify(validationResult.error || 'Erro na validação.', 'error');
+      notify(validationResult.error || 'Erro na validaÃ§Ã£o.', 'error');
       return;
     }
 
@@ -557,7 +580,7 @@ export const App: React.FC = () => {
     if (editingTaskId === id) {
       resetForm();
     }
-    notify('Tarefa excluída.', 'success');
+    notify('Tarefa excluÃ­da.', 'success');
   };
 
   const handleOpenClearModal = () => {
@@ -571,7 +594,7 @@ export const App: React.FC = () => {
     clearAllTasks();
     resetForm();
     setIsClearModalOpen(false);
-    notify('Todas as tarefas foram excluídas.', 'success');
+    notify('Todas as tarefas foram excluÃ­das.', 'success');
   };
 
   if (authChecking) {
@@ -658,7 +681,7 @@ export const App: React.FC = () => {
             <Suspense
               fallback={
                 <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                  Carregando módulo...
+                  Carregando mÃ³dulo...
                 </div>
               }
             >
@@ -673,6 +696,14 @@ export const App: React.FC = () => {
                     onNotify={notify}
                     onNavigateToGenerator={() => setActiveToolId('relatorios')}
                     currentUser={currentUser}
+                  />
+                </main>
+              ) : activeToolId === 'anotacoes' ? (
+                <main className="container" style={{ maxWidth: '1480px', padding: '0 16px', boxSizing: 'border-box', width: '100%' }}>
+                  <NotesHub
+                    currentUser={currentUser}
+                    onNotify={notify}
+                    onUnreadCountChanged={refreshUnreadNotes}
                   />
                 </main>
               ) : activeToolId === 'usuarios' && currentUser.role === 'admin' ? (
@@ -718,9 +749,9 @@ export const App: React.FC = () => {
 
       <Modal
         isOpen={isClearModalOpen}
-        kicker="Atenção"
+        kicker="AtenÃ§Ã£o"
         title={`Excluir tarefas de "${templateControls.activeTemplate.title}"?`}
-        message={`Essa ação removerá todas as tarefas salvas no rascunho de "${templateControls.activeTemplate.title}". Os rascunhos dos demais modelos serão mantidos.`}
+        message={`Essa aÃ§Ã£o removerÃ¡ todas as tarefas salvas no rascunho de "${templateControls.activeTemplate.title}". Os rascunhos dos demais modelos serÃ£o mantidos.`}
         confirmLabel="Excluir tarefas"
         cancelLabel="Cancelar"
         onConfirm={handleConfirmClear}
