@@ -6,6 +6,7 @@ import {
   FilePlus2,
 } from 'lucide-react';
 import { Task, TaskFormData, NotificationState, NotificationType, SaveReportParams } from '../../types/task';
+import { AuthUser } from '../../types/auth';
 import { VerticalReportSelector } from './VerticalReportSelector';
 import { TaskForm } from '../task/TaskForm';
 import { ReportPanel } from '../task/ReportPanel';
@@ -36,6 +37,7 @@ interface Props {
   autoSaveStatus?: 'idle' | 'saving' | 'saved';
   lastAutoSavedTime?: string | null;
   onStartNewReport?: () => void;
+  currentUser?: AuthUser | null;
 }
 
 export const ReportsHub: React.FC<Props> = ({
@@ -57,6 +59,7 @@ export const ReportsHub: React.FC<Props> = ({
   autoSaveStatus = 'idle',
   lastAutoSavedTime,
   onStartNewReport,
+  currentUser,
 }) => {
   const {
     templates,
@@ -169,11 +172,11 @@ export const ReportsHub: React.FC<Props> = ({
                   <Button
                     variant="primary"
                     onClick={() => setIsSelectorOpen(true)}
-                    title="Abrir catálogo para mudar de modelo de relatório"
+                    title="Abrir catálogo para mudar de relatório"
                     style={{ padding: '6px 14px', fontSize: '0.85rem' }}
                   >
                     <FolderKanban size={15} />
-                    Mudar Modelo
+                    Mudar Relatório
                   </Button>
                 </div>
               </div>
@@ -283,6 +286,9 @@ export const ReportsHub: React.FC<Props> = ({
                   onNotify={onNotify}
                   activeTemplateText={renderedTemplateMarkdown}
                   activeTemplateTitle={parsedActiveTemplate.meta.title}
+                  templateId={parsedActiveTemplate.meta.id}
+                  fieldValues={fieldValues}
+                  userRole={currentUser?.role}
                 />
               </div>
             </div>
@@ -296,9 +302,11 @@ export const ReportsHub: React.FC<Props> = ({
                 onFieldChange={setFieldValue}
                 onResetFields={resetFieldValues}
                 onOpenSelector={() => setIsSelectorOpen(true)}
+                onStartNewReport={onStartNewReport}
                 onSaveQuick={onSaveReportQuick}
                 onSaveCustom={onSaveReportCustom}
                 onNotify={onNotify}
+                userRole={currentUser?.role}
               />
             </div>
           )}

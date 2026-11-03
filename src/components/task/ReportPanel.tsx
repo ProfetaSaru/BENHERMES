@@ -1,14 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { Copy, Trash2, Check, Bookmark, BookmarkPlus } from 'lucide-react';
 import { Task } from '../../types/task';
+import { UserRole } from '../../types/auth';
 import { Panel } from '../common/Panel';
 import { SectionHeading } from '../common/SectionHeading';
 import { Button } from '../common/Button';
 import { SaveReportModal } from '../common/SaveReportModal';
-import { TaskList } from './TaskList';
 import { ReportPreview } from './ReportPreview';
 import { generateReport } from '../../utils/formatReport';
-import { formatTasksTable, formatTasksList } from '../../utils/markdownTemplateParser';
 
 interface ReportPanelProps {
   tasks: Task[];
@@ -27,6 +26,9 @@ interface ReportPanelProps {
   onNavigateToTemplates?: () => void;
   activeTemplateText?: string;
   activeTemplateTitle?: string;
+  templateId?: string;
+  fieldValues?: Record<string, string>;
+  userRole?: UserRole;
 }
 
 function padZero(num: number): string {
@@ -44,23 +46,21 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({
   onNavigateToTemplates,
   activeTemplateText,
   activeTemplateTitle,
+  templateId,
+  fieldValues,
+  userRole,
 }) => {
   const [copied, setCopied] = useState(false);
   const [isSaveAsModalOpen, setIsSaveAsModalOpen] = useState(false);
-  const [reportFormat, setReportFormat] = useState<'classic' | 'table' | 'list'>('classic');
+  const isOperator = userRole === 'operador';
+  const canSaveAs = true;
 
   const currentReportText = useMemo(() => {
     if (activeTemplateText) {
       return activeTemplateText;
     }
-    if (reportFormat === 'table') {
-      return formatTasksTable(tasks);
-    }
-    if (reportFormat === 'list') {
-      return formatTasksList(tasks);
-    }
     return generateReport(tasks);
-  }, [tasks, reportFormat, activeTemplateText]);
+  }, [tasks, activeTemplateText]);
 
   const defaultSaveTitle = useMemo(() => {
     const now = new Date();
@@ -136,15 +136,17 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({
               Salvar
             </Button>
 
-            {/* Botão Salvar como... */}
-            <Button
-              variant="secondary"
-              icon={<BookmarkPlus size={14} />}
-              onClick={handleOpenSaveAsModal}
-              title="Salvar relatório personalizando título, data ou horário"
-            >
-              Salvar como...
-            </Button>
+            {/* Botão Salvar como... (Apenas para perfis administrativos e supervisão) */}
+            {canSaveAs && (
+              <Button
+                variant="secondary"
+                icon={<BookmarkPlus size={14} />}
+                onClick={handleOpenSaveAsModal}
+                title="Salvar relatório personalizando título, data ou horário"
+              >
+                Salvar como...
+              </Button>
+            )}
 
             {/* Copiar Relatório */}
             <Button
@@ -166,18 +168,15 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({
           </div>
         </SectionHeading>
 
-        <TaskList
-          tasks={tasks}
-          onEdit={onEditTask}
-          onDelete={onDeleteTask}
-        />
-
         <ReportPreview
           tasks={tasks}
           reportText={currentReportText}
-          format={reportFormat}
-          onSelectFormat={setReportFormat}
+          title={activeTemplateTitle}
+          templateId={templateId}
+          fieldValues={fieldValues}
           onNavigateToTemplates={onNavigateToTemplates}
+          onEditTask={onEditTask}
+          onDeleteTask={onDeleteTask}
         />
       </Panel>
 
@@ -185,6 +184,7 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({
       <SaveReportModal
         isOpen={isSaveAsModalOpen}
         defaultTitle={defaultSaveTitle}
+        isOperator={isOperator}
         onClose={() => setIsSaveAsModalOpen(false)}
         onSave={handleConfirmSaveAs}
       />

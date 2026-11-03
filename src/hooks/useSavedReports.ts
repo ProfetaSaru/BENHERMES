@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Task, SavedReport, SaveReportParams } from '../types/task';
+import { AuthUser, formatOperatorReportTitle } from '../types/auth';
 import { apiRequest } from '../utils/apiClient';
 
 function padZero(num: number): string {
@@ -21,17 +22,47 @@ export function formatPeriodSummary(tasks: Task[]): string {
   return `${first} às ${last}`;
 }
 
-function buildReportPayload(params: SaveReportParams, isCustom = false): SavedReport {
+export function extractBaseTitle(title: string): string {
+  if (!title) return '';
+  return title
+    .replace(/\s*-\s*\d{1,2}\/\d{1,2}(?:\/\d{2,4})?(?:\s*(?:às|-)\s*\d{1,2}:\d{2})?$/i, '')
+    .trim();
+}
+
+export function updateReportTitleWithCurrentTimestamp(
+  originalTitle: string,
+  templateTitle: string,
+  dateStr: string,
+  timeStr: string,
+  currentUser?: AuthUser | null
+): string {
+  if (currentUser?.role === 'operador') {
+    return formatOperatorReportTitle(currentUser, dateStr, timeStr);
+  }
+  const base = extractBaseTitle(originalTitle) || templateTitle || 'Relatório';
+  const [yyyy, mm, dd] = dateStr.split('-');
+  return `${base} - ${dd}/${mm}/${yyyy} às ${timeStr}`;
+}
+
+function buildReportPayload(
+  params: SaveReportParams,
+  isCustom = false,
+  currentUser?: AuthUser | null
+): SavedReport {
   const now = new Date();
   const dateStr = isCustom && params.date ? params.date : getFormattedDate(now);
   const timeStr = isCustom && params.time ? params.time : getFormattedTime(now);
   const [yyyy, mm, dd] = dateStr.split('-');
 
-  const fallbackTitle = params.isExpandable
-    ? `${params.templateTitle || 'Relatório'} - ${dd}/${mm}/${yyyy} às ${timeStr}`
-    : `${params.templateTitle || 'Relatório'} - ${dd}/${mm} às ${timeStr}`;
-
-  const finalTitle = params.title?.trim() || fallbackTitle;
+  let finalTitle: string;
+  if (currentUser?.role === 'operador') {
+    finalTitle = formatOperatorReportTitle(currentUser, dateStr, timeStr);
+  } else {
+    const fallbackTitle = params.isExpandable
+      ? `${params.templateTitle || 'Relatório'} - ${dd}/${mm}/${yyyy} às ${timeStr}`
+      : `${params.templateTitle || 'Relatório'} - ${dd}/${mm} às ${timeStr}`;
+    finalTitle = params.title?.trim() || fallbackTitle;
+  }
   const tasks = params.tasks || [];
 
   return {
@@ -54,7 +85,9 @@ function buildReportPayload(params: SaveReportParams, isCustom = false): SavedRe
   };
 }
 
-export function useSavedReports(currentUserId?: string | null) {
+export function useSavedReports(currentUserOrId?: AuthUser | string | null) {
+  const currentUser = typeof currentUserOrId === 'object' ? currentUserOrId : null;
+  const currentUserId = typeof currentUserOrId === 'string' ? currentUserOrId : currentUser?.id;
   const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
 
   const refreshReports = useCallback(async () => {
@@ -94,7 +127,7 @@ export function useSavedReports(currentUserId?: string | null) {
    */
   const autoSaveReport = useCallback(
     async (params: SaveReportParams): Promise<SavedReport> => {
-      const payload = buildReportPayload(params, false);
+      const payload = buildReportPayload(params, false, currentUser);
       try {
         const res = await apiRequest<{ report: SavedReport }>('/api/reports/autosave', {
           method: 'POST',
@@ -108,7 +141,7 @@ export function useSavedReports(currentUserId?: string | null) {
         return payload;
       }
     },
-    [upsertInState]
+    [currentUser, upsertInState]
   );
 
   /**
@@ -116,7 +149,7 @@ export function useSavedReports(currentUserId?: string | null) {
    */
   const saveReportQuick = useCallback(
     (params: SaveReportParams): SavedReport => {
-      const newReport = buildReportPayload(params, false);
+      const newReport = buildReportPayload(params, false, currentUser);
       upsertInState(newReport);
 
       void apiRequest<{ report: SavedReport }>('/api/reports', {
@@ -130,15 +163,19 @@ export function useSavedReports(currentUserId?: string | null) {
 
       return newReport;
     },
-    [upsertInState]
+    [currentUser, upsertInState]
   );
 
   /**
-   * Salvamento customizado com título, data, horário e notas editáveis.
+   * Salvamento customizado (Salvar Como): sempre cria um novo relatório com um novo ID exclusivo.
    */
   const saveReportCustom = useCallback(
     (params: SaveReportParams): SavedReport => {
-      const newReport = buildReportPayload(params, true);
+      const payloadParams: SaveReportParams = {
+        ...params,
+        id: crypto.randomUUID(),
+      };
+      const newReport = buildReportPayload(payloadParams, true, currentUser);
       upsertInState(newReport);
 
       void apiRequest<{ report: SavedReport }>('/api/reports', {
@@ -152,7 +189,7 @@ export function useSavedReports(currentUserId?: string | null) {
 
       return newReport;
     },
-    [upsertInState]
+    [currentUser, upsertInState]
   );
 
   /**

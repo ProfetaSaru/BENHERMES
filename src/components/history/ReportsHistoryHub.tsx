@@ -3,7 +3,6 @@ import {
   History,
   Search,
   Copy,
-  Download,
   RotateCcw,
   Trash2,
   Calendar,
@@ -21,9 +20,13 @@ import {
   UserCheck,
   Radio,
   Users,
+  LayoutGrid,
+  Terminal,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { SavedReport } from '../../types/task';
 import { AuthUser, canDeleteReports, ROLE_LABELS } from '../../types/auth';
+import { ReportVisualRenderer, ReportVisualMode } from '../task/ReportVisualRenderer';
 
 interface ReportsHistoryHubProps {
   savedReports: SavedReport[];
@@ -121,6 +124,7 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
   const [selectedSupervisor, setSelectedSupervisor] = useState<string>('all');
   const [selectedAuthor, setSelectedAuthor] = useState<string>('all');
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
+  const [reportVisualModes, setReportVisualModes] = useState<Record<string, ReportVisualMode>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Edição inline de título
@@ -230,27 +234,10 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
     try {
       await navigator.clipboard.writeText(report.reportText);
       setCopiedId(report.id);
-      onNotify('Relatório copiado para a área de transferência!', 'success');
+      onNotify('Relatório copiado para o chat com sucesso!', 'success');
       setTimeout(() => setCopiedId(null), 2000);
     } catch {
       onNotify('Erro ao copiar texto do relatório.', 'error');
-    }
-  };
-
-  const handleDownloadFile = (report: SavedReport, format: 'txt' | 'md') => {
-    try {
-      const mime = format === 'md' ? 'text/markdown;charset=utf-8' : 'text/plain;charset=utf-8';
-      const blob = new Blob([report.reportText], { type: mime });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      const safeTitle = report.title.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40);
-      link.download = `${safeTitle}.${format}`;
-      link.click();
-      URL.revokeObjectURL(url);
-      onNotify(`Download do arquivo .${format} realizado!`, 'success');
-    } catch {
-      onNotify('Erro ao baixar arquivo do relatório.', 'error');
     }
   };
 
@@ -267,6 +254,7 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
   };
 
   const handleStartRename = (report: SavedReport) => {
+    if (currentUser?.role === 'operador') return;
     setEditingId(report.id);
     setEditTitleValue(report.title);
   };
@@ -506,7 +494,8 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
             const fieldHighlights = getKeyFieldHighlights(report);
             const isOwnReport =
               !report.userId || !currentUser || report.userId === currentUser.id;
-            const canEditThisReport = isOwnReport || currentUser?.role === 'admin';
+            const canEditThisReport =
+              currentUser?.role !== 'operador' && (isOwnReport || currentUser?.role === 'admin');
 
             const [yyyy, mm, dd] = report.displayDate.split('-');
             const formattedDateBR = dd && mm && yyyy ? `${dd}/${mm}/${yyyy}` : report.displayDate;
@@ -627,20 +616,10 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
                       type="button"
                       className="btn-history-action"
                       onClick={() => handleCopy(report)}
-                      title="Copiar texto compilado do relatório"
+                      title="Copiar texto compilado do relatório para envio no chat"
                     >
                       {isCopied ? <Check size={14} style={{ color: 'var(--green)' }} /> : <Copy size={14} />}
                       {isCopied ? 'Copiado!' : 'Copiar'}
-                    </button>
-
-                    <button
-                      type="button"
-                      className="btn-history-action"
-                      onClick={() => handleDownloadFile(report, 'txt')}
-                      title="Baixar como arquivo .txt"
-                    >
-                      <Download size={14} />
-                      .txt
                     </button>
 
                     {isOwnReport && (
@@ -668,7 +647,7 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
                   </div>
                 </div>
 
-                {/* Alternador de Pré-visualização */}
+                {/* Alternador de Pré-visualização Visual */}
                 <div>
                   <button
                     type="button"
@@ -676,12 +655,55 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
                     onClick={() => toggleExpand(report.id)}
                   >
                     {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-                    {isExpanded ? 'Ocultar texto do relatório' : 'Visualizar texto do relatório'}
+                    {isExpanded ? 'Ocultar visualização' : 'Visualizar relatório'}
                   </button>
 
                   {isExpanded && (
-                    <div className="history-preview-box" style={{ marginTop: '0.65rem' }}>
-                      {report.reportText}
+                    <div style={{ marginTop: '0.85rem' }}>
+                      <div className="preview-heading" style={{ borderRadius: '8px 8px 0 0', border: '1px solid var(--line)' }}>
+                        <div className="preview-heading-left">
+                          <span className="preview-title">Modo Visual:</span>
+                          <div className="preview-format-toggles">
+                            <button
+                              type="button"
+                              className={`preview-format-btn ${(reportVisualModes[report.id] || 'cards') === 'cards' ? 'active' : ''}`}
+                              onClick={() => setReportVisualModes((prev) => ({ ...prev, [report.id]: 'cards' }))}
+                              title="Interface visual com cartões"
+                            >
+                              <LayoutGrid size={13} />
+                              Cartões &amp; KPIs
+                            </button>
+                            <button
+                              type="button"
+                              className={`preview-format-btn ${(reportVisualModes[report.id] || 'cards') === 'terminal' ? 'active' : ''}`}
+                              onClick={() => setReportVisualModes((prev) => ({ ...prev, [report.id]: 'terminal' }))}
+                              title="Console Benzaiten clássico"
+                            >
+                              <Terminal size={13} />
+                              Console Benzaiten
+                            </button>
+                            <button
+                              type="button"
+                              className={`preview-format-btn ${(reportVisualModes[report.id] || 'cards') === 'executive' ? 'active' : ''}`}
+                              onClick={() => setReportVisualModes((prev) => ({ ...prev, [report.id]: 'executive' }))}
+                              title="Ficha executiva formal"
+                            >
+                              <FileSpreadsheet size={13} />
+                              Ficha Executiva
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ padding: '14px', background: 'var(--paper-surface)', border: '1px solid var(--line)', borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
+                        <ReportVisualRenderer
+                          templateId={report.templateId}
+                          visualMode={reportVisualModes[report.id] || 'cards'}
+                          tasks={report.tasks || []}
+                          fieldValues={report.fieldValues || {}}
+                          rawReportText={report.reportText}
+                          title={report.title}
+                        />
+                      </div>
                     </div>
                   )}
                 </div>

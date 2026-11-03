@@ -221,28 +221,28 @@ export function formatTasksClassic(tasks: Task[]): string {
 
 export function formatTasksTable(tasks: Task[]): string {
   if (tasks.length === 0) {
-    return '| Horário | Atividade | Detalhes |\n| :--- | :--- | :--- |\n| - | *(Nenhuma tarefa cadastrada)* | - |';
+    return '(Nenhuma tarefa cadastrada)';
   }
 
-  const header = '| Horário | Atividade | Detalhes |\n| :--- | :--- | :--- |';
+
   const rows = tasks.map((task) => {
-    const cleanDesc = (task.description || '-').replace(/\|/g, '\\|').trim();
-    return `| ${task.start} – ${task.end} | **${task.title.trim().toUpperCase()}** | ${cleanDesc} |`;
+    const cleanDesc = task.description ? ` - ${task.description.trim()}` : '';
+    return `${task.start} – ${task.end} | ${task.title.trim().toUpperCase()}${cleanDesc}`;
   });
 
-  return [header, ...rows].join('\n');
+  return rows.join('\n');
 }
 
 export function formatTasksList(tasks: Task[]): string {
   if (tasks.length === 0) {
-    return '- *(Nenhuma tarefa cadastrada)*';
+    return '• (Nenhuma tarefa cadastrada)';
   }
 
   return tasks
     .map((task) => {
       const upperTitle = task.title.trim().toUpperCase();
       const details = task.description ? ` — ${task.description.trim()}` : '';
-      return `- **${task.start} às ${task.end}**: ${upperTitle}${details}`;
+      return `• ${task.start} às ${task.end}: ${upperTitle}${details}`;
     })
     .join('\n');
 }

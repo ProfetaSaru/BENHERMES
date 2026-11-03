@@ -1,13 +1,25 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { MarkdownTemplateMeta, ParsedMarkdownTemplate } from '../types/markdownTemplate';
 import { BUILTIN_TEMPLATES } from '../templates/reports';
 import { extractTemplateFields } from '../utils/markdownTemplateParser';
+import { UserRole, isTemplateAllowedForRole } from '../types/auth';
 
 const DEFAULT_TEMPLATE_ID = BUILTIN_TEMPLATES[0]?.id || 'atividades-padrao';
 
-export function useMarkdownTemplates() {
+export function useMarkdownTemplates(userRole?: UserRole) {
+  const allowedTemplates = useMemo(() => {
+    return BUILTIN_TEMPLATES.filter((t) => isTemplateAllowedForRole(userRole, t.id));
+  }, [userRole]);
+
   const [activeTemplateId, setActiveTemplateId] = useState<string>(DEFAULT_TEMPLATE_ID);
   const [drafts, setDrafts] = useState<Record<string, Record<string, string>>>({});
+
+  // Garante que, se o perfil do usuário for operador e o template ativo não for permitido, volte ao padrão
+  useEffect(() => {
+    if (userRole === 'operador' && !isTemplateAllowedForRole('operador', activeTemplateId)) {
+      setActiveTemplateId(DEFAULT_TEMPLATE_ID);
+    }
+  }, [userRole, activeTemplateId]);
 
   const fieldValues = useMemo<Record<string, string>>(() => {
     return drafts[activeTemplateId] || {};
@@ -15,10 +27,11 @@ export function useMarkdownTemplates() {
 
   const activeTemplate = useMemo<MarkdownTemplateMeta>(() => {
     return (
-      BUILTIN_TEMPLATES.find((t) => t.id === activeTemplateId) ||
+      allowedTemplates.find((t) => t.id === activeTemplateId) ||
+      allowedTemplates[0] ||
       BUILTIN_TEMPLATES[0]
     );
-  }, [activeTemplateId]);
+  }, [allowedTemplates, activeTemplateId]);
 
   const parsedActiveTemplate = useMemo<ParsedMarkdownTemplate>(() => {
     const templateBody = activeTemplate.templateBody || activeTemplate.rawContent || '';
@@ -35,10 +48,10 @@ export function useMarkdownTemplates() {
   }, [activeTemplate]);
 
   const handleSelectTemplate = useCallback((id: string) => {
-    if (BUILTIN_TEMPLATES.some((t) => t.id === id)) {
+    if (allowedTemplates.some((t) => t.id === id)) {
       setActiveTemplateId(id);
     }
-  }, []);
+  }, [allowedTemplates]);
 
   const handleSetFieldValue = useCallback(
     (fieldId: string, value: string) => {
@@ -66,7 +79,7 @@ export function useMarkdownTemplates() {
 
   const restoreTemplateState = useCallback(
     (templateId: string, restoredFields: Record<string, string>) => {
-      const validId = BUILTIN_TEMPLATES.some((t) => t.id === templateId)
+      const validId = allowedTemplates.some((t) => t.id === templateId)
         ? templateId
         : DEFAULT_TEMPLATE_ID;
       setActiveTemplateId(validId);
@@ -75,7 +88,7 @@ export function useMarkdownTemplates() {
         [validId]: { ...restoredFields },
       }));
     },
-    []
+    [allowedTemplates]
   );
 
   const hydrateDrafts = useCallback(
@@ -84,7 +97,7 @@ export function useMarkdownTemplates() {
       nextFieldsByTemplate?: Record<string, Record<string, string>>
     ) => {
       const validId =
-        nextActiveTemplateId && BUILTIN_TEMPLATES.some((t) => t.id === nextActiveTemplateId)
+        nextActiveTemplateId && allowedTemplates.some((t) => t.id === nextActiveTemplateId)
           ? nextActiveTemplateId
           : DEFAULT_TEMPLATE_ID;
       setActiveTemplateId(validId);
@@ -94,7 +107,7 @@ export function useMarkdownTemplates() {
           : {}
       );
     },
-    []
+    [allowedTemplates]
   );
 
   const resetAllDrafts = useCallback(() => {
@@ -103,8 +116,8 @@ export function useMarkdownTemplates() {
   }, []);
 
   return {
-    templates: BUILTIN_TEMPLATES,
-    builtinTemplates: BUILTIN_TEMPLATES,
+    templates: allowedTemplates,
+    builtinTemplates: allowedTemplates,
     activeTemplateId,
     activeTemplate,
     parsedActiveTemplate,
