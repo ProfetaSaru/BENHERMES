@@ -76,7 +76,7 @@ export function canEditFeriados(role: UserRole): boolean {
 }
 
 /**
- * Modelos de relatÃ³rios autorizados exclusivamente para operadores (Atividades e TMA).
+ * Modelos de relatórios autorizados exclusivamente para operadores (Atividades e TMA).
  */
 export const OPERATOR_ALLOWED_TEMPLATE_IDS = [
   'atividades-padrao',
@@ -91,7 +91,7 @@ export function isTemplateAllowedForRole(role: UserRole | undefined, templateId:
 }
 
 /**
- * Extrai o primeiro e o Ãºltimo nome a partir de uma string de nome completo.
+ * Extrai o primeiro e o último nome a partir de uma string de nome completo.
  * Exemplo: "Carlos Eduardo da Silva" -> "Carlos Silva"
  */
 export function formatFirstAndLastName(fullName: string): string {
@@ -102,7 +102,7 @@ export function formatFirstAndLastName(fullName: string): string {
 }
 
 /**
- * Formata o tÃ­tulo padronizado obrigatÃ³rio para relatÃ³rios de operador:
+ * Formata o título padronizado obrigatório para relatórios de operador:
  * [PrimeiroNome] [UltimoNome] - [Data] - [Hora]
  * Exemplo: "Carlos Silva - 30/10/2026 - 12:45"
  */
