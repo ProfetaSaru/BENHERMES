@@ -39,6 +39,33 @@ export interface StoredReportRow {
   note?: string;
 }
 
+export interface StoredNoteRow {
+  id: string;
+  userId: string;
+  authorName: string;
+  authorRole: UserRole;
+  supervisorId: string | null;
+  supervisorName: string | null;
+  title: string;
+  content: string;
+  category: string;
+  color: string;
+  createdAt: string;
+  updatedAt: string;
+  commentsCount: number;
+  unreadCommentsCount: number;
+}
+
+export interface StoredNoteCommentRow {
+  id: string;
+  noteId: string;
+  userId: string;
+  authorName: string;
+  authorRole: UserRole;
+  content: string;
+  createdAt: string;
+}
+
 export interface UserDraftState {
   activeTemplateId: string;
   tasksByTemplate: Record<string, any[]>;
@@ -124,6 +151,43 @@ export class AppDatabase {
         key TEXT PRIMARY KEY,
         value_json TEXT NOT NULL,
         updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS notes (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        category TEXT NOT NULL DEFAULT 'Geral',
+        color TEXT NOT NULL DEFAULT 'default',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_notes_user_id ON notes(user_id);
+      CREATE INDEX IF NOT EXISTS idx_notes_updated_at ON notes(updated_at DESC);
+
+      CREATE TABLE IF NOT EXISTS note_comments (
+        id TEXT PRIMARY KEY,
+        note_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        content TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_note_comments_note_id ON note_comments(note_id);
+      CREATE INDEX IF NOT EXISTS idx_note_comments_created_at ON note_comments(created_at ASC);
+
+      CREATE TABLE IF NOT EXISTS note_reads (
+        note_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        last_read_at TEXT NOT NULL,
+        PRIMARY KEY (note_id, user_id),
+        FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       );
     `);
 
@@ -659,6 +723,307 @@ export class AppDatabase {
            updated_at = excluded.updated_at`
       )
       .run(key, JSON.stringify(value), new Date().toISOString());
+  }
+
+  private mapNoteRow(row: any): StoredNoteRow {
+    return {
+      id: row.id,
+      userId: row.user_id,
+      authorName: row.author_name || 'Desconhecido',
+      authorRole: row.author_role as UserRole,
+      supervisorId: row.supervisor_id || null,
+      supervisorName: row.supervisor_name || null,
+      title: row.title,
+      content: row.content,
+      category: row.category || 'Geral',
+      color: row.color || 'default',
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      commentsCount: Number(row.comments_count || 0),
+      unreadCommentsCount: Number(row.unread_comments_count || 0),
+    };
+  }
+
+  public listNotesForUser(user: PublicUser, filterUserId?: string): StoredNoteRow[] {
+    const baseSelect = `
+      SELECT
+        n.*,
+        u.display_name AS author_name,
+        u.role AS author_role,
+        u.supervisor_id AS supervisor_id,
+        sup.display_name AS supervisor_name,
+        (SELECT COUNT(*) FROM note_comments c WHERE c.note_id = n.id) AS comments_count,
+        (
+          SELECT COUNT(*)
+          FROM note_comments c
+          LEFT JOIN note_reads r ON r.note_id = n.id AND r.user_id = ?
+          WHERE c.note_id = n.id
+            AND c.user_id != ?
+            AND (r.last_read_at IS NULL OR c.created_at > r.last_read_at)
+        ) AS unread_comments_count
+      FROM notes n
+      JOIN users u ON n.user_id = u.id
+      LEFT JOIN users sup ON u.supervisor_id = sup.id
+    `;
+
+    // 1. Admin e Gerente: veem todas as anotações ou filtram por filterUserId
+    if (user.role === 'admin' || user.role === 'gerente') {
+      if (filterUserId && filterUserId.trim()) {
+        const rows = this.db
+          .prepare(`${baseSelect} WHERE n.user_id = ? ORDER BY n.updated_at DESC, n.created_at DESC`)
+          .all(user.id, user.id, filterUserId.trim()) as any[];
+        return rows.map((r) => this.mapNoteRow(r));
+      }
+      const rows = this.db
+        .prepare(`${baseSelect} ORDER BY n.updated_at DESC, n.created_at DESC`)
+        .all(user.id, user.id) as any[];
+      return rows.map((r) => this.mapNoteRow(r));
+    }
+
+    // 2. Supervisor: vê as suas próprias e as dos operadores vinculados a ele
+    if (user.role === 'supervisor') {
+      if (filterUserId && filterUserId.trim()) {
+        const target = filterUserId.trim();
+        const rows = this.db
+          .prepare(
+            `${baseSelect}
+             WHERE n.user_id = ?
+               AND (n.user_id = ? OR (u.role = 'operador' AND u.supervisor_id = ?))
+             ORDER BY n.updated_at DESC, n.created_at DESC`
+          )
+          .all(user.id, user.id, target, user.id, user.id) as any[];
+        return rows.map((r) => this.mapNoteRow(r));
+      }
+
+      const rows = this.db
+        .prepare(
+          `${baseSelect}
+           WHERE n.user_id = ? OR (u.role = 'operador' AND u.supervisor_id = ?)
+           ORDER BY n.updated_at DESC, n.created_at DESC`
+        )
+        .all(user.id, user.id, user.id, user.id) as any[];
+      return rows.map((r) => this.mapNoteRow(r));
+    }
+
+    // 3. Operador: estritamente suas próprias anotações
+    const rows = this.db
+      .prepare(`${baseSelect} WHERE n.user_id = ? ORDER BY n.updated_at DESC, n.created_at DESC`)
+      .all(user.id, user.id, user.id) as any[];
+    return rows.map((r) => this.mapNoteRow(r));
+  }
+
+  public getNoteById(id: string, user: PublicUser): StoredNoteRow | null {
+    const baseSelect = `
+      SELECT
+        n.*,
+        u.display_name AS author_name,
+        u.role AS author_role,
+        u.supervisor_id AS supervisor_id,
+        sup.display_name AS supervisor_name,
+        (SELECT COUNT(*) FROM note_comments c WHERE c.note_id = n.id) AS comments_count,
+        (
+          SELECT COUNT(*)
+          FROM note_comments c
+          LEFT JOIN note_reads r ON r.note_id = n.id AND r.user_id = ?
+          WHERE c.note_id = n.id
+            AND c.user_id != ?
+            AND (r.last_read_at IS NULL OR c.created_at > r.last_read_at)
+        ) AS unread_comments_count
+      FROM notes n
+      JOIN users u ON n.user_id = u.id
+      LEFT JOIN users sup ON u.supervisor_id = sup.id
+      WHERE n.id = ?
+    `;
+
+    const row = this.db.prepare(baseSelect).get(user.id, user.id, id) as any;
+    if (!row) return null;
+
+    if (user.role === 'admin' || user.role === 'gerente') {
+      return this.mapNoteRow(row);
+    }
+    if (user.role === 'supervisor') {
+      if (row.user_id === user.id || (row.author_role === 'operador' && row.supervisor_id === user.id)) {
+        return this.mapNoteRow(row);
+      }
+      return null;
+    }
+    if (user.role === 'operador') {
+      if (row.user_id === user.id) {
+        return this.mapNoteRow(row);
+      }
+      return null;
+    }
+    return null;
+  }
+
+  public createNote(
+    user: PublicUser,
+    data: { title: string; content: string; category?: string; color?: string }
+  ): StoredNoteRow {
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const title = (data.title || '').trim();
+    const content = (data.content || '').trim();
+    if (!title) throw new Error('O título da anotação é obrigatório.');
+    if (!content) throw new Error('O conteúdo da anotação é obrigatório.');
+
+    this.db
+      .prepare(
+        `INSERT INTO notes (id, user_id, title, content, category, color, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        id,
+        user.id,
+        title,
+        content,
+        (data.category || 'Geral').trim() || 'Geral',
+        (data.color || 'default').trim() || 'default',
+        now,
+        now
+      );
+
+    this.db
+      .prepare(
+        `INSERT INTO note_reads (note_id, user_id, last_read_at)
+         VALUES (?, ?, ?)
+         ON CONFLICT(note_id, user_id) DO UPDATE SET last_read_at = excluded.last_read_at`
+      )
+      .run(id, user.id, now);
+
+    return this.getNoteById(id, user)!;
+  }
+
+  public updateNote(
+    id: string,
+    user: PublicUser,
+    data: { title?: string; content?: string; category?: string; color?: string }
+  ): StoredNoteRow {
+    const existing = this.getNoteById(id, user);
+    if (!existing) throw new Error('Anotação não encontrada ou sem permissão de acesso.');
+
+    if (existing.userId !== user.id && user.role !== 'admin') {
+      throw new Error('Apenas o autor ou o Administrador podem editar esta anotação.');
+    }
+
+    const now = new Date().toISOString();
+    const nextTitle = data.title !== undefined ? data.title.trim() : existing.title;
+    const nextContent = data.content !== undefined ? data.content.trim() : existing.content;
+    const nextCategory = data.category !== undefined ? data.category.trim() : existing.category;
+    const nextColor = data.color !== undefined ? data.color.trim() : existing.color;
+
+    if (!nextTitle) throw new Error('O título não pode ser vazio.');
+    if (!nextContent) throw new Error('O conteúdo não pode ser vazio.');
+
+    this.db
+      .prepare(
+        `UPDATE notes
+         SET title = ?, content = ?, category = ?, color = ?, updated_at = ?
+         WHERE id = ?`
+      )
+      .run(nextTitle, nextContent, nextCategory || 'Geral', nextColor || 'default', now, id);
+
+    return this.getNoteById(id, user)!;
+  }
+
+  public deleteNote(id: string, user: PublicUser): void {
+    const existing = this.getNoteById(id, user);
+    if (!existing) throw new Error('Anotação não encontrada ou sem permissão de acesso.');
+
+    if (existing.userId !== user.id && user.role !== 'admin') {
+      throw new Error('Apenas o autor ou o Administrador podem excluir esta anotação.');
+    }
+
+    this.db.prepare(`DELETE FROM notes WHERE id = ?`).run(id);
+  }
+
+  public listNoteComments(noteId: string, user: PublicUser): StoredNoteCommentRow[] {
+    const note = this.getNoteById(noteId, user);
+    if (!note) throw new Error('Anotação não encontrada ou sem permissão de visualização.');
+
+    const rows = this.db
+      .prepare(
+        `SELECT
+           c.*,
+           u.display_name AS author_name,
+           u.role AS author_role
+         FROM note_comments c
+         JOIN users u ON c.user_id = u.id
+         WHERE c.note_id = ?
+         ORDER BY c.created_at ASC`
+      )
+      .all(noteId) as any[];
+
+    return rows.map((r) => ({
+      id: r.id,
+      noteId: r.note_id,
+      userId: r.user_id,
+      authorName: r.author_name,
+      authorRole: r.author_role as UserRole,
+      content: r.content,
+      createdAt: r.created_at,
+    }));
+  }
+
+  public addNoteComment(noteId: string, user: PublicUser, content: string): StoredNoteCommentRow {
+    const note = this.getNoteById(noteId, user);
+    if (!note) throw new Error('Anotação não encontrada ou sem permissão para comentar.');
+
+    const text = (content || '').trim();
+    if (!text) throw new Error('O comentário não pode ser vazio.');
+
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+
+    this.db
+      .prepare(
+        `INSERT INTO note_comments (id, note_id, user_id, content, created_at)
+         VALUES (?, ?, ?, ?, ?)`
+      )
+      .run(id, noteId, user.id, text, now);
+
+    this.db.prepare(`UPDATE notes SET updated_at = ? WHERE id = ?`).run(now, noteId);
+    this.markNoteAsRead(noteId, user);
+
+    return {
+      id,
+      noteId,
+      userId: user.id,
+      authorName: user.displayName,
+      authorRole: user.role,
+      content: text,
+      createdAt: now,
+    };
+  }
+
+  public markNoteAsRead(noteId: string, user: PublicUser): void {
+    const note = this.getNoteById(noteId, user);
+    if (!note) return;
+
+    const now = new Date().toISOString();
+    this.db
+      .prepare(
+        `INSERT INTO note_reads (note_id, user_id, last_read_at)
+         VALUES (?, ?, ?)
+         ON CONFLICT(note_id, user_id) DO UPDATE SET last_read_at = excluded.last_read_at`
+      )
+      .run(noteId, user.id, now);
+  }
+
+  public getUnreadNotesCountForUser(user: PublicUser): number {
+    const row = this.db
+      .prepare(
+        `SELECT COUNT(DISTINCT n.id) AS total
+         FROM notes n
+         JOIN note_comments c ON c.note_id = n.id
+         LEFT JOIN note_reads r ON r.note_id = n.id AND r.user_id = ?
+         WHERE (n.user_id = ? OR EXISTS (SELECT 1 FROM note_comments my_c WHERE my_c.note_id = n.id AND my_c.user_id = ?))
+           AND c.user_id != ?
+           AND (r.last_read_at IS NULL OR c.created_at > r.last_read_at)`
+      )
+      .get(user.id, user.id, user.id, user.id) as { total: number } | undefined;
+
+    return Number(row?.total || 0);
   }
 }
 

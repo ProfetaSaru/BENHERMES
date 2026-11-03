@@ -453,6 +453,101 @@ export function createApiHandler(appDb: AppDatabase, options?: { enforceIp?: boo
         return true;
       }
 
+      // 13. Anotações (/api/notes)
+      if (pathname === '/api/notes' && method === 'GET') {
+        const filterUserId = urlObj.searchParams.get('userId') || undefined;
+        const notes = appDb.listNotesForUser(currentUser, filterUserId);
+        sendJson(res, 200, { notes });
+        return true;
+      }
+
+      if (pathname === '/api/notes/unread-count' && method === 'GET') {
+        const unreadCount = appDb.getUnreadNotesCountForUser(currentUser);
+        sendJson(res, 200, { unreadCount });
+        return true;
+      }
+
+      if (pathname === '/api/notes' && method === 'POST') {
+        const body = await readJsonBody(req);
+        try {
+          const note = appDb.createNote(currentUser, {
+            title: String(body.title || ''),
+            content: String(body.content || ''),
+            category: body.category ? String(body.category) : undefined,
+            color: body.color ? String(body.color) : undefined,
+          });
+          sendJson(res, 201, { note });
+        } catch (err: any) {
+          sendJson(res, 400, { erro: err.message || 'Erro ao criar anotação.' });
+        }
+        return true;
+      }
+
+      if (pathname.startsWith('/api/notes/')) {
+        const rest = pathname.slice('/api/notes/'.length);
+
+        // Sub-rota: /api/notes/:id/comments
+        if (rest.endsWith('/comments') && method === 'POST') {
+          const noteId = decodeURIComponent(rest.slice(0, -'/comments'.length));
+          const body = await readJsonBody(req);
+          try {
+            const comment = appDb.addNoteComment(noteId, currentUser, String(body.content || ''));
+            sendJson(res, 201, { comment });
+          } catch (err: any) {
+            sendJson(res, 400, { erro: err.message || 'Erro ao adicionar comentário.' });
+          }
+          return true;
+        }
+
+        // Sub-rota: /api/notes/:id/read
+        if (rest.endsWith('/read') && method === 'POST') {
+          const noteId = decodeURIComponent(rest.slice(0, -'/read'.length));
+          appDb.markNoteAsRead(noteId, currentUser);
+          sendJson(res, 200, { ok: true });
+          return true;
+        }
+
+        // Operações em /api/notes/:id
+        const noteId = decodeURIComponent(rest);
+
+        if (method === 'GET') {
+          const note = appDb.getNoteById(noteId, currentUser);
+          if (!note) {
+            sendJson(res, 404, { erro: 'Anotação não encontrada ou acesso não autorizado.' });
+            return true;
+          }
+          const comments = appDb.listNoteComments(noteId, currentUser);
+          sendJson(res, 200, { note, comments });
+          return true;
+        }
+
+        if (method === 'PUT') {
+          const body = await readJsonBody(req);
+          try {
+            const updated = appDb.updateNote(noteId, currentUser, {
+              title: body.title !== undefined ? String(body.title) : undefined,
+              content: body.content !== undefined ? String(body.content) : undefined,
+              category: body.category !== undefined ? String(body.category) : undefined,
+              color: body.color !== undefined ? String(body.color) : undefined,
+            });
+            sendJson(res, 200, { note: updated });
+          } catch (err: any) {
+            sendJson(res, 403, { erro: err.message || 'Erro ao atualizar anotação.' });
+          }
+          return true;
+        }
+
+        if (method === 'DELETE') {
+          try {
+            appDb.deleteNote(noteId, currentUser);
+            sendJson(res, 200, { ok: true });
+          } catch (err: any) {
+            sendJson(res, 403, { erro: err.message || 'Erro ao excluir anotação.' });
+          }
+          return true;
+        }
+      }
+
       sendJson(res, 404, { erro: `Rota de API não encontrada: ${method} ${pathname}` });
       return true;
     } catch (err: any) {
