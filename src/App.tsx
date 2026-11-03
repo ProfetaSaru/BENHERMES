@@ -3,7 +3,12 @@ import { useTasks } from './hooks/useTasks';
 import { useTaskForm } from './hooks/useTaskForm';
 import { useNotification } from './hooks/useNotification';
 import { useTheme } from './hooks/useTheme';
-import { useSavedReports, getFormattedTime } from './hooks/useSavedReports';
+import {
+  useSavedReports,
+  getFormattedTime,
+  getFormattedDate,
+  updateReportTitleWithCurrentTimestamp,
+} from './hooks/useSavedReports';
 import { useMarkdownTemplates } from './hooks/useMarkdownTemplates';
 import { Sidebar } from './components/layout/Sidebar';
 import { TopNavbar } from './components/layout/TopNavbar';
@@ -11,8 +16,9 @@ import { ToolPlaceholder } from './components/layout/ToolPlaceholder';
 import { ReportsHub } from './components/reports/ReportsHub';
 import { LoginScreen } from './components/auth/LoginScreen';
 import { Modal } from './components/common/Modal';
+import { NewReportChoiceModal } from './components/common/NewReportChoiceModal';
 import { Task, SavedReport, SaveReportParams } from './types/task';
-import { AuthUser, canSeeTool } from './types/auth';
+import { AuthUser, canSeeTool, isTemplateAllowedForRole, formatOperatorReportTitle } from './types/auth';
 import { getNavigationItems } from './utils/navigationItems';
 import { renderTemplate } from './utils/markdownTemplateParser';
 import { apiRequest, setStoredAuthToken } from './utils/apiClient';
@@ -51,7 +57,7 @@ export const App: React.FC = () => {
   const [authChecking, setAuthChecking] = useState<boolean>(true);
   const [draftsHydratedForUser, setDraftsHydratedForUser] = useState<string | null>(null);
 
-  const templateControls = useMarkdownTemplates();
+  const templateControls = useMarkdownTemplates(currentUser?.role);
   const {
     tasks,
     tasksByTemplate,
@@ -74,7 +80,7 @@ export const App: React.FC = () => {
     deleteReport,
     renameReport,
     clearAllReports,
-  } = useSavedReports(currentUser?.id);
+  } = useSavedReports(currentUser);
 
   const {
     formData,
@@ -87,6 +93,10 @@ export const App: React.FC = () => {
   } = useTaskForm();
 
   const [activeReportIds, setActiveReportIds] = useState<Record<string, string>>({});
+  const [restoredTracking, setRestoredTracking] = useState<
+    Record<string, { originalTitle: string; pendingNameUpdate: boolean }>
+  >({});
+  const [isNewReportChoiceModalOpen, setIsNewReportChoiceModalOpen] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [lastAutoSavedTime, setLastAutoSavedTime] = useState<string | null>(null);
   const lastSignatureByTemplateRef = useRef<Record<string, string>>({});
@@ -96,6 +106,8 @@ export const App: React.FC = () => {
     resetAllTasks();
     templateControls.resetAllDrafts();
     setActiveReportIds({});
+    setRestoredTracking({});
+    setIsNewReportChoiceModalOpen(false);
     lastSignatureByTemplateRef.current = {};
     setAutoSaveStatus('idle');
     setLastAutoSavedTime(null);
@@ -291,6 +303,27 @@ export const App: React.FC = () => {
       const parsed = templateControls.parsedActiveTemplate;
       const compiledText = renderTemplate(parsed.templateBody, fields, tasks);
 
+      let titleToUse: string | undefined = undefined;
+      if (restoredTracking[tplId]?.pendingNameUpdate) {
+        const now = new Date();
+        const dateStr = getFormattedDate(now);
+        const timeStr = getFormattedTime(now);
+        titleToUse = updateReportTitleWithCurrentTimestamp(
+          restoredTracking[tplId].originalTitle,
+          parsed.meta.title,
+          dateStr,
+          timeStr,
+          currentUser
+        );
+        setRestoredTracking((prev) => ({
+          ...prev,
+          [tplId]: {
+            originalTitle: titleToUse!,
+            pendingNameUpdate: false,
+          },
+        }));
+      }
+
       const saved = await autoSaveReport({
         id: reportId,
         templateId: parsed.meta.id,
@@ -300,6 +333,7 @@ export const App: React.FC = () => {
         fieldValues: fields,
         tasks,
         reportText: compiledText,
+        title: titleToUse,
       });
 
       if (saved && saved.id && saved.id !== reportId) {
@@ -321,6 +355,7 @@ export const App: React.FC = () => {
     templateControls.parsedActiveTemplate,
     getOrAssignActiveReportId,
     autoSaveReport,
+    restoredTracking,
   ]);
 
   const handleStartNewReport = useCallback(() => {
@@ -328,23 +363,62 @@ export const App: React.FC = () => {
     const hasData =
       tasks.length > 0 ||
       Object.values(templateControls.fieldValues).some((v) => v && v.trim().length > 0);
+
     if (hasData) {
-      const confirmed = window.confirm(
-        'Iniciar um novo relatório em branco? O relatório atual já está salvo no Histórico.'
-      );
-      if (!confirmed) return;
+      setIsNewReportChoiceModalOpen(true);
+      return;
     }
+
     const freshId = crypto.randomUUID();
     setActiveReportIds((prev) => ({ ...prev, [tplId]: freshId }));
+    setRestoredTracking((prev) => {
+      const copy = { ...prev };
+      delete copy[tplId];
+      return copy;
+    });
+    lastSignatureByTemplateRef.current[tplId] = JSON.stringify({ tasks: [], fields: {} });
+    setAutoSaveStatus('idle');
+    notify('Novo relatório pronto para preenchimento!', 'info');
+  }, [
+    templateControls.activeTemplateId,
+    templateControls.fieldValues,
+    tasks.length,
+    notify,
+  ]);
+
+  const handleConfirmNewReportKeepData = useCallback(() => {
+    const tplId = templateControls.activeTemplateId;
+    const freshId = crypto.randomUUID();
+    setActiveReportIds((prev) => ({ ...prev, [tplId]: freshId }));
+    setRestoredTracking((prev) => {
+      const copy = { ...prev };
+      delete copy[tplId];
+      return copy;
+    });
+    lastSignatureByTemplateRef.current[tplId] = '';
+    notify(
+      'Novo relatório iniciado mantendo os dados atuais como base. Ao salvar, um novo relatório será criado no Histórico.',
+      'success'
+    );
+  }, [templateControls.activeTemplateId, notify]);
+
+  const handleConfirmNewReportClearData = useCallback(() => {
+    const tplId = templateControls.activeTemplateId;
+    const freshId = crypto.randomUUID();
+    setActiveReportIds((prev) => ({ ...prev, [tplId]: freshId }));
+    setRestoredTracking((prev) => {
+      const copy = { ...prev };
+      delete copy[tplId];
+      return copy;
+    });
     clearAllTasks();
     templateControls.resetFieldValues();
     resetForm();
     lastSignatureByTemplateRef.current[tplId] = JSON.stringify({ tasks: [], fields: {} });
     setAutoSaveStatus('idle');
-    notify('Novo relatório iniciado!', 'info');
+    notify('Novo relatório em branco iniciado!', 'info');
   }, [
     templateControls,
-    tasks.length,
     clearAllTasks,
     resetForm,
     notify,
@@ -359,18 +433,49 @@ export const App: React.FC = () => {
 
   const handleSaveReportQuick = (params: SaveReportParams) => {
     const reportId = getOrAssignActiveReportId(params.templateId);
-    saveReportQuick({ ...params, id: reportId });
+    const now = new Date();
+    const dateStr = getFormattedDate(now);
+    const timeStr = getFormattedTime(now);
+
+    let reportTitle: string | undefined;
+    if (restoredTracking[params.templateId]?.pendingNameUpdate) {
+      reportTitle = updateReportTitleWithCurrentTimestamp(
+        restoredTracking[params.templateId].originalTitle,
+        params.templateTitle,
+        dateStr,
+        timeStr,
+        currentUser
+      );
+      setRestoredTracking((prev) => ({
+        ...prev,
+        [params.templateId]: {
+          originalTitle: reportTitle!,
+          pendingNameUpdate: false,
+        },
+      }));
+    } else if (currentUser?.role === 'operador') {
+      reportTitle = formatOperatorReportTitle(currentUser, dateStr, timeStr);
+    } else {
+      reportTitle = params.title;
+    }
+
+    saveReportQuick({ ...params, id: reportId, title: reportTitle });
     setAutoSaveStatus('saved');
-    setLastAutoSavedTime(getFormattedTime(new Date()));
+    setLastAutoSavedTime(getFormattedTime(now));
     notify('Relatório salvo com sucesso no Histórico!', 'success');
   };
 
   const handleSaveReportCustom = (params: SaveReportParams) => {
     const saved = saveReportCustom(params);
     setActiveReportIds((prev) => ({ ...prev, [params.templateId]: saved.id }));
+    setRestoredTracking((prev) => {
+      const copy = { ...prev };
+      delete copy[params.templateId];
+      return copy;
+    });
     setAutoSaveStatus('saved');
     setLastAutoSavedTime(getFormattedTime(new Date()));
-    notify('Relatório personalizado salvo no Histórico!', 'success');
+    notify('Novo relatório salvo no Histórico com sucesso!', 'success');
   };
 
   /**
@@ -379,6 +484,11 @@ export const App: React.FC = () => {
    * gera um novo ID próprio para não sobrescrever o relatório da outra conta.
    */
   const handleRestoreReport = (report: SavedReport) => {
+    if (currentUser?.role === 'operador' && !isTemplateAllowedForRole('operador', report.templateId)) {
+      notify('Operadores só têm acesso aos relatórios de Atividades e TMA.', 'error');
+      return;
+    }
+
     const hasCurrentData =
       tasks.length > 0 || Object.keys(templateControls.fieldValues).length > 0;
 
@@ -393,6 +503,14 @@ export const App: React.FC = () => {
     const targetReportId = isOwnReport ? report.id : crypto.randomUUID();
 
     setActiveReportIds((prev) => ({ ...prev, [report.templateId]: targetReportId }));
+    setRestoredTracking((prev) => ({
+      ...prev,
+      [report.templateId]: {
+        originalTitle: report.title,
+        pendingNameUpdate: true,
+      },
+    }));
+
     lastSignatureByTemplateRef.current[report.templateId] = JSON.stringify({
       tasks: report.tasks || [],
       fields: report.fieldValues || {},
@@ -533,6 +651,7 @@ export const App: React.FC = () => {
                 autoSaveStatus={autoSaveStatus}
                 lastAutoSavedTime={lastAutoSavedTime}
                 onStartNewReport={handleStartNewReport}
+                currentUser={currentUser}
               />
             </main>
           ) : (
@@ -557,7 +676,7 @@ export const App: React.FC = () => {
                   />
                 </main>
               ) : activeToolId === 'usuarios' && currentUser.role === 'admin' ? (
-                <main className="container" style={{ maxWidth: '1200px', padding: '0 16px' }}>
+                <main className="container" style={{ maxWidth: '1480px', padding: '0 16px', boxSizing: 'border-box', width: '100%' }}>
                   <UsersManagementHub currentUser={currentUser} onNotify={notify} />
                 </main>
               ) : activeToolId === 'configuracoes' ? (
@@ -579,6 +698,7 @@ export const App: React.FC = () => {
                     notification={notification}
                     onNotify={notify}
                     userRole={currentUser.role}
+                    currentUser={currentUser}
                   />
                 </main>
               ) : activeToolId === 'relatorio-ura' && currentUser.role === 'admin' ? (
@@ -605,6 +725,13 @@ export const App: React.FC = () => {
         cancelLabel="Cancelar"
         onConfirm={handleConfirmClear}
         onCancel={() => setIsClearModalOpen(false)}
+      />
+
+      <NewReportChoiceModal
+        isOpen={isNewReportChoiceModalOpen}
+        onClose={() => setIsNewReportChoiceModalOpen(false)}
+        onKeepData={handleConfirmNewReportKeepData}
+        onClearData={handleConfirmNewReportClearData}
       />
     </div>
   );
