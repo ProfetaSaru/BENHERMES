@@ -242,6 +242,16 @@ describe('Módulo de Anotações: RBAC, Filtros, Comentários em Thread e Notifi
     expect(commentRes.data.comment.authorName).toBe('Marcos Supervisor A');
     expect(commentRes.data.comment.authorRole).toBe('supervisor');
 
+    // Consulta a sub-rota GET /api/notes/:id/comments
+    const listCommentsRes = await callApi(handler, {
+      method: 'GET',
+      url: `/api/notes/${noteId}/comments`,
+      token: operadorAToken,
+    });
+    expect(listCommentsRes.status).toBe(200);
+    expect(listCommentsRes.data.comments).toHaveLength(1);
+    expect(listCommentsRes.data.comments[0].content).toBe('Já acionamos a equipe de TI, favor acompanhar.');
+
     // O texto original da anotação PERMANECE INTACTO
     const getNote = await callApi(handler, {
       method: 'GET',

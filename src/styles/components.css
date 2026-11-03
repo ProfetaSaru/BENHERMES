@@ -3513,6 +3513,17 @@ pre {
    MODAIS DE ANOTAÇÕES (Nova Anotação, Edição e Visualizador/Thread)
    ========================================================================== */
 
+.modal-error-banner {
+  padding: 10px 14px;
+  background: var(--red-soft, rgba(239, 68, 68, 0.1));
+  border: 1px solid var(--red, #ef4444);
+  border-radius: var(--radius-sm, 8px);
+  color: var(--red, #ef4444);
+  font-size: 0.86rem;
+  font-weight: 500;
+  margin-bottom: 0.85rem;
+}
+
 .note-editor-modal-modern,
 .note-detail-modal-modern {
   background: var(--paper) !important;
@@ -3535,6 +3546,13 @@ pre {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.modal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   flex-shrink: 0;
 }
 
@@ -4086,18 +4104,25 @@ pre {
   display: flex;
   gap: 0.75rem;
   align-items: flex-end;
+  width: 100%;
+  margin-top: 1rem;
 }
 
 .composer-textarea-wrap {
   position: relative;
   flex: 1;
+  min-width: 0;
 }
 
 .composer-textarea-wrap .note-comment-input {
   width: 100%;
+  min-height: 48px;
+  max-height: 120px;
   font-size: 0.9rem;
-  padding-bottom: 1.5rem;
+  padding: 10px 14px 1.5rem 14px;
   border-radius: 8px;
+  resize: vertical;
+  box-sizing: border-box;
 }
 
 .composer-shortcut-hint {
@@ -4110,10 +4135,12 @@ pre {
 }
 
 .send-comment-btn {
-  display: flex;
+  width: auto !important;
+  flex-shrink: 0;
+  display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  padding: 0.7rem 1.2rem;
+  padding: 0.7rem 1.35rem;
   font-weight: 600;
   border-radius: 8px;
   white-space: nowrap;

@@ -487,16 +487,29 @@ export function createApiHandler(appDb: AppDatabase, options?: { enforceIp?: boo
         const rest = pathname.slice('/api/notes/'.length);
 
         // Sub-rota: /api/notes/:id/comments
-        if (rest.endsWith('/comments') && method === 'POST') {
+        if (rest.endsWith('/comments')) {
           const noteId = decodeURIComponent(rest.slice(0, -'/comments'.length));
-          const body = await readJsonBody(req);
-          try {
-            const comment = appDb.addNoteComment(noteId, currentUser, String(body.content || ''));
-            sendJson(res, 201, { comment });
-          } catch (err: any) {
-            sendJson(res, 400, { erro: err.message || 'Erro ao adicionar comentário.' });
+
+          if (method === 'GET') {
+            try {
+              const comments = appDb.listNoteComments(noteId, currentUser);
+              sendJson(res, 200, { comments });
+            } catch (err: any) {
+              sendJson(res, 403, { erro: err.message || 'Erro ao listar comentários.' });
+            }
+            return true;
           }
-          return true;
+
+          if (method === 'POST') {
+            const body = await readJsonBody(req);
+            try {
+              const comment = appDb.addNoteComment(noteId, currentUser, String(body.content || ''));
+              sendJson(res, 201, { comment });
+            } catch (err: any) {
+              sendJson(res, 400, { erro: err.message || 'Erro ao adicionar comentário.' });
+            }
+            return true;
+          }
         }
 
         // Sub-rota: /api/notes/:id/read
