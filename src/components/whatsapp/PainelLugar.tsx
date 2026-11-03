@@ -17,7 +17,7 @@ interface PainelLugarProps {
   titulo: string;
   subtitulo: string;
   /** Campo de nome (operador ou supervisor); ausente nas vagas de backup */
-  nome?: { rotulo: string; valor: string; onChange: (valor: string) => void; podeEsvaziar: boolean };
+  nome?: { rotulo: string; valor: string; onChange: (valor: string) => void; podeEsvaziar: boolean; somenteLeitura?: boolean };
   /** Onde está o WhatsApp ("📱 Azul · Usuário 2 · Messenger 1" ou "sem celular") */
   local?: string;
   /** Só no supervisor: onde ele usa o WhatsApp */
@@ -121,19 +121,21 @@ export const PainelLugar: React.FC<PainelLugarProps> = ({
         <div className="wpp-painel-campo">
           <label htmlFor="wpp-nome" className="formatter-field-label">
             {nome.rotulo}
+            {nome.somenteLeitura && <span className="ura-ajuda" style={{ marginLeft: 8 }}>(Somente Admin)</span>}
           </label>
           <input
             id="wpp-nome"
             className="formatter-select"
             value={nome.valor}
-            onChange={(e) => nome.onChange(e.target.value)}
+            disabled={nome.somenteLeitura}
+            onChange={(e) => !nome.somenteLeitura && nome.onChange(e.target.value)}
             onBlur={(e) => {
               const limpo = e.target.value.replace(/\s+/g, ' ').trim();
               if (limpo !== nome.valor) nome.onChange(limpo);
             }}
             placeholder={nome.podeEsvaziar ? 'Vaga vazia' : 'Nome'}
           />
-          {nome.podeEsvaziar && nome.valor.trim() && (
+          {!nome.somenteLeitura && nome.podeEsvaziar && nome.valor.trim() && (
             <button type="button" className="btn btn-secondary wpp-botao-pequeno" onClick={() => nome.onChange('')}>
               <UserX size={16} />
               Esvaziar baia

@@ -3,7 +3,12 @@ import { BarChart3, Download, FileJson, FileUp, Map as MapIcon, MessageCircle, U
 import * as XLSX from 'xlsx';
 import { NotificationState, NotificationType } from '../../types/task';
 import {
+  AuthUser,
   UserRole,
+  canConfigureWhatsapp,
+  canExportWhatsappJson,
+  canExportWhatsappSpreadsheet,
+  canSeeAllMesas,
   canDeleteWhatsappItems,
   canImportOverwriteWhatsappMap,
   canManageWhatsappMaintenance,
@@ -16,7 +21,7 @@ import { nomeDoCelular, ondeEstaABaia, textoDoLocal } from '../../utils/celulare
 import { codigoDoLugar } from '../../utils/mapaMesas';
 import { baixarPlanilha } from '../../utils/planilhaColorida';
 import { AlvoAlerta, ResumoWhatsapp, alertas, resumoDaSala, resumoGeral } from '../../utils/whatsappAlertas';
-import { exportarMapa, importarMapa } from '../../utils/whatsappBaias';
+import { exportarMapa, filtrarMapaParaSupervisor, importarMapa } from '../../utils/whatsappBaias';
 import { lerArquivoDoMapa } from '../../utils/whatsappPlanilha';
 import { gerarResumoWhatsapp, nomeDoResumoWhatsapp } from '../../utils/whatsappResumo';
 import { Alertas } from './Alertas';
@@ -33,6 +38,7 @@ interface WhatsappHubProps {
   notification: NotificationState;
   onNotify: (message: string, type?: NotificationType) => void;
   userRole?: UserRole;
+  currentUser?: AuthUser | null;
 }
 
 type Selecao = AlvoAlerta;
@@ -40,7 +46,9 @@ type Selecao = AlvoAlerta;
 const doisDigitos = (n: number) => String(n).padStart(2, '0');
 const dataHora = (iso: string) => {
   const d = new Date(iso);
-  return `${doisDigitos(d.getDate())}/${doisDigitos(d.getMonth() + 1)}/${d.getFullYear()} às ${doisDigitos(d.getHours())}:${doisDigitos(d.getMinutes())}`;
+  return `${doisDigitos(d.getDate())}
+
+/${doisDigitos(d.getMonth() + 1)}/${d.getFullYear()} às ${doisDigitos(d.getHours())}:${doisDigitos(d.getMinutes())}`;
 };
 const hojeArquivo = (d: Date) => `${d.getFullYear()}-${doisDigitos(d.getMonth() + 1)}-${doisDigitos(d.getDate())}`;
 
@@ -86,10 +94,16 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({
   notification,
   onNotify,
   userRole = 'admin',
+  currentUser = null,
 }) => {
+  const isAdmin = userRole === 'admin';
+  const isSupervisor = userRole === 'supervisor';
   const canMaintenance = canManageWhatsappMaintenance(userRole);
   const canDelete = canDeleteWhatsappItems(userRole);
   const canImportOverwrite = canImportOverwriteWhatsappMap(userRole);
+  const canExportJson = canExportWhatsappJson(userRole);
+  const canConfigure = canConfigureWhatsapp(userRole);
+  const canExportSpreadsheet = canExportWhatsappSpreadsheet(userRole);
   const wpp = useWhatsappBaias();
   const { mapa } = wpp;
   const { feriados } = useFeriados();
@@ -113,9 +127,13 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({
     return () => window.clearInterval(id);
   }, []);
 
-  const geral = resumoGeral(mapa, agora);
+  const mapaExibido = (isSupervisor && currentUser && !canSeeAllMesas(userRole))
+    ? filtrarMapaParaSupervisor(mapa, currentUser)
+    : mapa;
+
+  const geral = resumoGeral(mapaExibido, agora);
   const problemas = geral.banido + geral.analise + geral.permanente + geral.restringido + geral.naoTem;
-  const listaDeAlertas = alertas(mapa, agora);
+  const listaDeAlertas = alertas(mapaExibido, agora);
 
   /** Vaga ligada abre o painel da baia; backup abre o painel da vaga */
   const abrir = (alvo: AlvoAlerta) => {
@@ -136,7 +154,10 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({
   const handleBaixarPlanilha = async () => {
     try {
       const momento = new Date();
-      await baixarPlanilha(await gerarResumoWhatsapp(mapa, momento, feriados), nomeDoResumoWhatsapp(momento));
+      const mapaParaBaixar = (isSupervisor && currentUser)
+        ? filtrarMapaParaSupervisor(mapa, currentUser)
+        : mapa;
+      await baixarPlanilha(await gerarResumoWhatsapp(mapaParaBaixar, momento, feriados), nomeDoResumoWhatsapp(momento));
       onNotify('Download da planilha iniciado!', 'success');
     } catch (err: any) {
       onNotify(`Erro ao gerar a planilha: ${err.message}`, 'error');
@@ -217,7 +238,17 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({
     const { posicao } = selecao;
     const ehSup = posicao === 'SUP';
     const nome = ehSup
-      ? { rotulo: 'Supervisor', valor: mesa.supervisor, podeEsvaziar: false, onChange: (v: string) => wpp.alterarMesa(sala.id, mesa.id, { supervisor: v }) }
+      ? {
+          rotulo: 'Supervisor',
+          valor: mesa.supervisor,
+          podeEsvaziar: false,
+          somenteLeitura: !isAdmin,
+          onChange: (v: string) => {
+            if (isAdmin) {
+              wpp.alterarMesa(sala.id, mesa.id, { supervisor: v });
+            }
+          },
+        }
       : {
         rotulo: 'Operador',
         valor: lugar.operador,
@@ -287,7 +318,7 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({
 
       {aba === 'estatisticas' ? (
         <Estatisticas
-          mapa={mapa}
+          mapa={mapaExibido}
           agora={agora}
           feriados={feriados}
           onAbrir={(alvo) => {
@@ -316,20 +347,25 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({
                 Resumo
               </h2>
               <div className="formatter-actions-buttons escala-acoes">
-                <button type="button" className="btn btn-primary" onClick={handleBaixarPlanilha}>
+                {canExportSpreadsheet && (
+                  <button type="button" className="btn btn-primary" onClick={handleBaixarPlanilha}>
                   <Download size={16} />
-                  Baixar planilha
-                </button>
+                  {isSupervisor ? 'Baixar planilha da equipe' : 'Baixar planilha'}
+                  </button>
+                )}
                 {canImportOverwrite && (
                   <button type="button" className="btn btn-secondary" onClick={() => planilhaRef.current?.click()}>
                     <Upload size={16} />
                     Importar planilha
                   </button>
                 )}
-                <button type="button" className="btn btn-secondary" onClick={handleExportarMapa}>
+
+                  {canExportJson && (
+                  <button type="button" className="btn btn-secondary" onClick={handleExportarMapa}>
                   <FileJson size={16} />
-                  Exportar mapa
-                </button>
+                    Exportar mapa
+                  </button>
+                )}
                 {canImportOverwrite && (
                   <button type="button" className="btn btn-secondary" onClick={() => jsonRef.current?.click()}>
                     <FileUp size={16} />
@@ -341,9 +377,9 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({
 
             <Contagens resumo={geral} celulares />
             <Alertas itens={listaDeAlertas} agora={agora} onAbrir={abrir} />
-            {mapa.salas.length > 1 && (
+            {mapaExibido.salas.length > 1 && (
               <div className="wpp-resumo-salas">
-                {mapa.salas.map((s) => (
+                {mapaExibido.salas.map((s) => (
                   <div key={s.id}>
                     <strong>{s.nome}</strong>
                     <Contagens resumo={resumoDaSala(s, agora)} />
@@ -396,7 +432,17 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({
             </div>
           )}
 
-          {mapa.salas.map((sala) => (
+          {isSupervisor && mapaExibido.salas.length === 0 && (
+            <div className="formatter-card" style={{ padding: '24px', textAlign: 'center' }}>
+              <h3 style={{ marginBottom: '8px' }}>Nenhuma mesa alocada</h3>
+              <p className="ura-ajuda">
+                Você está logado como supervisor, mas ainda não possui nenhuma mesa vinculada à sua conta.
+                Solicite ao Administrador que vincule sua equipe nas configurações de salas e mesas.
+              </p>
+            </div>
+          )}
+
+          {mapaExibido.salas.map((sala) => (
             <section key={sala.id} className="formatter-card wpp-sala" aria-label={sala.nome}>
               <div className="formatter-card-header">
                 <h2 className="formatter-card-title">{sala.nome}</h2>
@@ -450,14 +496,18 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({
           ))}
 
           <Celulares
-            mapa={mapa}
+            mapa={mapaExibido}
             agora={agora}
             selecionado={selecao?.tipo === 'vaga' ? { celularId: selecao.celularId, vagaId: selecao.vagaId } : null}
             onSelecionar={(celularId, vagaId) => abrir({ tipo: 'vaga', celularId, vagaId })}
           />
 
-          <ConfigurarMesas mapa={mapa} onMapa={wpp.substituir} onNotify={onNotify} canDelete={canDelete} />
-          <ConfigurarCelulares mapa={mapa} onMapa={wpp.substituir} onNotify={onNotify} canDelete={canDelete} />
+          {canConfigure && (
+            <>
+              <ConfigurarMesas mapa={mapa} onMapa={wpp.substituir} onNotify={onNotify} canDelete={canDelete} />
+              <ConfigurarCelulares mapa={mapa} onMapa={wpp.substituir} onNotify={onNotify} canDelete={canDelete} />
+            </>
+          )}
         </>
       )}
 

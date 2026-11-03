@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ChevronDown, Minus, Pencil, Plus, Settings2, Trash2 } from 'lucide-react';
+import { AuthUser } from '../../types/auth';
 import { NotificationType } from '../../types/task';
+import { apiRequest } from '../../utils/apiClient';
 import { Centro, MapaWhatsapp, Mesa } from '../../types/whatsapp';
 import { codigoDoLugar } from '../../utils/mapaMesas';
 import {
@@ -23,6 +25,7 @@ interface ConfigurarMesasProps {
   onMapa: (mapa: MapaWhatsapp) => void;
   onNotify: (message: string, type?: NotificationType) => void;
   canDelete?: boolean;
+  supervisors?: AuthUser[];
 }
 
 /** Mesa em edição: rascunho completo (para a prévia) e onde ela fica */
@@ -45,10 +48,33 @@ export const ConfigurarMesas: React.FC<ConfigurarMesasProps> = ({
   onMapa,
   onNotify,
   canDelete = true,
+  supervisors,
 }) => {
   const [aberto, setAberto] = useState(false);
   const [novaSala, setNovaSala] = useState('');
   const [edicao, setEdicao] = useState<Edicao | null>(null);
+  const [internalSupervisors, setInternalSupervisors] = useState<AuthUser[]>([]);
+
+  useEffect(() => {
+    if (supervisors && supervisors.length > 0) return;
+    apiRequest<{ users: AuthUser[] }>('/api/users')
+      .then((res) => {
+        setInternalSupervisors(res.users || []);
+      })
+      .catch(() => {});
+  }, [supervisors]);
+
+  const todosSupervisores = supervisors && supervisors.length > 0 ? supervisors : internalSupervisors;
+  const listaSupervisores = [
+    ...todosSupervisores.filter((u) => u.role === 'supervisor' && u.active),
+  ];
+  if (
+    edicao?.rascunho.supervisorUserId &&
+    !listaSupervisores.some((u) => u.id === edicao.rascunho.supervisorUserId)
+  ) {
+    const extra = todosSupervisores.find((u) => u.id === edicao.rascunho.supervisorUserId);
+    if (extra) listaSupervisores.push(extra);
+  }
 
   const agora = () => new Date();
 
@@ -61,7 +87,7 @@ export const ConfigurarMesas: React.FC<ConfigurarMesasProps> = ({
     setEdicao({
       salaId,
       nova: true,
-      rascunho: novaMesa({ nome: `${n}º Equipe`, sigla, supervisor: '', esq: 4, dir: 4, centro: 'SUP', inicio: 'sup' }, agora()),
+      rascunho: novaMesa({ nome: `${n}º Equipe`, sigla, supervisor: '', supervisorUserId: null, esq: 4, dir: 4, centro: 'SUP', inicio: 'sup' }, agora()),
     });
   };
 
@@ -73,6 +99,7 @@ export const ConfigurarMesas: React.FC<ConfigurarMesasProps> = ({
       nome: r.nome,
       sigla: r.sigla,
       supervisor: r.supervisor,
+      supervisorUserId: r.supervisorUserId,
       esq: r.esq,
       dir: r.dir,
       centro: r.centro,
@@ -81,7 +108,7 @@ export const ConfigurarMesas: React.FC<ConfigurarMesasProps> = ({
       ...mudanca,
     };
     const { mesa } = formatarMesa(r, { ...dados, sigla: r.sigla }, agora());
-    setEdicao({ ...edicao, rascunho: { ...mesa, sigla: dados.sigla } });
+    setEdicao({ ...edicao, rascunho: { ...mesa, sigla: dados.sigla, supervisorUserId: dados.supervisorUserId } });
   };
 
   const salvar = () => {
@@ -97,7 +124,7 @@ export const ConfigurarMesas: React.FC<ConfigurarMesasProps> = ({
       return;
     }
     if (nova) {
-      const mesa = { ...rascunho, sigla: rascunho.sigla.trim().toUpperCase(), nome: rascunho.nome.trim() };
+      const mesa = { ...rascunho, sigla: rascunho.sigla.trim().toUpperCase(), nome: rascunho.nome.trim(), supervisorUserId: rascunho.supervisorUserId ?? null };
       onMapa(adicionarMesaNoMapa(mapa, salaId, mesa, agora()));
       onNotify(`Mesa ${mesa.nome} criada.`, 'success');
       setEdicao(null);
@@ -111,6 +138,7 @@ export const ConfigurarMesas: React.FC<ConfigurarMesasProps> = ({
         nome: rascunho.nome.trim(),
         sigla: rascunho.sigla,
         supervisor: rascunho.supervisor,
+        supervisorUserId: rascunho.supervisorUserId ?? null,
         esq: rascunho.esq,
         dir: rascunho.dir,
         centro: rascunho.centro,
@@ -285,8 +313,31 @@ export const ConfigurarMesas: React.FC<ConfigurarMesasProps> = ({
                     {siglaValida(edicao.rascunho.sigla, mapa, edicao.nova ? undefined : edicao.rascunho.id)}
                   </p>
                 )}
-                <label className="formatter-field-label" htmlFor="wpp-mesa-sup">
-                  Supervisor
+                <label className="formatter-field-label" htmlFor="wpp-mesa-sup-user">
+                  Supervisor alocado (Conta de Login)
+                </label>
+                <select
+                  id="wpp-mesa-sup-user"
+                  className="formatter-select"
+                  value={edicao.rascunho.supervisorUserId || ''}
+                  onChange={(e) => {
+                    const supId = e.target.value || null;
+                    const supUser = listaSupervisores.find((s) => s.id === supId);
+                    mudarRascunho({
+                      supervisorUserId: supId,
+                      ...(supUser ? { supervisor: supUser.displayName } : {}),
+                    });
+                  }}
+                >
+                  <option value="">-- Nenhum supervisor vinculado --</option>
+                  {listaSupervisores.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.displayName} (@{s.username})
+                    </option>
+                  ))}
+                </select>
+                <label className="formatter-field-label" htmlFor="wpp-mesa-sup" style={{ marginTop: '8px' }}>
+                  Nome de exibição do supervisor
                 </label>
                 <input
                   id="wpp-mesa-sup"
