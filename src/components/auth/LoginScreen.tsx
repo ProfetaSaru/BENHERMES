@@ -125,7 +125,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 type="text"
                 className="formatter-select"
                 style={{ width: '100%', paddingLeft: '36px' }}
-                placeholder="Ex.: admin, supervisor1, operador1"
+                placeholder="Digite seu Usuário"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 autoComplete="username"

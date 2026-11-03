@@ -9,10 +9,13 @@ import {
   Edit3,
   Check,
   X,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { AuthUser, ROLE_LABELS, UserRole } from '../../types/auth';
 import { NotificationType } from '../../types/task';
 import { apiRequest } from '../../utils/apiClient';
+import { Button } from '../common/Button';
 
 interface UsersManagementHubProps {
   currentUser: AuthUser;
@@ -33,12 +36,14 @@ export const UsersManagementHub: React.FC<UsersManagementHubProps> = ({
   const [role, setRole] = useState<UserRole>('operador');
   const [supervisorId, setSupervisorId] = useState('');
 
-  // Edição inline de usuário
-  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  // Edição em modal de usuário e senha
+  const [editingUser, setEditingUser] = useState<AuthUser | null>(null);
   const [editDisplayName, setEditDisplayName] = useState('');
   const [editRole, setEditRole] = useState<UserRole>('operador');
   const [editSupervisorId, setEditSupervisorId] = useState('');
   const [editPassword, setEditPassword] = useState('');
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   const loadUsers = useCallback(async () => {
     try {
@@ -55,6 +60,17 @@ export const UsersManagementHub: React.FC<UsersManagementHubProps> = ({
   useEffect(() => {
     void loadUsers();
   }, [loadUsers]);
+
+  useEffect(() => {
+    if (!editingUser) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setEditingUser(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [editingUser]);
 
   const supervisors = users.filter((u) => u.role === 'supervisor' && u.active);
 
@@ -89,16 +105,25 @@ export const UsersManagementHub: React.FC<UsersManagementHubProps> = ({
   };
 
   const startEditing = (u: AuthUser) => {
-    setEditingUserId(u.id);
+    setEditingUser(u);
     setEditDisplayName(u.displayName);
     setEditRole(u.role);
     setEditSupervisorId(u.supervisorId || '');
     setEditPassword('');
+    setShowEditPassword(false);
   };
 
-  const handleSaveEdit = async (u: AuthUser) => {
+  const handleSaveEdit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!editingUser) return;
+    if (!editDisplayName.trim()) {
+      onNotify('O nome do usuário não pode ficar em branco.', 'error');
+      return;
+    }
+
     try {
-      await apiRequest(`/api/users/${encodeURIComponent(u.id)}`, {
+      setIsSavingEdit(true);
+      await apiRequest(`/api/users/${encodeURIComponent(editingUser.id)}`, {
         method: 'PUT',
         body: {
           displayName: editDisplayName.trim(),
@@ -107,11 +132,13 @@ export const UsersManagementHub: React.FC<UsersManagementHubProps> = ({
           password: editPassword.trim() ? editPassword.trim() : undefined,
         },
       });
-      onNotify(`Conta "${editDisplayName.trim()}" atualizada!`, 'success');
-      setEditingUserId(null);
+      onNotify(`Conta "${editDisplayName.trim()}" atualizada com sucesso!`, 'success');
+      setEditingUser(null);
       await loadUsers();
     } catch (err: any) {
       onNotify(err.message || 'Erro ao atualizar conta.', 'error');
+    } finally {
+      setIsSavingEdit(false);
     }
   };
 
@@ -265,7 +292,7 @@ export const UsersManagementHub: React.FC<UsersManagementHubProps> = ({
           {role === 'operador' && (
             <div>
               <label className="formatter-field-label" htmlFor="new-user-sup">
-                Supervisor Associado
+                Supervisor
               </label>
               <select
                 id="new-user-sup"
@@ -295,7 +322,7 @@ export const UsersManagementHub: React.FC<UsersManagementHubProps> = ({
       </div>
 
       {/* Lista de Contas */}
-      <div className="formatter-card">
+      <div className="users-mgmt-card">
         <div className="formatter-card-header">
           <h2 className="formatter-card-title">
             <Users size={20} />
@@ -306,75 +333,31 @@ export const UsersManagementHub: React.FC<UsersManagementHubProps> = ({
         {loading ? (
           <div className="formatter-field-sample">Carregando contas...</div>
         ) : (
-          <div className="formatter-table-scroll">
-            <table className="formatter-table">
+          <div className="users-table-scroll">
+            <table className="users-table">
               <thead>
                 <tr>
                   <th>Nome</th>
                   <th>Login</th>
                   <th>Perfil</th>
-                  <th>Supervisor Associado</th>
+                  <th>Supervisor</th>
                   <th>Status</th>
                   <th style={{ textAlign: 'right' }}>Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {users.map((u) => {
-                  const isEditing = editingUserId === u.id;
                   return (
                     <tr key={u.id}>
-                      <td style={{ fontWeight: 600 }}>
-                        {isEditing ? (
-                          <input
-                            className="formatter-select"
-                            value={editDisplayName}
-                            onChange={(e) => setEditDisplayName(e.target.value)}
-                            aria-label="Editar nome"
-                          />
-                        ) : (
-                          u.displayName
-                        )}
-                      </td>
+                      <td style={{ fontWeight: 600 }}>{u.displayName}</td>
                       <td>
                         <code>{u.username}</code>
                       </td>
                       <td>
-                        {isEditing ? (
-                          <select
-                            className="formatter-select"
-                            value={editRole}
-                            onChange={(e) => setEditRole(e.target.value as UserRole)}
-                            aria-label="Editar perfil"
-                          >
-                            <option value="operador">Operador</option>
-                            <option value="supervisor">Supervisor</option>
-                            <option value="gerente">Gerente</option>
-                            <option value="admin">Admin</option>
-                          </select>
-                        ) : (
-                          <span className="badge badge-primary">{ROLE_LABELS[u.role]}</span>
-                        )}
+                        <span className="badge badge-primary">{ROLE_LABELS[u.role]}</span>
                       </td>
                       <td>
-                        {isEditing ? (
-                          editRole === 'operador' ? (
-                            <select
-                              className="formatter-select"
-                              value={editSupervisorId}
-                              onChange={(e) => setEditSupervisorId(e.target.value)}
-                              aria-label="Editar supervisor associado"
-                            >
-                              <option value="">Sem supervisor</option>
-                              {supervisors.map((sup) => (
-                                <option key={sup.id} value={sup.id}>
-                                  {sup.displayName}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <span style={{ color: 'var(--text-muted)' }}>—</span>
-                          )
-                        ) : u.role === 'operador' ? (
+                        {u.role === 'operador' ? (
                           u.supervisorName || (
                             <span style={{ color: 'var(--text-muted)' }}>Sem supervisor</span>
                           )
@@ -383,93 +366,43 @@ export const UsersManagementHub: React.FC<UsersManagementHubProps> = ({
                         )}
                       </td>
                       <td>
-                        {isEditing ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                            <KeyRound size={14} />
-                            <input
-                              id={`edit-password-${u.id}`}
-                              name="new-password"
-                              autoComplete="new-password"
-                              type="password"
-                              className="formatter-select"
-                              placeholder="Nova senha (opcional)"
-                              value={editPassword}
-                              onChange={(e) => setEditPassword(e.target.value)}
-                              aria-label="Nova senha opcional"
-                            />
-                          </div>
-                        ) : u.active ? (
+                        {u.active ? (
                           <span className="badge badge-success">Ativo</span>
                         ) : (
                           <span className="badge badge-muted">Inativo</span>
                         )}
                       </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <div
-                          style={{
-                            display: 'inline-flex',
-                            gap: '0.4rem',
-                            alignItems: 'center',
-                            justifyContent: 'flex-end',
-                          }}
-                        >
-                          {isEditing ? (
+                      <td className="users-col-actions">
+                        <div className="users-actions-group">
+                          <Button
+                            variant="secondary"
+                            icon={<Edit3 size={14} />}
+                            onClick={() => startEditing(u)}
+                            title="Editar dados da conta e redefinir senha"
+                            style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                          >
+                            Editar / Senha
+                          </Button>
+                          {u.id !== currentUser.id && (
                             <>
+                              <Button
+                                variant="secondary"
+                                icon={u.active ? <XCircle size={14} /> : <CheckCircle2 size={14} />}
+                                onClick={() => handleToggleActive(u)}
+                                title={u.active ? 'Desativar conta' : 'Ativar conta'}
+                                style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                              >
+                                {u.active ? 'Desativar' : 'Ativar'}
+                              </Button>
                               <button
                                 type="button"
-                                className="btn btn-primary"
-                                style={{ padding: '5px 10px', width: 'auto' }}
-                                onClick={() => handleSaveEdit(u)}
-                                title="Salvar alterações"
+                                className="ura-arquivo-remover"
+                                onClick={() => handleDeleteUser(u)}
+                                title="Excluir conta"
+                                aria-label={`Excluir conta ${u.displayName}`}
                               >
-                                <Check size={14} />
-                                Salvar
+                                <Trash2 size={16} />
                               </button>
-                              <button
-                                type="button"
-                                className="btn btn-secondary"
-                                style={{ padding: '5px 10px', width: 'auto' }}
-                                onClick={() => setEditingUserId(null)}
-                                title="Cancelar"
-                              >
-                                <X size={14} />
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <button
-                                type="button"
-                                className="btn btn-secondary"
-                                style={{ padding: '5px 10px', width: 'auto', fontSize: '0.78rem' }}
-                                onClick={() => startEditing(u)}
-                                title="Editar nome, cargo, supervisor ou senha"
-                              >
-                                <Edit3 size={14} />
-                                Editar / Senha
-                              </button>
-                              {u.id !== currentUser.id && (
-                                <>
-                                  <button
-                                    type="button"
-                                    className="btn btn-secondary"
-                                    style={{ padding: '5px 10px', width: 'auto', fontSize: '0.78rem' }}
-                                    onClick={() => handleToggleActive(u)}
-                                    title={u.active ? 'Desativar conta' : 'Ativar conta'}
-                                  >
-                                    {u.active ? <XCircle size={14} /> : <CheckCircle2 size={14} />}
-                                    {u.active ? 'Desativar' : 'Ativar'}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="ura-arquivo-remover"
-                                    onClick={() => handleDeleteUser(u)}
-                                    title="Excluir conta"
-                                    aria-label={`Excluir conta ${u.displayName}`}
-                                  >
-                                    <Trash2 size={16} />
-                                  </button>
-                                </>
-                              )}
                             </>
                           )}
                         </div>
@@ -482,6 +415,158 @@ export const UsersManagementHub: React.FC<UsersManagementHubProps> = ({
           </div>
         )}
       </div>
+
+      {/* Modal de Edição de Conta & Redefinição de Senha */}
+      {editingUser && (
+        <div
+          className="modal-backdrop"
+          onClick={() => setEditingUser(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="modal-card"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '520px', width: '100%' }}
+          >
+            <div className="modal-header">
+              <div className="modal-title-group">
+                <p className="modal-kicker">GESTÃO DE ACESSO</p>
+                <h3 className="modal-title">Editar Conta &amp; Senha</h3>
+              </div>
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => setEditingUser(null)}
+                aria-label="Fechar"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form
+              onSubmit={handleSaveEdit}
+              className="modal-body"
+              style={{ padding: '20px 24px', overflowY: 'auto' }}
+            >
+              <div className="user-edit-modal-form">
+                <div className="form-group">
+                  <label htmlFor="edit-username">Login de Acesso (Identificador)</label>
+                  <input
+                    id="edit-username"
+                    className="formatter-select"
+                    value={editingUser.username}
+                    disabled
+                    style={{
+                      background: 'var(--paper-surface)',
+                      cursor: 'not-allowed',
+                      opacity: 0.8,
+                      fontFamily: 'monospace',
+                    }}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="edit-display-name">Nome Completo / Exibição</label>
+                  <input
+                    id="edit-display-name"
+                    className="formatter-select"
+                    value={editDisplayName}
+                    onChange={(e) => setEditDisplayName(e.target.value)}
+                    placeholder="Nome completo do usuário"
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="edit-role">Tipo de Login (Cargo)</label>
+                  <select
+                    id="edit-role"
+                    className="formatter-select"
+                    value={editRole}
+                    onChange={(e) => setEditRole(e.target.value as UserRole)}
+                  >
+                    <option value="operador">Operador</option>
+                    <option value="supervisor">Supervisor</option>
+                    <option value="gerente">Gerente</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+
+                {editRole === 'operador' && (
+                  <div className="form-group">
+                    <label htmlFor="edit-supervisor">Supervisor</label>
+                    <select
+                      id="edit-supervisor"
+                      className="formatter-select"
+                      value={editSupervisorId}
+                      onChange={(e) => setEditSupervisorId(e.target.value)}
+                    >
+                      <option value="">Sem supervisor vinculado</option>
+                      {supervisors
+                        .filter((s) => s.id !== editingUser.id)
+                        .map((sup) => (
+                          <option key={sup.id} value={sup.id}>
+                            {sup.displayName} ({sup.username})
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                )}
+
+                <div className="user-edit-modal-password-box">
+                  <div className="user-edit-modal-password-header">
+                    <KeyRound size={16} style={{ color: 'var(--blue)' }} />
+                    <span>Redefinir Senha de Acesso</span>
+                  </div>
+                  <p className="user-edit-modal-password-desc">
+                    Deixe em branco para manter a senha atual inalterada. Preencha apenas caso queira cadastrar uma nova senha para este usuário.
+                  </p>
+                  <div className="user-password-input-wrap">
+                    <input
+                      id="edit-password"
+                      name="new-password"
+                      type={showEditPassword ? 'text' : 'password'}
+                      className="formatter-select"
+                      value={editPassword}
+                      onChange={(e) => setEditPassword(e.target.value)}
+                      placeholder="Digite a nova senha..."
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      className="user-password-toggle-btn"
+                      onClick={() => setShowEditPassword((prev) => !prev)}
+                      title={showEditPassword ? 'Ocultar senha' : 'Ver senha'}
+                      aria-label="Alternar visibilidade da senha"
+                    >
+                      {showEditPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-actions" style={{ marginTop: '24px' }}>
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={() => setEditingUser(null)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  variant="primary"
+                  type="submit"
+                  icon={<Check size={16} />}
+                  disabled={isSavingEdit}
+                >
+                  {isSavingEdit ? 'Salvando...' : 'Salvar Alterações'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

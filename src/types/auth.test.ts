@@ -6,6 +6,9 @@ import {
   canImportOverwriteWhatsappMap,
   canDeleteReports,
   canEditFeriados,
+  isTemplateAllowedForRole,
+  formatFirstAndLastName,
+  formatOperatorReportTitle,
 } from './auth';
 import { getNavigationItems } from '../utils/navigationItems';
 
@@ -54,6 +57,46 @@ describe('RBAC e Visibilidade de Abas por Perfil', () => {
     expect(ids).toEqual(['relatorios', 'historico', 'configuracoes']);
     expect(canManageWhatsappMaintenance('operador')).toBe(false);
     expect(canDeleteWhatsappItems('operador')).toBe(false);
+  });
+
+  it('restringe modelos de relatórios para operador exclusivamente para atividades e tma', () => {
+    expect(isTemplateAllowedForRole('operador', 'atividades-padrao')).toBe(true);
+    expect(isTemplateAllowedForRole('operador', 'produtividade-atendimento')).toBe(true);
+    expect(isTemplateAllowedForRole('operador', 'atividades-tabela')).toBe(false);
+    expect(isTemplateAllowedForRole('operador', 'passagem-plantao')).toBe(false);
+    expect(isTemplateAllowedForRole('operador', 'novo-colaborador')).toBe(false);
+    expect(isTemplateAllowedForRole('operador', 'comunicado-geral')).toBe(false);
+    expect(isTemplateAllowedForRole('operador', 'relatorio-incidente')).toBe(false);
+
+    // Outros papéis têm acesso total
+    for (const role of ['admin', 'gerente', 'supervisor'] as const) {
+      expect(isTemplateAllowedForRole(role, 'atividades-padrao')).toBe(true);
+      expect(isTemplateAllowedForRole(role, 'atividades-tabela')).toBe(true);
+      expect(isTemplateAllowedForRole(role, 'passagem-plantao')).toBe(true);
+      expect(isTemplateAllowedForRole(role, 'novo-colaborador')).toBe(true);
+    }
+  });
+
+  it('formata primeiro e último nome corretamente', () => {
+    expect(formatFirstAndLastName('Carlos Eduardo da Silva')).toBe('Carlos Silva');
+    expect(formatFirstAndLastName('Beatriz Mendes')).toBe('Beatriz Mendes');
+    expect(formatFirstAndLastName('Lucas')).toBe('Lucas');
+    expect(formatFirstAndLastName('   Mariana   Alves   Ferreira   ')).toBe('Mariana Ferreira');
+    expect(formatFirstAndLastName('')).toBe('');
+  });
+
+  it('padroniza o título do relatório de operador como Primeiro Ultimo - Data - Hora', () => {
+    const user = { username: 'carlos123', displayName: 'Carlos Eduardo da Silva' };
+    const title = formatOperatorReportTitle(user, '2026-10-30', '12:45');
+    expect(title).toBe('Carlos Silva - 30/10/2026 - 12:45');
+
+    const singleNameUser = { username: 'beatriz', displayName: 'Beatriz' };
+    const title2 = formatOperatorReportTitle(singleNameUser, '2026-10-30', '09:00');
+    expect(title2).toBe('Beatriz - 30/10/2026 - 09:00');
+
+    const noDisplayNameUser = { username: 'operador_joao' };
+    const title3 = formatOperatorReportTitle(noDisplayNameUser, '15/08/2026', '14:20');
+    expect(title3).toBe('operador_joao - 15/08/2026 - 14:20');
   });
 });
 
