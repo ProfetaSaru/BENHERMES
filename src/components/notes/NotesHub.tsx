@@ -8,6 +8,10 @@ import {
   User,
   Tag,
   RefreshCw,
+  X,
+  MessageSquare,
+  Bell,
+  Sparkles,
 } from 'lucide-react';
 import type { NoteItem, NoteColor } from '../../types/notes';
 import { NOTE_CATEGORIES } from '../../types/notes';
@@ -81,6 +85,14 @@ export const NotesHub: React.FC<NotesHubProps> = ({
       // Ignora falhas de localStorage
     }
   };
+
+  // Estatísticas rápidas
+  const stats = useMemo(() => {
+    const total = notes.length;
+    const comments = notes.reduce((acc, n) => acc + (n.commentsCount || 0), 0);
+    const unread = notes.filter((n) => n.unreadCommentsCount > 0).length;
+    return { total, comments, unread };
+  }, [notes]);
 
   // Extrai lista única de colaboradores visíveis para o dropdown de filtro
   const availableAuthors = useMemo(() => {
@@ -165,17 +177,35 @@ export const NotesHub: React.FC<NotesHubProps> = ({
 
   return (
     <div className="notes-hub-container">
-      {/* Header */}
-      <div className="notes-hub-header">
+      {/* Header com Estatísticas */}
+      <div className="notes-hub-header-modern">
         <div className="header-text-block">
           <div className="header-title-row">
-            <div className="header-icon-box">
+            <div className="header-icon-box-modern">
               <StickyNote size={24} />
             </div>
             <div>
-              <h1 className="header-main-title">Mural de Anotações</h1>
+              <div className="header-headline-row">
+                <h1 className="header-main-title">Mural de Anotações</h1>
+                <div className="header-stats-chips">
+                  <span className="stat-chip" title="Total de anotações">
+                    <Sparkles size={12} />
+                    <span>{stats.total} {stats.total === 1 ? 'anotação' : 'anotações'}</span>
+                  </span>
+                  <span className="stat-chip" title="Total de comentários">
+                    <MessageSquare size={12} />
+                    <span>{stats.comments} {stats.comments === 1 ? 'comentário' : 'comentários'}</span>
+                  </span>
+                  {stats.unread > 0 && (
+                    <span className="stat-chip stat-chip-unread" title="Anotações com comentários não lidos">
+                      <Bell size={12} className="pulse-icon" />
+                      <span>{stats.unread} {stats.unread === 1 ? 'pendente' : 'pendentes'}</span>
+                    </span>
+                  )}
+                </div>
+              </div>
               <p className="header-subtitle">
-                Espaço compartilhado para anotações, recados e feedbacks contextuais com sua equipe.
+                Espaço compartilhado para recados, dúvidas e feedbacks com sua equipe.
               </p>
             </div>
           </div>
@@ -184,7 +214,7 @@ export const NotesHub: React.FC<NotesHubProps> = ({
         <div className="header-actions-block">
           <button
             type="button"
-            className="btn btn-primary create-note-btn"
+            className="btn btn-primary create-note-btn-modern"
             onClick={handleOpenCreateModal}
           >
             <Plus size={16} />
@@ -194,16 +224,26 @@ export const NotesHub: React.FC<NotesHubProps> = ({
       </div>
 
       {/* Toolbar / Filtros */}
-      <div className="notes-hub-toolbar">
-        <div className="toolbar-search-box">
-          <Search size={16} className="search-icon" />
+      <div className="notes-hub-toolbar-modern">
+        <div className="toolbar-search-box-modern">
+          <Search size={15} className="search-icon" />
           <input
             type="text"
             className="toolbar-search-input"
-            placeholder="Buscar por título, texto ou autor..."
+            placeholder="Buscar por título, texto ou colaborador..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+          {searchTerm && (
+            <button
+              type="button"
+              className="search-clear-btn"
+              onClick={() => setSearchTerm('')}
+              title="Limpar busca"
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
 
         <div className="toolbar-filters-group">
@@ -235,7 +275,7 @@ export const NotesHub: React.FC<NotesHubProps> = ({
                 onChange={(e) => setSelectedUserFilter(e.target.value)}
                 aria-label="Filtrar por Pessoa"
               >
-                <option value="all">Todas as Pessoas</option>
+                <option value="all">Todos os Colaboradores</option>
                 {availableAuthors.map((author) => (
                   <option key={author.id} value={author.id}>
                     {author.name} ({author.role})
@@ -257,7 +297,7 @@ export const NotesHub: React.FC<NotesHubProps> = ({
           </button>
 
           {/* Alternador Grid / Lista */}
-          <div className="view-mode-toggle" role="group" aria-label="Modo de visualização">
+          <div className="view-mode-toggle-modern" role="group" aria-label="Modo de visualização">
             <button
               type="button"
               className={`toggle-btn ${viewMode === 'grid' ? 'active' : ''}`}
@@ -284,19 +324,19 @@ export const NotesHub: React.FC<NotesHubProps> = ({
       <div className="notes-hub-content">
         {isLoading && notes.length === 0 ? (
           <div className="notes-loading-state">
-            <RefreshCw size={24} className="animate-spin" />
+            <RefreshCw size={26} className="animate-spin" />
             <p>Carregando anotações do servidor...</p>
           </div>
         ) : filteredNotes.length === 0 ? (
-          <div className="notes-empty-state">
-            <div className="empty-icon-box">
-              <StickyNote size={40} />
+          <div className="notes-empty-state-modern">
+            <div className="empty-icon-box-modern">
+              <StickyNote size={36} />
             </div>
             <h3>Nenhuma anotação encontrada</h3>
             <p>
               {searchTerm || selectedCategory !== 'all' || selectedUserFilter !== 'all'
-                ? 'Nenhuma anotação corresponde aos filtros selecionados. Tente limpar os filtros.'
-                : 'Ainda não há anotações registradas. Crie a primeira para começar!'}
+                ? 'Nenhuma anotação corresponde aos filtros aplicados. Tente limpar os critérios.'
+                : 'Ainda não há anotações registradas. Crie a primeira anotação para sua equipe!'}
             </p>
             {searchTerm || selectedCategory !== 'all' || selectedUserFilter !== 'all' ? (
               <button
@@ -322,7 +362,7 @@ export const NotesHub: React.FC<NotesHubProps> = ({
             )}
           </div>
         ) : viewMode === 'grid' ? (
-          <div className="notes-grid">
+          <div className="notes-grid-modern">
             {filteredNotes.map((note) => (
               <NoteCard
                 key={note.id}
@@ -341,14 +381,14 @@ export const NotesHub: React.FC<NotesHubProps> = ({
             ))}
           </div>
         ) : (
-          <div className="notes-table-container">
-            <table className="notes-table">
+          <div className="notes-table-container-modern">
+            <table className="notes-table-modern">
               <thead>
                 <tr>
-                  <th style={{ width: '140px' }}>Categoria / Cor</th>
+                  <th style={{ width: '150px' }}>Categoria</th>
                   <th>Título & Prévia</th>
-                  <th style={{ width: '180px' }}>Autor</th>
-                  <th style={{ width: '160px' }}>Criado em</th>
+                  <th style={{ width: '220px' }}>Autor</th>
+                  <th style={{ width: '170px' }}>Data</th>
                   <th style={{ width: '90px', textAlign: 'center' }}>Comentários</th>
                   <th style={{ width: '120px', textAlign: 'right' }}>Ações</th>
                 </tr>
@@ -376,10 +416,11 @@ export const NotesHub: React.FC<NotesHubProps> = ({
         )}
       </div>
 
-      {/* Modal de Criação / Edição */}
+      {/* Modal de Criação / Edição com Live Preview */}
       <NoteEditorModal
         isOpen={isEditorOpen}
         noteToEdit={noteToEdit}
+        currentUser={currentUser}
         onClose={() => setIsEditorOpen(false)}
         onSave={handleSaveNote}
       />
@@ -406,7 +447,7 @@ export const NotesHub: React.FC<NotesHubProps> = ({
         isOpen={Boolean(noteToDelete)}
         kicker="Excluir Anotação"
         title={`Deseja excluir "${noteToDelete?.title}"?`}
-        message="Essa ação removerá permanentemente a anotação e todos os seus comentários."
+        message="Essa ação removerá permanentemente a anotação e todo o histórico de comentários."
         confirmLabel="Excluir Definitivamente"
         cancelLabel="Cancelar"
         onConfirm={handleConfirmDelete}

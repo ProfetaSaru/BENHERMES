@@ -1,6 +1,20 @@
 import React from 'react';
-import { MessageSquare, Bell, Edit3, Trash2, ArrowRight } from 'lucide-react';
+import {
+  MessageSquare,
+  Bell,
+  Edit3,
+  Trash2,
+  ArrowRight,
+  AlertTriangle,
+  Clock,
+  HelpCircle,
+  Bookmark,
+  PhoneCall,
+  MessageCircle,
+  FileText,
+} from 'lucide-react';
 import type { NoteItem } from '../../types/notes';
+import { getAuthorInitials } from '../../types/notes';
 import type { AuthUser } from '../../types/auth';
 import { ROLE_LABELS } from '../../types/auth';
 
@@ -11,6 +25,25 @@ interface NoteRowProps {
   onEdit: (e: React.MouseEvent) => void;
   onDelete: (e: React.MouseEvent) => void;
 }
+
+const getCategoryIcon = (category: string) => {
+  switch (category) {
+    case 'Urgente':
+      return <AlertTriangle size={12} className="cat-icon-urgent" />;
+    case 'Rotina':
+      return <Clock size={12} />;
+    case 'Dúvida':
+      return <HelpCircle size={12} />;
+    case 'Lembrete':
+      return <Bookmark size={12} />;
+    case 'Atendimento':
+      return <PhoneCall size={12} />;
+    case 'Feedback':
+      return <MessageCircle size={12} />;
+    default:
+      return <FileText size={12} />;
+  }
+};
 
 export const NoteRow: React.FC<NoteRowProps> = ({
   note,
@@ -36,22 +69,27 @@ export const NoteRow: React.FC<NoteRowProps> = ({
     }
   };
 
+  const initials = getAuthorInitials(note.authorName);
+
   return (
     <tr
       className={`note-table-row note-row-${note.color} ${note.unreadCommentsCount > 0 ? 'has-unread' : ''}`}
       onClick={onClick}
     >
-      <td className="note-cell-color">
-        <span className={`color-dot color-dot-${note.color}`} title={`Cor: ${note.color}`} />
-        <span className="note-category-badge">{note.category}</span>
+      <td className="note-cell-color-accent">
+        <div className={`color-accent-strip color-strip-${note.color}`} />
+        <span className={`note-category-chip cat-${note.category.toLowerCase()}`}>
+          {getCategoryIcon(note.category)}
+          <span>{note.category}</span>
+        </span>
       </td>
 
       <td className="note-cell-info">
         <div className="note-row-title-wrap">
           <strong className="note-row-title">{note.title}</strong>
           {note.unreadCommentsCount > 0 && (
-            <span className="note-unread-badge" title="Novos comentários">
-              <Bell size={11} />
+            <span className="note-unread-pulse-badge" title="Novos comentários">
+              <Bell size={11} className="pulse-icon" />
               <span>{note.unreadCommentsCount} novo</span>
             </span>
           )}
@@ -60,11 +98,16 @@ export const NoteRow: React.FC<NoteRowProps> = ({
       </td>
 
       <td className="note-cell-author">
-        <div className="author-wrap">
-          <span className="author-name">{note.authorName}</span>
-          <span className={`role-pill role-${note.authorRole}`}>
-            {ROLE_LABELS[note.authorRole] || note.authorRole}
-          </span>
+        <div className="author-row-cluster">
+          <div className={`author-avatar-circle avatar-${note.authorRole}`} title={note.authorName}>
+            {initials}
+          </div>
+          <div className="author-text-meta">
+            <span className="author-name">{note.authorName}</span>
+            <span className={`role-badge role-badge-${note.authorRole}`}>
+              {ROLE_LABELS[note.authorRole] || note.authorRole}
+            </span>
+          </div>
         </div>
       </td>
 
@@ -73,10 +116,10 @@ export const NoteRow: React.FC<NoteRowProps> = ({
       </td>
 
       <td className="note-cell-comments">
-        <span className="note-comments-counter">
-          <MessageSquare size={14} />
+        <div className="note-comments-pill">
+          <MessageSquare size={12} />
           <span>{note.commentsCount}</span>
-        </span>
+        </div>
       </td>
 
       <td className="note-cell-actions" onClick={(e) => e.stopPropagation()}>
@@ -84,7 +127,7 @@ export const NoteRow: React.FC<NoteRowProps> = ({
           <button
             type="button"
             className="note-table-btn view-btn"
-            title="Ver anotação completa e comentários"
+            title="Abrir detalhes e comentários"
             onClick={onClick}
           >
             <ArrowRight size={14} />
@@ -114,4 +157,3 @@ export const NoteRow: React.FC<NoteRowProps> = ({
     </tr>
   );
 };
-
