@@ -465,6 +465,49 @@ pre {
   margin-top: 24px;
 }
 
+/* Modais de Confirmação e Diálogos de Alerta (sem header/body fatiados) */
+.modal-confirm-card,
+.modal-card:not(:has(.modal-header)):not(:has(.modal-body)) {
+  padding: 1.75rem 2rem;
+  max-width: 480px;
+}
+
+.modal-confirm-card .modal-confirm-kicker,
+.modal-card:not(:has(.modal-header)) > .section-kicker {
+  margin: 0 0 8px 0;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--blue);
+}
+
+.modal-confirm-card .modal-confirm-title,
+.modal-card:not(:has(.modal-header)) > h2 {
+  margin: 0 0 10px 0;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.35;
+  letter-spacing: -0.015em;
+}
+
+.modal-confirm-card .modal-confirm-message,
+.modal-card:not(:has(.modal-header)) > p:not(.section-kicker) {
+  margin: 0 0 1.5rem 0;
+  color: var(--muted);
+  font-size: 0.94rem;
+  line-height: 1.55;
+}
+
+.modal-confirm-card .modal-confirm-actions,
+.modal-card:not(:has(.modal-header)) > .modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 0;
+}
+
 .modal-header {
   padding: 1.25rem 1.5rem;
   border-bottom: 1px solid var(--line);

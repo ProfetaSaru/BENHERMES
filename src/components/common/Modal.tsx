@@ -53,11 +53,11 @@ export const Modal: React.FC<ModalProps> = ({
       aria-labelledby="modal-title"
       onClick={handleBackdropClick}
     >
-      <div className="modal-card">
-        {kicker && <p className="section-kicker">{kicker}</p>}
-        <h2 id="modal-title">{title}</h2>
-        <p>{message}</p>
-        <div className="modal-actions">
+      <div className="modal-card modal-confirm-card">
+        {kicker && <p className="section-kicker modal-confirm-kicker">{kicker}</p>}
+        <h2 id="modal-title" className="modal-confirm-title">{title}</h2>
+        <p className="modal-confirm-message">{message}</p>
+        <div className="modal-actions modal-confirm-actions">
           <Button variant="secondary" onClick={onCancel}>
             {cancelLabel}
           </Button>
