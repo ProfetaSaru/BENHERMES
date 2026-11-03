@@ -3564,7 +3564,43 @@ pre {
   overflow: hidden;
 }
 
+.note-preview-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 9999px;
+  border: 1px solid var(--line);
+  background: var(--paper-surface);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.note-preview-toggle-btn:hover {
+  color: var(--ink);
+  border-color: var(--line-strong);
+  background: var(--paper);
+}
+
+.note-preview-toggle-btn.active {
+  background: var(--blue-soft, rgba(29, 78, 216, 0.1));
+  color: var(--blue);
+  border-color: rgba(29, 78, 216, 0.35);
+  box-shadow: 0 1px 3px rgba(29, 78, 216, 0.15);
+}
+
 .editor-modal-layout {
+  transition: all 0.22s ease;
+}
+
+.editor-modal-layout.no-preview {
+  display: block;
+}
+
+.editor-modal-layout.has-preview {
   display: grid;
   grid-template-columns: 1fr 310px;
   gap: 1.75rem;
@@ -3572,7 +3608,7 @@ pre {
 }
 
 @media (max-width: 800px) {
-  .editor-modal-layout {
+  .editor-modal-layout.has-preview {
     grid-template-columns: 1fr;
   }
 }
@@ -3629,69 +3665,192 @@ pre {
   opacity: 0.75;
 }
 
-/* Seletor de Categoria com Chips */
-.category-chips-selector {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-}
-
-.cat-select-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.45rem 0.85rem;
-  border-radius: 9999px;
-  border: 1px solid var(--line);
-  background: var(--paper-surface);
-  color: var(--ink-secondary);
-  font-size: 0.82rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.cat-select-chip:hover {
-  border-color: var(--blue);
-  color: var(--blue);
-  background: var(--blue-soft);
-}
-
-.cat-select-chip.active {
-  background: var(--blue);
-  border-color: var(--blue);
-  color: #ffffff;
-  font-weight: 600;
-  box-shadow: 0 2px 6px rgba(29, 78, 216, 0.25);
-}
-
-/* Seletor de Cores com Grade */
-.color-swatches-grid {
+/* Linha Compacta com Seletores Expansíveis */
+.note-meta-collapsible-row {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(95px, 1fr));
-  gap: 0.5rem;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 }
 
-.color-choice-btn {
+@media (max-width: 480px) {
+  .note-meta-collapsible-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.expandable-selector-wrap {
+  position: relative;
+}
+
+.expandable-selector {
+  position: relative;
+  width: 100%;
+}
+
+.expandable-selector-trigger {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
-  padding: 0.45rem 0.65rem;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 12px;
   background: var(--paper-surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 8px);
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-family: inherit;
   cursor: pointer;
   transition: all 0.15s ease;
+  box-sizing: border-box;
 }
 
-.color-choice-btn:hover {
+.expandable-selector-trigger:hover {
   border-color: var(--blue);
-}
-
-.color-choice-btn.active {
-  border-color: var(--blue);
-  box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.25);
   background: var(--paper);
+}
+
+.expandable-selector-trigger.open {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.15);
+  background: var(--paper);
+}
+
+.trigger-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cat-trigger-icon {
+  display: flex;
+  align-items: center;
+  color: var(--blue);
+}
+
+.cat-trigger-label,
+.color-trigger-label {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.swatch-circle-compact {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.trigger-chevron {
+  color: var(--muted);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  flex-shrink: 0;
+}
+
+.trigger-chevron.rotated {
+  transform: rotate(180deg);
+  color: var(--blue);
+}
+
+/* Menus Dropdown Expansíveis */
+.expandable-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 8px);
+  box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.18), 0 4px 10px -2px rgba(0, 0, 0, 0.08);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 220px;
+  overflow-y: auto;
+  animation: modalFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.expandable-dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  text-align: left;
+  width: 100%;
+}
+
+.expandable-dropdown-item:hover {
+  background: var(--paper-surface);
+  color: var(--blue);
+}
+
+.expandable-dropdown-item.active {
+  background: var(--blue-soft, rgba(29, 78, 216, 0.1));
+  color: var(--blue);
+  font-weight: 600;
+}
+
+.dropdown-item-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dropdown-item-check {
+  color: var(--blue);
+  flex-shrink: 0;
+}
+
+/* Grid de Cores dentro do Dropdown */
+.color-dropdown-menu {
+  padding: 8px;
+}
+
+.expandable-color-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+.expandable-color-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--paper-surface);
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--ink);
+  transition: all 0.12s ease;
+  text-align: left;
+}
+
+.expandable-color-item:hover {
+  border-color: var(--blue);
+  background: var(--paper);
+}
+
+.expandable-color-item.active {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.2);
+  background: var(--paper);
+  font-weight: 600;
 }
 
 .swatch-circle {
@@ -3704,10 +3863,14 @@ pre {
   flex-shrink: 0;
 }
 
-.swatch-label {
+.swatch-label,
+.swatch-item-label {
   font-size: 0.78rem;
   color: var(--ink);
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Painel de Live Preview */
