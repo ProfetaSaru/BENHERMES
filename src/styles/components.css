@@ -3529,7 +3529,7 @@ pre {
 
 .note-editor-modal-modern .modal-header,
 .note-detail-modal-modern .modal-header {
-  padding: 1.25rem 1.75rem;
+  padding: 1rem 1.5rem;
   background: var(--paper);
   border-bottom: 1px solid var(--line);
   display: flex;
@@ -3539,7 +3539,7 @@ pre {
 }
 
 .note-editor-modal-modern .modal-footer {
-  padding: 1rem 1.75rem;
+  padding: 0.85rem 1.5rem;
   background: var(--paper-surface);
   border-top: 1px solid var(--line);
   display: flex;
@@ -3551,7 +3551,7 @@ pre {
 
 .note-editor-modal-body,
 .note-detail-modal-body {
-  padding: 1.5rem 1.75rem;
+  padding: 1.25rem 1.5rem;
   background: var(--paper);
   overflow-y: auto;
   flex: 1;
@@ -3616,7 +3616,7 @@ pre {
 .note-editor-form-left {
   display: flex;
   flex-direction: column;
-  gap: 1.15rem;
+  gap: 0.95rem;
 }
 
 .note-editor-form-left .form-label {
@@ -3663,6 +3663,14 @@ pre {
 .note-comment-input::placeholder {
   color: var(--muted);
   opacity: 0.75;
+}
+
+/* Altura Ampliada e Responsiva para Área de Escrita */
+.note-form-textarea {
+  min-height: 220px;
+  height: clamp(220px, 32vh, 320px);
+  resize: vertical;
+  line-height: 1.55;
 }
 
 /* Linha Compacta com Seletores Expansíveis */
@@ -3897,9 +3905,15 @@ pre {
 
 .note-preview-card {
   pointer-events: none;
-  min-height: 180px;
+  min-height: 240px;
   background: var(--paper);
   border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+}
+
+.note-preview-card .note-card-snippet {
+  flex: 1;
 }
 
 /* Modal de Detalhes e Leitor */

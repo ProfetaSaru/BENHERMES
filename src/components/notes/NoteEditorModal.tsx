@@ -363,7 +363,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
                     id="note-content-input"
                     className="textarea-field note-form-textarea"
                     placeholder="Escreva sua anotação ou recado aqui..."
-                    rows={5}
+                    rows={10}
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
                     required
