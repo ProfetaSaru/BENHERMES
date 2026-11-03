@@ -16,9 +16,8 @@ import {
   FileText,
 } from 'lucide-react';
 import type { NoteItem, NoteColor } from '../../types/notes';
-import { NOTE_COLORS, NOTE_CATEGORIES } from '../../types/notes';
+import { NOTE_COLORS, NOTE_CATEGORIES, getAuthorInitials } from '../../types/notes';
 import type { AuthUser } from '../../types/auth';
-import { ROLE_LABELS } from '../../types/auth';
 
 interface NoteEditorModalProps {
   isOpen: boolean;
@@ -111,15 +110,18 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
     }
   };
 
+  const authorDisplayName = currentUser?.displayName || currentUser?.username || 'Você';
+  const authorInitials = getAuthorInitials(authorDisplayName);
+
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
       <div
-        className="modal-box note-editor-modal-modern"
+        className="modal-card note-editor-modal-modern"
         onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: '820px', width: '94%' }}
+        style={{ maxWidth: '860px', width: '95%' }}
       >
         <div className="modal-header">
-          <div className="modal-title-wrap">
+          <div className="modal-title-group">
             <span className="modal-kicker">Mural de Anotações</span>
             <h2 className="modal-title">
               {noteToEdit ? 'Editar Anotação' : 'Nova Anotação'}
@@ -135,150 +137,155 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
           </button>
         </div>
 
-        <div className="editor-modal-layout">
-          {/* Formulário Principal */}
-          <form onSubmit={handleSubmit} className="note-editor-form-left">
-            {errorMsg && <div className="modal-error-banner">{errorMsg}</div>}
+        <form onSubmit={handleSubmit} className="note-editor-modal-form">
+          <div className="modal-body note-editor-modal-body">
+            <div className="editor-modal-layout">
+              {/* Formulário Principal */}
+              <div className="note-editor-form-left">
+                {errorMsg && <div className="modal-error-banner">{errorMsg}</div>}
 
-            <div className="form-group">
-              <label className="form-label" htmlFor="note-title-input">
-                <Type size={14} />
-                <span>Título da Anotação</span>
-              </label>
-              <input
-                id="note-title-input"
-                type="text"
-                className="form-input"
-                placeholder="Ex: Ponto de atenção com retorno do cliente..."
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                autoFocus
-                required
-              />
-            </div>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="note-title-input">
+                    <Type size={14} />
+                    <span>Título da Anotação</span>
+                  </label>
+                  <input
+                    id="note-title-input"
+                    type="text"
+                    className="field-input input-field note-form-input"
+                    placeholder="Ex: Ponto de atenção com retorno do cliente..."
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    autoFocus
+                    required
+                  />
+                </div>
 
-            {/* Seletor de Categoria com Chips rápidos */}
-            <div className="form-group">
-              <label className="form-label">
-                <Tag size={14} />
-                <span>Categoria</span>
-              </label>
-              <div className="category-chips-selector">
-                {NOTE_CATEGORIES.map((cat) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    className={`cat-select-chip ${category === cat ? 'active' : ''}`}
-                    onClick={() => setCategory(cat)}
-                  >
-                    {getCategoryIcon(cat)}
-                    <span>{cat}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+                {/* Seletor de Categoria com Chips rápidos */}
+                <div className="form-group">
+                  <label className="form-label">
+                    <Tag size={14} />
+                    <span>Categoria</span>
+                  </label>
+                  <div className="category-chips-selector">
+                    {NOTE_CATEGORIES.map((cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        className={`cat-select-chip ${category === cat ? 'active' : ''}`}
+                        onClick={() => setCategory(cat)}
+                      >
+                        {getCategoryIcon(cat)}
+                        <span>{cat}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-            {/* Seletor de Cores */}
-            <div className="form-group">
-              <label className="form-label">
-                <Palette size={14} />
-                <span>Cor do Card</span>
-              </label>
-              <div className="color-swatches-grid">
-                {NOTE_COLORS.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    className={`color-choice-btn color-choice-${c.id} ${color === c.id ? 'active' : ''}`}
-                    title={c.label}
-                    onClick={() => setColor(c.id)}
-                  >
-                    <span className="swatch-circle" style={{ background: c.accentColor }}>
-                      {color === c.id && <Check size={12} color="#fff" />}
-                    </span>
-                    <span className="swatch-label">{c.label.split(' ')[0]}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+                {/* Seletor de Cores */}
+                <div className="form-group">
+                  <label className="form-label">
+                    <Palette size={14} />
+                    <span>Cor do Card</span>
+                  </label>
+                  <div className="color-swatches-grid">
+                    {NOTE_COLORS.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        className={`color-choice-btn color-choice-${c.id} ${color === c.id ? 'active' : ''}`}
+                        title={c.label}
+                        onClick={() => setColor(c.id)}
+                      >
+                        <span className="swatch-circle" style={{ background: c.accentColor }}>
+                          {color === c.id && <Check size={12} color="#fff" />}
+                        </span>
+                        <span className="swatch-label">{c.label.split(' ')[0]}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-            {/* Conteúdo */}
-            <div className="form-group">
-              <label className="form-label" htmlFor="note-content-input">
-                <AlignLeft size={14} />
-                <span>Conteúdo da Anotação</span>
-              </label>
-              <textarea
-                id="note-content-input"
-                className="form-textarea"
-                placeholder="Escreva sua anotação ou recado aqui..."
-                rows={5}
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="modal-actions">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={onClose}
-                disabled={isSubmitting}
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? 'Salvando...' : noteToEdit ? 'Salvar Alterações' : 'Criar Anotação'}
-              </button>
-            </div>
-          </form>
-
-          {/* Live Preview Lateral */}
-          <div className="note-live-preview-wrap">
-            <div className="preview-label">
-              <Eye size={13} />
-              <span>Prévia no Mural</span>
-            </div>
-
-            <div className={`note-card note-card-${color} note-preview-card`}>
-              <div className="note-card-top-accent" />
-              <div className="note-card-header">
-                <div className="note-card-badges">
-                  <span className={`note-category-chip cat-${category.toLowerCase()}`}>
-                    {getCategoryIcon(category)}
-                    <span>{category}</span>
-                  </span>
+                {/* Conteúdo */}
+                <div className="form-group">
+                  <label className="form-label" htmlFor="note-content-input">
+                    <AlignLeft size={14} />
+                    <span>Conteúdo da Anotação</span>
+                  </label>
+                  <textarea
+                    id="note-content-input"
+                    className="textarea-field note-form-textarea"
+                    placeholder="Escreva sua anotação ou recado aqui..."
+                    rows={5}
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                    required
+                  />
                 </div>
               </div>
 
-              <h3 className="note-card-title">
-                {title.trim() || 'Título da anotação'}
-              </h3>
-              <p className="note-card-content">
-                {content.trim() || 'O conteúdo digitado aparecerá aqui como prévia visual.'}
-              </p>
+              {/* Live Preview Lateral */}
+              <div className="note-live-preview-wrap">
+                <div className="preview-label">
+                  <Eye size={13} />
+                  <span>Prévia no Mural</span>
+                </div>
 
-              <div className="note-card-footer">
-                <div className="note-card-author-cluster">
-                  <div className={`author-avatar-circle avatar-${currentUser.role}`}>
-                    {currentUser.displayName ? currentUser.displayName.slice(0, 2).toUpperCase() : 'EU'}
+                <div className={`note-card note-card-${color} note-preview-card`}>
+                  <div className="note-card-top-accent" />
+                  <div className="note-card-header">
+                    <div className="note-card-badges">
+                      <span className={`note-category-chip cat-${category.toLowerCase()}`}>
+                        {getCategoryIcon(category)}
+                        <span>{category}</span>
+                      </span>
+                    </div>
                   </div>
-                  <div className="author-text-meta">
-                    <span className="author-name">{currentUser.displayName || currentUser.username}</span>
-                    <span className={`role-badge role-badge-${currentUser.role}`}>
-                      {ROLE_LABELS[currentUser.role] || currentUser.role}
-                    </span>
+
+                  <h3 className="note-card-title">
+                    {title.trim() || 'Título da anotação'}
+                  </h3>
+
+                  <p className="note-card-snippet">
+                    {content.trim() || 'O conteúdo digitado aparecerá aqui como prévia visual.'}
+                  </p>
+
+                  <div className="note-card-footer">
+                    <div className="note-author-info">
+                      <div className={`author-avatar-circle avatar-${currentUser?.role || 'operador'}`}>
+                        {authorInitials}
+                      </div>
+                      <div className="author-details">
+                        <span className="author-name">{authorDisplayName}</span>
+                        <span className={`author-role-badge role-${currentUser?.role || 'operador'}`}>
+                          {currentUser?.role?.toUpperCase() || 'OPERADOR'}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+
+          <div className="modal-footer">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={onClose}
+              disabled={isSubmitting}
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Salvando...' : noteToEdit ? 'Salvar Alterações' : 'Criar Anotação'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

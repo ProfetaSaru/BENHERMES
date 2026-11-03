@@ -29,6 +29,8 @@ export interface NoteCommentItem {
   createdAt: string;
 }
 
+export type NoteComment = NoteCommentItem;
+
 export const NOTE_COLORS: {
   id: NoteColor;
   label: string;
