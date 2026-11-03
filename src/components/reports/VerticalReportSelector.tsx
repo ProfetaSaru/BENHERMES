@@ -1,10 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import {
   Search,
-  Plus,
-  Upload,
-  Bot,
-  Download,
   FileText,
   Table,
   Clock,
@@ -17,17 +13,12 @@ import {
   X,
 } from 'lucide-react';
 import { MarkdownTemplateMeta } from '../../types/markdownTemplate';
-import { Button } from '../common/Button';
 
 interface Props {
   templates: MarkdownTemplateMeta[];
   activeTemplateId: string;
   onSelectTemplate: (id: string) => void;
   onClose?: () => void;
-  onOpenNewTemplateModal: () => void;
-  onOpenAiPromptModal: () => void;
-  onImportTemplateFile: () => void;
-  onDownloadExampleBase: () => void;
   taskCount?: number;
   getTemplateTaskCount?: (templateId: string) => number;
 }
@@ -60,10 +51,6 @@ export const VerticalReportSelector: React.FC<Props> = ({
   activeTemplateId,
   onSelectTemplate,
   onClose,
-  onOpenNewTemplateModal,
-  onOpenAiPromptModal,
-  onImportTemplateFile,
-  onDownloadExampleBase,
   taskCount = 0,
   getTemplateTaskCount,
 }) => {
@@ -133,51 +120,6 @@ export const VerticalReportSelector: React.FC<Props> = ({
         )}
       </div>
 
-      {/* Botões de Ações Rápidas */}
-      <div className="selector-quick-actions">
-        <Button
-          variant="primary"
-          onClick={onOpenNewTemplateModal}
-          title="Criar novo modelo personalizado em Markdown"
-          style={{ width: '100%', justifyContent: 'center', padding: '7px 10px', fontSize: '0.84rem' }}
-        >
-          <Plus size={15} />
-          Novo Modelo
-        </Button>
-
-        <div className="selector-action-subrow">
-          <button
-            type="button"
-            className="selector-mini-action-btn"
-            onClick={onImportTemplateFile}
-            title="Importar arquivo .md do computador"
-          >
-            <Upload size={13} />
-            <span>Importar .md</span>
-          </button>
-
-          <button
-            type="button"
-            className="selector-mini-action-btn"
-            onClick={onOpenAiPromptModal}
-            title="Copiar prompt pronto para ChatGPT / Claude"
-          >
-            <Bot size={13} />
-            <span>Criar c/ IA</span>
-          </button>
-
-          <button
-            type="button"
-            className="selector-mini-action-btn"
-            onClick={onDownloadExampleBase}
-            title="Baixar modelo base de exemplo (.md)"
-          >
-            <Download size={13} />
-            <span>Exemplo</span>
-          </button>
-        </div>
-      </div>
-
       {/* Listas Verticais de Relatórios */}
       <div className="selector-groups-container">
         {/* GRUPO 1: Relatórios Expansíveis */}
@@ -227,9 +169,6 @@ export const VerticalReportSelector: React.FC<Props> = ({
                             ? `${itemTaskCount} ${itemTaskCount === 1 ? 'tarefa ativa' : 'tarefas ativas'}`
                             : 'Com tarefas'}
                         </span>
-                        {!template.isBuiltin && (
-                          <span className="item-badge-pill custom">Custom</span>
-                        )}
                       </div>
                     </div>
                   </button>
@@ -244,7 +183,7 @@ export const VerticalReportSelector: React.FC<Props> = ({
           <div className="selector-group-header">
             <span className="selector-group-title">
               <FileCode size={14} className="group-header-icon" />
-              Relatórios Não Expansíveis
+              Formulários Diretos
             </span>
             <span className="selector-group-badge" title="Modelos com campos diretos sem grade de tarefas">
               {nonExpandableTemplates.length}
@@ -276,9 +215,6 @@ export const VerticalReportSelector: React.FC<Props> = ({
                       <span className="item-card-desc">{template.description}</span>
                       <div className="item-card-footer">
                         <span className="item-badge-pill direct">Formulário Direto</span>
-                        {!template.isBuiltin && (
-                          <span className="item-badge-pill custom">Custom</span>
-                        )}
                       </div>
                     </div>
                   </button>

@@ -40,6 +40,7 @@ export interface Mesa {
   /** Prefixo dos códigos: OP1, DG */
   sigla: string;
   supervisor: string;
+  supervisorUserId?: string | null;
   whatsappSupervisor: WhatsappDoSupervisor;
   esq: number;
   dir: number;

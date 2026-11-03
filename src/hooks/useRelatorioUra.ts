@@ -1,27 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Apelido, Metas, OperadorCadastro, RegistroHistoricoUra, ResultadoUra } from '../types/relatorioUra';
 import { normalizarNome } from '../utils/calendario';
 import { registrarNoHistorico } from '../utils/uraCalculo';
 import { ConfigArgus, URL_PADRAO_ARGUS } from '../utils/argusApi';
+import { apiRequest } from '../utils/apiClient';
 
-export const STORAGE_RELATORIO_URA_KEY = 'benhermes_relatorio_ura';
-/** Token e endereço da API do Argus: chave separada, só neste navegador */
-export const STORAGE_ARGUS_KEY = 'benhermes_argus';
-
-const carregarArgus = (): ConfigArgus => {
-  try {
-    const dados = JSON.parse(localStorage.getItem(STORAGE_ARGUS_KEY) ?? '{}');
-    return { token: String(dados.token ?? ''), url: String(dados.url ?? '') || URL_PADRAO_ARGUS };
-  } catch {
-    return { token: '', url: URL_PADRAO_ARGUS };
-  }
-};
-
-/**
- * O que fica guardado no navegador: só cadastro (nome, supervisor, equipe, status),
- * apelidos, metas e os TOTAIS de cada relatório. As exportações do dia (que têm CPFs)
- * ficam apenas na memória da página e somem ao fechá-la.
- */
 interface RelatorioUraArmazenado {
   cadastro: OperadorCadastro[];
   apelidos: Apelido[];
@@ -31,95 +14,167 @@ interface RelatorioUraArmazenado {
 
 const VAZIO: RelatorioUraArmazenado = { cadastro: [], apelidos: [], metas: {}, historico: [] };
 
-const carregar = (): RelatorioUraArmazenado => {
-  try {
-    const bruto = localStorage.getItem(STORAGE_RELATORIO_URA_KEY);
-    if (!bruto) return VAZIO;
-    const dados = JSON.parse(bruto);
-    return {
-      cadastro: Array.isArray(dados?.cadastro) ? dados.cadastro : [],
-      apelidos: Array.isArray(dados?.apelidos) ? dados.apelidos : [],
-      metas: dados?.metas && typeof dados.metas === 'object' ? dados.metas : {},
-      historico: Array.isArray(dados?.historico) ? dados.historico : [],
-    };
-  } catch (error) {
-    console.error('Falha ao ler o relatório da URA do localStorage:', error);
-    return VAZIO;
-  }
-};
-
 export function useRelatorioUra() {
-  const [dados, setDados] = useState<RelatorioUraArmazenado>(carregar);
-  const [argus, setArgus] = useState<ConfigArgus>(carregarArgus);
+  const [dados, setDados] = useState<RelatorioUraArmazenado>(VAZIO);
+  const [argus, setArgusState] = useState<ConfigArgus>({ token: '', url: URL_PADRAO_ARGUS });
+  const debounceTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_ARGUS_KEY, JSON.stringify(argus));
-    } catch (error) {
-      console.error('Falha ao salvar a configuração do Argus no localStorage:', error);
-    }
-  }, [argus]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_RELATORIO_URA_KEY, JSON.stringify(dados));
-    } catch (error) {
-      console.error('Falha ao salvar o relatório da URA no localStorage:', error);
-    }
-  }, [dados]);
-
-  const atualizarCadastro = useCallback((cadastro: OperadorCadastro[]) => {
-    setDados((atual) => ({ ...atual, cadastro }));
+    let ativo = true;
+    apiRequest<{ dados: RelatorioUraArmazenado | null; argus: ConfigArgus | null }>('/api/relatorio-ura')
+      .then((res) => {
+        if (!ativo) return;
+        if (res.dados) {
+          setDados({
+            cadastro: Array.isArray(res.dados.cadastro) ? res.dados.cadastro : [],
+            apelidos: Array.isArray(res.dados.apelidos) ? res.dados.apelidos : [],
+            metas: res.dados.metas && typeof res.dados.metas === 'object' ? res.dados.metas : {},
+            historico: Array.isArray(res.dados.historico) ? res.dados.historico : [],
+          });
+        }
+        if (res.argus) {
+          setArgusState({
+            token: String(res.argus.token ?? ''),
+            url: String(res.argus.url ?? '') || URL_PADRAO_ARGUS,
+          });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      ativo = false;
+      if (debounceTimerRef.current) {
+        window.clearTimeout(debounceTimerRef.current);
+      }
+    };
   }, []);
 
-  const atualizarApelidos = useCallback((apelidos: Apelido[]) => {
-    setDados((atual) => ({ ...atual, apelidos }));
+  const sincronizarDados = useCallback((proximo: RelatorioUraArmazenado, imediato = false) => {
+    if (debounceTimerRef.current) {
+      window.clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+
+    const executar = () => {
+      void apiRequest('/api/relatorio-ura', {
+        method: 'PUT',
+        body: { dados: proximo },
+      }).catch(() => {});
+    };
+
+    if (imediato) {
+      executar();
+    } else {
+      debounceTimerRef.current = window.setTimeout(executar, 400);
+    }
   }, []);
+
+  const atualizarArgus = useCallback((novoArgus: ConfigArgus) => {
+    setArgusState(novoArgus);
+    void apiRequest('/api/relatorio-ura', {
+      method: 'PUT',
+      body: { argus: novoArgus },
+    }).catch(() => {});
+  }, []);
+
+  const atualizarCadastro = useCallback(
+    (cadastro: OperadorCadastro[]) => {
+      setDados((atual) => {
+        const proximo = { ...atual, cadastro };
+        sincronizarDados(proximo);
+        return proximo;
+      });
+    },
+    [sincronizarDados]
+  );
+
+  const atualizarApelidos = useCallback(
+    (apelidos: Apelido[]) => {
+      setDados((atual) => {
+        const proximo = { ...atual, apelidos };
+        sincronizarDados(proximo);
+        return proximo;
+      });
+    },
+    [sincronizarDados]
+  );
 
   /** Liga um nome que aparece em algum sistema ao nome oficial do cadastro */
-  const adicionarApelido = useCallback((apelido: Apelido) => {
-    setDados((atual) => ({
-      ...atual,
-      apelidos: [
-        ...atual.apelidos.filter((a) => normalizarNome(a.noSistema) !== normalizarNome(apelido.noSistema)),
-        apelido,
-      ],
-    }));
-  }, []);
+  const adicionarApelido = useCallback(
+    (apelido: Apelido) => {
+      setDados((atual) => {
+        const proximo = {
+          ...atual,
+          apelidos: [
+            ...atual.apelidos.filter((a) => normalizarNome(a.noSistema) !== normalizarNome(apelido.noSistema)),
+            apelido,
+          ],
+        };
+        sincronizarDados(proximo);
+        return proximo;
+      });
+    },
+    [sincronizarDados]
+  );
 
-  const atualizarMetas = useCallback((metas: Metas) => {
-    setDados((atual) => ({ ...atual, metas }));
-  }, []);
+  const atualizarMetas = useCallback(
+    (metas: Metas) => {
+      setDados((atual) => {
+        const proximo = { ...atual, metas };
+        sincronizarDados(proximo);
+        return proximo;
+      });
+    },
+    [sincronizarDados]
+  );
 
-  const salvarRelatorio = useCallback((resultado: ResultadoUra) => {
-    setDados((atual) => ({ ...atual, historico: registrarNoHistorico(atual.historico, resultado) }));
-  }, []);
+  const salvarRelatorio = useCallback(
+    (resultado: ResultadoUra) => {
+      setDados((atual) => {
+        const proximo = { ...atual, historico: registrarNoHistorico(atual.historico, resultado) };
+        sincronizarDados(proximo);
+        return proximo;
+      });
+    },
+    [sincronizarDados]
+  );
 
   /** Junta um histórico importado: os dias que já existem aqui são mantidos */
   const importarHistorico = useCallback(
     (importado: RegistroHistoricoUra[]): number => {
       const existentes = new Set(dados.historico.map((r) => r.data));
       const novos = importado.filter((r) => !existentes.has(r.data));
-      // sort é estável: dentro do mesmo dia, a ordem das linhas é mantida
       const historico = [...dados.historico, ...novos].sort((a, b) => a.data.localeCompare(b.data));
-      setDados({ ...dados, historico });
+      const proximo = { ...dados, historico };
+      setDados(proximo);
+      sincronizarDados(proximo, true);
       return new Set(novos.map((r) => r.data)).size;
     },
-    [dados]
+    [dados, sincronizarDados]
   );
 
-  const removerDia = useCallback((data: string) => {
-    setDados((atual) => ({ ...atual, historico: atual.historico.filter((r) => r.data !== data) }));
-  }, []);
+  const removerDia = useCallback(
+    (data: string) => {
+      setDados((atual) => {
+        const proximo = { ...atual, historico: atual.historico.filter((r) => r.data !== data) };
+        sincronizarDados(proximo);
+        return proximo;
+      });
+    },
+    [sincronizarDados]
+  );
 
   const limparHistorico = useCallback(() => {
-    setDados((atual) => ({ ...atual, historico: [] }));
-  }, []);
+    setDados((atual) => {
+      const proximo = { ...atual, historico: [] };
+      sincronizarDados(proximo);
+      return proximo;
+    });
+  }, [sincronizarDados]);
 
   return {
     ...dados,
     argus,
-    atualizarArgus: setArgus,
+    atualizarArgus,
     atualizarCadastro,
     atualizarApelidos,
     adicionarApelido,

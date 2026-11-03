@@ -70,7 +70,7 @@ export const UraConfiguracoes: React.FC<UraConfiguracoesProps> = ({
           Configurações
         </h2>
         <div className="badge-wrapper">
-          <span className="badge badge-muted">Salvas só neste navegador</span>
+          <span className="badge badge-muted">Salvas no servidor</span>
         </div>
       </div>
 
@@ -101,6 +101,7 @@ export const UraConfiguracoes: React.FC<UraConfiguracoesProps> = ({
           </label>
           <textarea
             id="ura-apelidos"
+            name="ura-apelidos"
             className="formatter-select escala-textarea ura-textarea-apelidos"
             value={textoApelidos}
             onChange={(e) => setTextoApelidos(e.target.value)}
@@ -121,6 +122,8 @@ export const UraConfiguracoes: React.FC<UraConfiguracoesProps> = ({
         </div>
         <div className="ura-argus-grid">
           <input
+            id="argus-token"
+            name="argus-token"
             type="password"
             className="formatter-select"
             value={argus.token}
@@ -130,6 +133,8 @@ export const UraConfiguracoes: React.FC<UraConfiguracoesProps> = ({
             autoComplete="off"
           />
           <input
+            id="argus-url"
+            name="argus-url"
             className="formatter-select"
             value={argus.url}
             onChange={(e) => onArgusChange({ ...argus, url: e.target.value })}
@@ -138,7 +143,7 @@ export const UraConfiguracoes: React.FC<UraConfiguracoesProps> = ({
           />
         </div>
         <div className="formatter-field-sample ura-quebra">
-          O token fica só neste navegador; a consulta passa pela ponte do BENHERMES (no site, a função da Vercel),
+          O token fica salvo no servidor local; a consulta passa pela ponte do BENHERMES,
           que não grava nada. Não compartilhe a tela com ele visível. A tarifação não existe na API: continua manual.
         </div>
         <div className="formatter-actions-buttons escala-acoes" style={{ marginTop: 8 }}>
@@ -182,6 +187,8 @@ export const UraConfiguracoes: React.FC<UraConfiguracoesProps> = ({
                     <td>{indicador.titulo}</td>
                     <td>
                       <select
+                        id={`meta-sentido-${indicador.chave}`}
+                        name={`meta-sentido-${indicador.chave}`}
                         className="formatter-select"
                         value={meta?.sentido ?? indicador.sentido}
                         onChange={(e) => alterarMeta(indicador.chave, 'sentido', e.target.value)}
@@ -194,6 +201,8 @@ export const UraConfiguracoes: React.FC<UraConfiguracoesProps> = ({
                     {(['verde', 'vermelho'] as const).map((campo) => (
                       <td key={campo}>
                         <input
+                          id={`meta-${indicador.chave}-${campo}`}
+                          name={`meta-${indicador.chave}-${campo}`}
                           className="formatter-select"
                           value={meta?.[campo] ?? ''}
                           onChange={(e) => alterarMeta(indicador.chave, campo, e.target.value)}

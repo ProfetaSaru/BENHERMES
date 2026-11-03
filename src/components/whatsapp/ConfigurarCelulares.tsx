@@ -25,6 +25,7 @@ interface ConfigurarCelularesProps {
   mapa: MapaWhatsapp;
   onMapa: (mapa: MapaWhatsapp) => void;
   onNotify: (message: string, type?: NotificationType) => void;
+  canDelete?: boolean;
 }
 
 const MARCAS_COM_USUARIOS: Marca[] = ['MOTOROLA', 'XIAOMI'];
@@ -42,7 +43,12 @@ interface Rascunho {
 const RASCUNHO_VAZIO: Rascunho = { cor: '', hex: '#808080', apelido: '', marca: 'SAMSUNG', usuarios: 4, mesaId: '' };
 
 /** Cadastro dos celulares corporativos: equipe, marca, usuários, vagas e números dos chips */
-export const ConfigurarCelulares: React.FC<ConfigurarCelularesProps> = ({ mapa, onMapa, onNotify }) => {
+export const ConfigurarCelulares: React.FC<ConfigurarCelularesProps> = ({
+  mapa,
+  onMapa,
+  onNotify,
+  canDelete = true,
+}) => {
   const [aberto, setAberto] = useState(false);
   const [novo, setNovo] = useState<Rascunho | null>(null);
   const [vagasAbertas, setVagasAbertas] = useState<string | null>(null);
@@ -261,15 +267,17 @@ export const ConfigurarCelulares: React.FC<ConfigurarCelularesProps> = ({ mapa, 
                       </option>
                     ))}
                   </select>
-                  <button
-                    type="button"
-                    className="ura-arquivo-remover"
-                    onClick={() => remover(cel)}
-                    aria-label={`Remover o celular ${nomeDoCelular(cel)}`}
-                    title="Remover celular"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  {canDelete && (
+                    <button
+                      type="button"
+                      className="ura-arquivo-remover"
+                      onClick={() => remover(cel)}
+                      aria-label={`Remover o celular ${nomeDoCelular(cel)}`}
+                      title="Remover celular"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
                 </div>
                 <div className="wpp-config-celular-linha">
                   <label className="wpp-config-inline">
@@ -376,7 +384,7 @@ export const ConfigurarCelulares: React.FC<ConfigurarCelularesProps> = ({ mapa, 
                               }}
                             />
                           </td>
-                          {cel.marca === 'OUTRO' && (
+                          {cel.marca === 'OUTRO' && canDelete && (
                             <td>
                               <button
                                 type="button"

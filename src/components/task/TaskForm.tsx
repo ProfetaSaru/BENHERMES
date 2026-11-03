@@ -78,7 +78,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
         )}
       </SectionHeading>
 
-      <form onSubmit={onSubmit}>
+      <form onSubmit={onSubmit} noValidate>
         {hasCategories && templateCategories && (
           <div className="task-category-selector-wrapper">
             <span className="task-category-selector-label">Etapa / Categoria:</span>
@@ -110,7 +110,6 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                 id="start-time"
                 name="start-time"
                 type="time"
-                required
                 value={formData.start}
                 onChange={(e) => onFieldChange('start', e.target.value)}
               />
@@ -133,7 +132,6 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                   id="end-time"
                   name="end-time"
                   type="time"
-                  required
                   value={formData.end}
                   onChange={(e) => onFieldChange('end', e.target.value)}
                 />
@@ -157,7 +155,6 @@ export const TaskForm: React.FC<TaskFormProps> = ({
             name="title"
             type="text"
             placeholder={titlePlaceholder}
-            required
             value={formData.title}
             style={{ textTransform: 'uppercase' }}
             onChange={(e) => onFieldChange('title', e.target.value)}

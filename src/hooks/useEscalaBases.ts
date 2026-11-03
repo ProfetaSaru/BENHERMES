@@ -1,8 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { EscalaCadastro, EscalaRegistro, ImportacaoEscala, ResultadoSorteio } from '../types/escala';
 import { mesclarHistorico, registrarSorteio } from '../utils/escalaBases';
-
-export const STORAGE_ESCALA_KEY = 'benhermes_escala_bases';
+import { apiRequest } from '../utils/apiClient';
 
 /** Quantos resultados completos (com ausentes e avisos) ficam guardados */
 const RESULTADOS_GUARDADOS = 30;
@@ -21,52 +20,83 @@ const podarResultados = (resultados: Record<string, ResultadoSorteio>): Record<s
   return Object.fromEntries(datas.map((d) => [d, resultados[d]]));
 };
 
-const carregar = (): EscalaArmazenada => {
-  try {
-    const bruto = localStorage.getItem(STORAGE_ESCALA_KEY);
-    if (!bruto) return VAZIO;
-    const dados = JSON.parse(bruto);
-    if (!dados || !Array.isArray(dados.historico) || !dados.cadastro) return VAZIO;
-    return {
-      cadastro: {
-        bases: Array.isArray(dados.cadastro.bases) ? dados.cadastro.bases : [],
-        pessoas: Array.isArray(dados.cadastro.pessoas) ? dados.cadastro.pessoas : [],
-      },
-      historico: dados.historico,
-      resultados: dados.resultados && typeof dados.resultados === 'object' ? dados.resultados : {},
-    };
-  } catch (error) {
-    console.error('Falha ao ler a escala de bases do localStorage:', error);
-    return VAZIO;
-  }
-};
-
 /**
  * Cadastro (bases e pessoas) e histórico de sorteios da escala do Ativo 2,
- * guardados apenas no navegador (localStorage).
+ * sincronizados no servidor (/api/escala).
  */
 export function useEscalaBases() {
-  const [dados, setDados] = useState<EscalaArmazenada>(carregar);
+  const [dados, setDados] = useState<EscalaArmazenada>(VAZIO);
+  const debounceTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_ESCALA_KEY, JSON.stringify(dados));
-    } catch (error) {
-      console.error('Falha ao salvar a escala de bases no localStorage:', error);
+    let ativo = true;
+    apiRequest<{ dados: EscalaArmazenada | null }>('/api/escala')
+      .then((res) => {
+        if (!ativo || !res.dados) return;
+        const d = res.dados;
+        setDados({
+          cadastro: {
+            bases: Array.isArray(d.cadastro?.bases) ? d.cadastro.bases : [],
+            pessoas: Array.isArray(d.cadastro?.pessoas) ? d.cadastro.pessoas : [],
+          },
+          historico: Array.isArray(d.historico) ? d.historico : [],
+          resultados: d.resultados && typeof d.resultados === 'object' ? d.resultados : {},
+        });
+      })
+      .catch(() => {});
+    return () => {
+      ativo = false;
+      if (debounceTimerRef.current) {
+        window.clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
+  const sincronizar = useCallback((proximo: EscalaArmazenada, imediato = false) => {
+    if (debounceTimerRef.current) {
+      window.clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
     }
-  }, [dados]);
 
-  const atualizarCadastro = useCallback((cadastro: Partial<EscalaCadastro>) => {
-    setDados((atual) => ({ ...atual, cadastro: { ...atual.cadastro, ...cadastro } }));
+    const executar = () => {
+      void apiRequest('/api/escala', {
+        method: 'PUT',
+        body: { dados: proximo },
+      }).catch(() => {});
+    };
+
+    if (imediato) {
+      executar();
+    } else {
+      debounceTimerRef.current = window.setTimeout(executar, 400);
+    }
   }, []);
 
-  const salvarSorteio = useCallback((resultado: ResultadoSorteio) => {
-    setDados((atual) => ({
-      ...atual,
-      historico: registrarSorteio(atual.historico, resultado),
-      resultados: podarResultados({ ...atual.resultados, [resultado.data]: resultado }),
-    }));
-  }, []);
+  const atualizarCadastro = useCallback(
+    (cadastro: Partial<EscalaCadastro>) => {
+      setDados((atual) => {
+        const proximo = { ...atual, cadastro: { ...atual.cadastro, ...cadastro } };
+        sincronizar(proximo);
+        return proximo;
+      });
+    },
+    [sincronizar]
+  );
+
+  const salvarSorteio = useCallback(
+    (resultado: ResultadoSorteio) => {
+      setDados((atual) => {
+        const proximo = {
+          ...atual,
+          historico: registrarSorteio(atual.historico, resultado),
+          resultados: podarResultados({ ...atual.resultados, [resultado.data]: resultado }),
+        };
+        sincronizar(proximo);
+        return proximo;
+      });
+    },
+    [sincronizar]
+  );
 
   /**
    * Aplica uma importação. O cadastro só é trocado se vier preenchido;
@@ -79,22 +109,41 @@ export function useEscalaBases() {
       const cadastroValido =
         importacao.cadastro && (importacao.cadastro.bases.length > 0 || importacao.cadastro.pessoas.length > 0);
 
-      setDados({ ...dados, cadastro: cadastroValido ? importacao.cadastro! : dados.cadastro, historico });
+      const proximo = {
+        ...dados,
+        cadastro: cadastroValido ? importacao.cadastro! : dados.cadastro,
+        historico,
+      };
+      setDados(proximo);
+      sincronizar(proximo, true);
       return diasNovos;
     },
-    [dados]
+    [dados, sincronizar]
   );
 
-  const removerSorteio = useCallback((data: string) => {
-    setDados((atual) => {
-      const { [data]: _removido, ...resultados } = atual.resultados;
-      return { ...atual, historico: atual.historico.filter((r) => r.data !== data), resultados };
-    });
-  }, []);
+  const removerSorteio = useCallback(
+    (data: string) => {
+      setDados((atual) => {
+        const { [data]: _removido, ...resultados } = atual.resultados;
+        const proximo = {
+          ...atual,
+          historico: atual.historico.filter((r) => r.data !== data),
+          resultados,
+        };
+        sincronizar(proximo);
+        return proximo;
+      });
+    },
+    [sincronizar]
+  );
 
   const limparHistorico = useCallback(() => {
-    setDados((atual) => ({ ...atual, historico: [], resultados: {} }));
-  }, []);
+    setDados((atual) => {
+      const proximo = { ...atual, historico: [], resultados: {} };
+      sincronizar(proximo);
+      return proximo;
+    });
+  }, [sincronizar]);
 
   return {
     cadastro: dados.cadastro,

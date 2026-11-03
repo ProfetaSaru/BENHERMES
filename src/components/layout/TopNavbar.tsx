@@ -1,17 +1,22 @@
 import React from 'react';
-import { Menu, Layers, ShieldCheck, HardDrive } from 'lucide-react';
+import { Menu, Layers, ShieldCheck, LogOut, UserCheck } from 'lucide-react';
 import { NavigationItem } from '../../types/navigation';
+import { AuthUser, ROLE_LABELS } from '../../types/auth';
 
 interface TopNavbarProps {
   activeItem: NavigationItem;
   onOpenMobileSidebar: () => void;
   taskCount?: number;
+  currentUser?: AuthUser | null;
+  onLogout?: () => void;
 }
 
 export const TopNavbar: React.FC<TopNavbarProps> = ({
   activeItem,
   onOpenMobileSidebar,
   taskCount = 0,
+  currentUser,
+  onLogout,
 }) => {
   return (
     <header className="top-navbar">
@@ -35,18 +40,44 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
         </div>
       </div>
 
-      <div className="top-navbar-right">
-        <div className="top-navbar-status" title="Seus dados estão protegidos e salvos no navegador local">
-          <HardDrive size={15} />
-          <span>Armazenamento Local</span>
-          <span className="top-navbar-pulse" />
-        </div>
-
-        {taskCount > 0 && (
+      <div className="top-navbar-right" style={{ gap: '0.6rem' }}>
+        {activeItem.id === 'relatorios' && taskCount > 0 && (
           <div className="top-navbar-badge">
             <ShieldCheck size={14} />
-            <span>{taskCount} {taskCount === 1 ? 'item' : 'itens'}</span>
+            <span>
+              {taskCount} {taskCount === 1 ? 'item' : 'itens'}
+            </span>
           </div>
+        )}
+
+        {currentUser && (
+          <div
+            className="top-navbar-status"
+            title={
+              currentUser.supervisorName
+                ? `Supervisor: ${currentUser.supervisorName}`
+                : `Logado como ${ROLE_LABELS[currentUser.role]}`
+            }
+          >
+            <UserCheck size={15} />
+            <span>
+              <strong>{currentUser.displayName}</strong> · {ROLE_LABELS[currentUser.role]}
+            </span>
+            <span className="top-navbar-pulse" />
+          </div>
+        )}
+
+        {onLogout && (
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ width: 'auto', padding: '0.38rem 0.75rem', fontSize: '0.8rem' }}
+            onClick={onLogout}
+            title="Sair da conta"
+          >
+            <LogOut size={14} />
+            Sair
+          </button>
         )}
       </div>
     </header>

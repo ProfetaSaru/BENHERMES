@@ -36,10 +36,10 @@ export const estado = (situacao: Situacao, agora: Date, restritoAte?: Date): Est
 
 export const novaMesa = (
   dados: Pick<Mesa, 'nome' | 'sigla' | 'supervisor' | 'esq' | 'dir' | 'centro' | 'inicio'> &
-    Partial<Pick<Mesa, 'whatsappSupervisor'>>,
+    Partial<Pick<Mesa, 'whatsappSupervisor' | 'supervisorUserId'>>,
   agora: Date
 ): Mesa => {
-  const mesa = { whatsappSupervisor: 'PC', ...dados, id: crypto.randomUUID(), desativadas: [], lugares: {} } as Mesa;
+  const mesa = { whatsappSupervisor: 'PC', supervisorUserId: dados.supervisorUserId ?? null, ...dados, id: crypto.randomUUID(), desativadas: [], lugares: {} } as Mesa;
   mesa.lugares = Object.fromEntries(posicoesAtivas(mesa).map((p) => [p, { operador: '', whatsapp: estado('OK', agora) }]));
   return mesa;
 };
@@ -169,7 +169,7 @@ export const adicionarMesaNoMapa = (mapa: MapaWhatsapp, salaId: string, mesa: Me
 export const removerMesaNoMapa = (mapa: MapaWhatsapp, salaId: string, mesaId: string, agora: Date): MapaWhatsapp =>
   comSalas(mapa, mapa.salas.map((s) => (s.id === salaId ? { ...s, mesas: s.mesas.filter((m) => m.id !== mesaId) } : s)), agora);
 
-export type DadosDaMesa = FormatoMesa & Pick<Mesa, 'nome' | 'supervisor'>;
+export type DadosDaMesa = FormatoMesa & Pick<Mesa, 'nome' | 'supervisor'> & { supervisorUserId?: string | null };
 
 /**
  * Novo formato da mesa: quem continua fica como está, posições novas entram vazias e OK,
@@ -392,3 +392,68 @@ export const lerMapaSalvo = (texto: string | null, agora: Date): { mapa: MapaWha
 };
 
 export const carregarMapa = (texto: string | null, agora: Date): MapaWhatsapp => lerMapaSalvo(texto, agora).mapa;
+
+export interface SupervisorIdentificacao {
+  id?: string;
+  displayName?: string;
+  username?: string;
+}
+
+export function isMesaDoSupervisor(mesa: Mesa, supervisor?: SupervisorIdentificacao | null): boolean {
+  if (!supervisor) return false;
+  // Prioridade 1: ID do supervisor alocado pelo Admin
+  if (mesa.supervisorUserId && supervisor.id) {
+    return mesa.supervisorUserId === supervisor.id;
+  }
+  // Prioridade 2: Fallback por nome/login para compatibilidade com mapas legados
+  const supText = (mesa.supervisor || '').trim().toLowerCase();
+  if (!supText) return false;
+  return (
+    Boolean(supervisor.displayName && supText === supervisor.displayName.trim().toLowerCase()) ||
+    Boolean(supervisor.username && supText === supervisor.username.trim().toLowerCase())
+  );
+}
+
+export function filtrarMapaParaSupervisor(
+  mapa: MapaWhatsapp,
+  supervisor: SupervisorIdentificacao
+): MapaWhatsapp {
+  const mesasDoSup = mapa.salas.flatMap((s) => s.mesas).filter((m) => isMesaDoSupervisor(m, supervisor));
+  const mesaIds = new Set(mesasDoSup.map((m) => m.id));
+
+  // Salas que possuem mesa do supervisor
+  const salasFiltradas = mapa.salas
+    .map((s) => ({
+      ...s,
+      mesas: s.mesas.filter((m) => mesaIds.has(m.id)),
+    }))
+    .filter((s) => s.mesas.length > 0);
+
+  // Celulares vinculados às mesas do supervisor
+  const celularesFiltrados = mapa.celulares.filter(
+    (c) => c.mesaId !== null && mesaIds.has(c.mesaId)
+  );
+
+  // Histórico relevante para as mesas/celulares do supervisor
+  const siglasMesas = new Set(mesasDoSup.map((m) => m.sigla.toUpperCase()));
+  const nomesMesas = new Set(mesasDoSup.map((m) => m.nome.toUpperCase()));
+
+  const historicoFiltrado = mapa.historico.filter((e) => {
+    if (e.equipe && (siglasMesas.has(e.equipe.toUpperCase()) || nomesMesas.has(e.equipe.toUpperCase()))) {
+      return true;
+    }
+    if (e.celular && celularesFiltrados.some((c) => c.cor === e.celular || c.apelido === e.celular)) {
+      return true;
+    }
+    return false;
+  });
+
+  return {
+    ...mapa,
+    salas: salasFiltradas,
+    celulares: celularesFiltrados,
+    historico: historicoFiltrado,
+    manutencoes: [],
+    manutencaoAtual: null,
+  };
+}

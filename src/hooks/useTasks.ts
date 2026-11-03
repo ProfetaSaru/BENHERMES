@@ -1,101 +1,88 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Task, TaskFormData } from '../types/task';
-import { loadStoredTasksByTemplate, saveStoredTasksByTemplate } from '../utils/storage';
 
 function sortTaskList(items: Task[]): Task[] {
   return [...items].sort((a, b) => a.start.localeCompare(b.start));
 }
 
 export function useTasks(activeTemplateId: string = 'atividades-padrao') {
-  const [tasksByTemplate, setTasksByTemplate] = useState<Record<string, Task[]>>(() => {
-    const raw = loadStoredTasksByTemplate();
-    const normalized: Record<string, Task[]> = {};
-    for (const [key, list] of Object.entries(raw)) {
-      if (Array.isArray(list)) {
-        normalized[key] = sortTaskList(
-          list.map((task) => ({
-            ...task,
-            title: task.title.toUpperCase(),
-          }))
-        );
-      }
-    }
-    return normalized;
-  });
-
-  // Salva no localStorage sempre que o mapa de tarefas mudar
-  useEffect(() => {
-    saveStoredTasksByTemplate(tasksByTemplate);
-  }, [tasksByTemplate]);
+  const [tasksByTemplate, setTasksByTemplate] = useState<Record<string, Task[]>>({});
 
   // Lista de tarefas do modelo ativo no momento
   const tasks = useMemo(() => {
     return tasksByTemplate[activeTemplateId] || [];
   }, [tasksByTemplate, activeTemplateId]);
 
-  const addTask = useCallback((formData: TaskFormData): Task => {
-    const newTask: Task = {
-      id: crypto.randomUUID(),
-      ...formData,
-      title: formData.title.trim().toUpperCase(),
-    };
-
-    setTasksByTemplate((prev) => {
-      const currentList = prev[activeTemplateId] || [];
-      const updated = sortTaskList([...currentList, newTask]);
-      return {
-        ...prev,
-        [activeTemplateId]: updated,
-      };
-    });
-
-    return newTask;
-  }, [activeTemplateId]);
-
-  const updateTask = useCallback((id: string, formData: TaskFormData): boolean => {
-    let wasUpdated = false;
-
-    setTasksByTemplate((prev) => {
-      const currentList = prev[activeTemplateId] || [];
-      const taskIndex = currentList.findIndex((t) => t.id === id);
-      if (taskIndex === -1) {
-        return prev;
-      }
-
-      wasUpdated = true;
-      const updatedList = [...currentList];
-      updatedList[taskIndex] = {
-        id,
+  const addTask = useCallback(
+    (formData: TaskFormData): Task => {
+      const newTask: Task = {
+        id: crypto.randomUUID(),
         ...formData,
         title: formData.title.trim().toUpperCase(),
       };
 
-      return {
-        ...prev,
-        [activeTemplateId]: sortTaskList(updatedList),
-      };
-    });
+      setTasksByTemplate((prev) => {
+        const currentList = prev[activeTemplateId] || [];
+        const updated = sortTaskList([...currentList, newTask]);
+        return {
+          ...prev,
+          [activeTemplateId]: updated,
+        };
+      });
 
-    return wasUpdated;
-  }, [activeTemplateId]);
+      return newTask;
+    },
+    [activeTemplateId]
+  );
 
-  const deleteTask = useCallback((id: string) => {
-    setTasksByTemplate((prev) => {
-      const currentList = prev[activeTemplateId] || [];
-      return {
-        ...prev,
-        [activeTemplateId]: currentList.filter((t) => t.id !== id),
-      };
-    });
-  }, [activeTemplateId]);
+  const updateTask = useCallback(
+    (id: string, formData: TaskFormData): boolean => {
+      let wasUpdated = false;
+
+      setTasksByTemplate((prev) => {
+        const currentList = prev[activeTemplateId] || [];
+        const taskIndex = currentList.findIndex((t) => t.id === id);
+        if (taskIndex === -1) {
+          return prev;
+        }
+
+        wasUpdated = true;
+        const updatedList = [...currentList];
+        updatedList[taskIndex] = {
+          id,
+          ...formData,
+          title: formData.title.trim().toUpperCase(),
+        };
+
+        return {
+          ...prev,
+          [activeTemplateId]: sortTaskList(updatedList),
+        };
+      });
+
+      return wasUpdated;
+    },
+    [activeTemplateId]
+  );
+
+  const deleteTask = useCallback(
+    (id: string) => {
+      setTasksByTemplate((prev) => {
+        const currentList = prev[activeTemplateId] || [];
+        return {
+          ...prev,
+          [activeTemplateId]: currentList.filter((t) => t.id !== id),
+        };
+      });
+    },
+    [activeTemplateId]
+  );
 
   const clearAllTasks = useCallback(() => {
-    setTasksByTemplate((prev) => {
-      return {
-        ...prev,
-        [activeTemplateId]: [],
-      };
-    });
+    setTasksByTemplate((prev) => ({
+      ...prev,
+      [activeTemplateId]: [],
+    }));
   }, [activeTemplateId]);
 
   /**
@@ -114,7 +101,7 @@ export function useTasks(activeTemplateId: string = 'atividades-padrao') {
       }
 
       const sorted = sortTaskList(
-        taskList.map((t) => ({ ...t, title: t.title.toUpperCase() }))
+        taskList.map((t) => ({ ...t, title: String(t.title || '').toUpperCase() }))
       );
 
       setTasksByTemplate((prev) => ({
@@ -124,6 +111,27 @@ export function useTasks(activeTemplateId: string = 'atividades-padrao') {
     },
     [activeTemplateId]
   );
+
+  const replaceAllTasksByTemplate = useCallback((rawMap: Record<string, Task[]>) => {
+    const normalized: Record<string, Task[]> = {};
+    if (rawMap && typeof rawMap === 'object') {
+      for (const [key, list] of Object.entries(rawMap)) {
+        if (Array.isArray(list)) {
+          normalized[key] = sortTaskList(
+            list.map((task) => ({
+              ...task,
+              title: String(task.title || '').toUpperCase(),
+            }))
+          );
+        }
+      }
+    }
+    setTasksByTemplate(normalized);
+  }, []);
+
+  const resetAllTasks = useCallback(() => {
+    setTasksByTemplate({});
+  }, []);
 
   const getTemplateTaskCount = useCallback(
     (templateId: string): number => {
@@ -147,6 +155,8 @@ export function useTasks(activeTemplateId: string = 'atividades-padrao') {
     deleteTask,
     clearAllTasks,
     restoreTasks,
+    replaceAllTasksByTemplate,
+    resetAllTasks,
     getTemplateTaskCount,
     totalAllTasksCount,
   };

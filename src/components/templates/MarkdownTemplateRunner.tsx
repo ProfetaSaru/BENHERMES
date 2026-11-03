@@ -2,31 +2,27 @@ import React, { useState, useMemo, useEffect } from 'react';
 import {
   Copy,
   Check,
-  Download,
   Bookmark,
   BookmarkPlus,
   RotateCcw,
-  Edit3,
-  Trash2,
   Eye,
   EyeOff,
-  Code,
-  Sparkles,
-  Layers,
-  Calendar,
-  Clock,
-  Table,
   FolderKanban,
+  LayoutGrid,
+  Terminal,
+  FileSpreadsheet,
+  FilePlus2,
 } from 'lucide-react';
 import { Task, SaveReportParams } from '../../types/task';
 import { ParsedMarkdownTemplate } from '../../types/markdownTemplate';
+import { UserRole } from '../../types/auth';
 import { Button } from '../common/Button';
 import { Panel } from '../common/Panel';
 import { SectionHeading } from '../common/SectionHeading';
 import { SaveReportModal } from '../common/SaveReportModal';
 import { renderTemplate } from '../../utils/markdownTemplateParser';
-import { downloadMarkdownFile } from '../../utils/aiPromptTemplate';
 import { generateBenhubEmail, formatToTitleCase } from '../../utils/templateHelpers';
+import { ReportVisualRenderer, ReportVisualMode } from '../task/ReportVisualRenderer';
 
 interface Props {
   template: ParsedMarkdownTemplate;
@@ -35,12 +31,11 @@ interface Props {
   onFieldChange: (fieldId: string, value: string) => void;
   onResetFields: () => void;
   onOpenSelector?: () => void;
-  onEditTemplate?: () => void;
-  onDeleteTemplate?: () => void;
-  onExportTemplateFile: () => void;
+  onStartNewReport?: () => void;
   onSaveQuick: (params: SaveReportParams) => void;
   onSaveCustom: (params: SaveReportParams) => void;
   onNotify: (message: string, type?: 'success' | 'error' | '') => void;
+  userRole?: UserRole;
 }
 
 export const MarkdownTemplateRunner: React.FC<Props> = ({
@@ -50,19 +45,20 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
   onFieldChange,
   onResetFields,
   onOpenSelector,
-  onEditTemplate,
-  onDeleteTemplate,
-  onExportTemplateFile,
+  onStartNewReport,
   onSaveQuick,
   onSaveCustom,
   onNotify,
+  userRole,
 }) => {
   const [copied, setCopied] = useState(false);
-  const [viewMode, setViewMode] = useState<'formatted' | 'raw'>('formatted');
+  const [visualMode, setVisualMode] = useState<ReportVisualMode>('cards');
   const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
   const [isNomeBenhubCustom, setIsNomeBenhubCustom] = useState(false);
   const [isEmailBenhubCustom, setIsEmailBenhubCustom] = useState(false);
   const [isSaveAsModalOpen, setIsSaveAsModalOpen] = useState(false);
+  const isOperator = userRole === 'operador';
+  const canSaveAs = true;
 
   useEffect(() => {
     setIsNomeBenhubCustom(false);
@@ -82,7 +78,6 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
 
     onFieldChange(fieldId, value);
 
-    // Se o usuário digitou diretamente em nome_benhub ou email_benhub, marca como customizado
     if (fieldId === 'nome_benhub') {
       setIsNomeBenhubCustom(value.trim().length > 0);
       return;
@@ -93,7 +88,6 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
       return;
     }
 
-    // Sugestão automática de e-mail e formatação se estiver digitando o nome do colaborador
     if (isNameField) {
       const suggestedEmail = generateBenhubEmail(rawValue);
       const titleCased = formatToTitleCase(rawValue);
@@ -114,28 +108,20 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
     onResetFields();
   };
 
-  // Gera o texto Markdown substituindo as variáveis
-  const renderedMarkdown = useMemo(() => {
+  // Gera o texto substituindo as variáveis para cópia fiel no chat
+  const renderedText = useMemo(() => {
     return renderTemplate(template.templateBody, fieldValues, tasks);
   }, [template.templateBody, fieldValues, tasks]);
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(renderedMarkdown);
+      await navigator.clipboard.writeText(renderedText);
       setCopied(true);
-      onNotify('Relatório copiado com sucesso para a área de transferência!', 'success');
+      onNotify('Relatório copiado para o chat da empresa com sucesso!', 'success');
       setTimeout(() => setCopied(false), 2000);
     } catch {
       onNotify('Erro ao copiar relatório.', 'error');
     }
-  };
-
-  const handleDownloadFilled = () => {
-    const filename = `${template.meta.title.toLowerCase().replace(/\s+/g, '-')}-${new Date()
-      .toISOString()
-      .slice(0, 10)}`;
-    downloadMarkdownFile(filename, renderedMarkdown);
-    onNotify('Download do relatório em .md realizado!', 'success');
   };
 
   const handleQuickSave = () => {
@@ -146,7 +132,7 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
       isExpandable: false,
       fieldValues,
       tasks: [],
-      reportText: renderedMarkdown,
+      reportText: renderedText,
     });
     onNotify('Relatório salvo no Histórico com sucesso!', 'success');
   };
@@ -155,7 +141,12 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
     setIsSaveAsModalOpen(true);
   };
 
-  const handleConfirmSaveAs = (data: { title: string; date: string; time: string; note?: string }) => {
+  const handleConfirmSaveAs = (data: {
+    title: string;
+    date: string;
+    time: string;
+    note?: string;
+  }) => {
     onSaveCustom({
       templateId: template.meta.id,
       templateTitle: template.meta.title,
@@ -163,88 +154,57 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
       isExpandable: false,
       fieldValues,
       tasks: [],
-      reportText: renderedMarkdown,
+      reportText: renderedText,
       title: data.title,
       date: data.date,
       time: data.time,
       note: data.note,
     });
-    onNotify('Relatório salvo no Histórico com sucesso!', 'success');
+    onNotify('Relatório personalizado salvo no Histórico!', 'success');
   };
 
   const defaultSaveTitle = useMemo(() => {
     const now = new Date();
     const dd = String(now.getDate()).padStart(2, '0');
     const mm = String(now.getMonth() + 1).padStart(2, '0');
-    return `${template.meta.title} - ${dd}/${mm}`;
+    const hh = String(now.getHours()).padStart(2, '0');
+    const min = String(now.getMinutes()).padStart(2, '0');
+    return `${template.meta.title} - ${dd}/${mm} às ${hh}:${min}`;
   }, [template.meta.title]);
 
-  // Separa campos manuais dos campos que possuem preenchimento automático pelo sistema
   const manualFields = template.fields.filter((f) => !f.isSystemAuto);
-  const systemFields = template.fields.filter((f) => f.isSystemAuto);
 
   return (
-    <div className="template-runner-container">
-      {/* Barra de título do modelo ativo */}
-      <div className="runner-header-bar">
-        <div className="runner-header-meta">
-          <div className="runner-title-badge-row">
-            <h3 className="runner-title">{template.meta.title}</h3>
-            <span className={`runner-category-tag cat-${template.meta.category}`}>
-              {template.meta.category}
-            </span>
-            {template.meta.isBuiltin ? (
-              <span className="runner-origin-badge builtin">Padrão</span>
-            ) : (
-              <span className="runner-origin-badge custom">Customizado</span>
-            )}
-          </div>
-          <p className="runner-desc">{template.meta.description}</p>
+    <div className="markdown-template-runner">
+      {/* Barra de Título e Mudar Modelo */}
+      <div className="runner-header-card">
+        <div className="runner-header-info">
+          <span className="runner-category-pill">{template.meta.category.toUpperCase()}</span>
+          <h2 className="runner-title">{template.meta.title}</h2>
+          <p className="runner-description">{template.meta.description}</p>
         </div>
 
-        <div className="runner-header-actions">
+        <div className="runner-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {onStartNewReport && (
+            <Button
+              variant="secondary"
+              onClick={onStartNewReport}
+              title="Iniciar um novo relatório (mantendo o atual salvo no Histórico)"
+              style={{ padding: '6px 12px', fontSize: '0.82rem' }}
+            >
+              <FilePlus2 size={14} />
+              Novo Relatório
+            </Button>
+          )}
           {onOpenSelector && (
             <Button
               variant="primary"
               onClick={onOpenSelector}
-              title="Abrir catálogo para escolher outro modelo ou relatório"
+              title="Abrir catálogo para escolher outro relatório"
               style={{ padding: '6px 14px', fontSize: '0.85rem' }}
             >
               <FolderKanban size={15} />
-              Mudar Modelo
-            </Button>
-          )}
-
-          <Button
-            variant="secondary"
-            onClick={onExportTemplateFile}
-            title="Baixar arquivo de template (.md) original"
-            style={{ padding: '6px 12px', fontSize: '0.85rem' }}
-          >
-            <Download size={15} />
-            Baixar Template
-          </Button>
-
-          {onEditTemplate && (
-            <Button
-              variant="secondary"
-              onClick={onEditTemplate}
-              title="Editar código deste modelo"
-              style={{ padding: '6px 12px', fontSize: '0.85rem' }}
-            >
-              <Edit3 size={15} />
-              Editar
-            </Button>
-          )}
-
-          {onDeleteTemplate && (
-            <Button
-              variant="danger"
-              onClick={onDeleteTemplate}
-              title="Excluir este modelo customizado"
-              style={{ padding: '6px 12px', fontSize: '0.85rem' }}
-            >
-              <Trash2 size={15} />
+              Mudar Relatório
             </Button>
           )}
         </div>
@@ -269,34 +229,9 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
               )}
             </div>
 
-            {/* Informações de variáveis automáticas do sistema */}
-            {systemFields.length > 0 && (
-              <div className="system-auto-chips-box">
-                <span className="system-auto-title">
-                  <Sparkles size={13} style={{ color: 'var(--blue)' }} />
-                  Dados Injetados Automaticamente:
-                </span>
-                <div className="system-chips-list">
-                  {systemFields.map((f) => (
-                    <span key={f.id} className="system-chip">
-                      {f.id === 'tarefas' && <Clock size={12} />}
-                      {f.id === 'tarefas_tabela' && <Table size={12} />}
-                      {f.id === 'tarefas_lista' && <Layers size={12} />}
-                      {(f.id === 'data_atual' || f.id === 'data') && <Calendar size={12} />}
-                      <strong>{f.id}</strong>
-                      <span className="chip-count">
-                        {f.type === 'tasks' ? `${tasks.length} tarefas cadastradas` : 'Data/Hora'}
-                      </span>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Campos Manuais */}
             {manualFields.length === 0 ? (
               <div className="empty-fields-note">
-                <p>Este modelo utiliza apenas dados automáticos ou texto fixo.</p>
+                <p>Este relatório utiliza apenas dados fixos ou calculados automaticamente.</p>
                 <small>Não há campos manuais necessários para preencher.</small>
               </div>
             ) : (
@@ -363,45 +298,53 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
           </Panel>
         </div>
 
-        {/* Coluna 2: Preview & Ações */}
+        {/* Coluna 2: Preview Visual & Ações */}
         <div className="runner-preview-column">
           <Panel>
             <div className="runner-panel-header">
               <SectionHeading title="Pré-Visualização do Relatório" />
-              <div className="preview-view-toggle">
+              <div className="preview-format-toggles">
                 <button
                   type="button"
-                  className={`view-toggle-btn ${viewMode === 'formatted' ? 'active' : ''}`}
-                  onClick={() => setViewMode('formatted')}
-                  title="Visualização estruturada"
+                  className={`preview-format-btn ${visualMode === 'cards' ? 'active' : ''}`}
+                  onClick={() => setVisualMode('cards')}
+                  title="Interface visual em cartões e métricas"
                 >
-                  <Eye size={14} />
-                  Formatado
+                  <LayoutGrid size={13} />
+                  Cartões &amp; KPIs
                 </button>
                 <button
                   type="button"
-                  className={`view-toggle-btn ${viewMode === 'raw' ? 'active' : ''}`}
-                  onClick={() => setViewMode('raw')}
-                  title="Código Markdown bruto"
+                  className={`preview-format-btn ${visualMode === 'terminal' ? 'active' : ''}`}
+                  onClick={() => setVisualMode('terminal')}
+                  title="Console Benzaiten clássico"
                 >
-                  <Code size={14} />
-                  Markdown Bruto
+                  <Terminal size={13} />
+                  Console Benzaiten
+                </button>
+                <button
+                  type="button"
+                  className={`preview-format-btn ${visualMode === 'executive' ? 'active' : ''}`}
+                  onClick={() => setVisualMode('executive')}
+                  title="Ficha executiva corporativa"
+                >
+                  <FileSpreadsheet size={13} />
+                  Ficha Executiva
                 </button>
               </div>
             </div>
 
-            {/* Caixa de visualização */}
-            <div className="runner-preview-content-box">
-              {viewMode === 'raw' ? (
-                <pre className="raw-markdown-view">{renderedMarkdown}</pre>
-              ) : (
-                <div className="formatted-markdown-view">
-                  <FormattedMarkdownRenderer content={renderedMarkdown} />
-                </div>
-              )}
+            <div className="runner-preview-content-box" style={{ padding: '4px', background: 'transparent', border: 'none' }}>
+              <ReportVisualRenderer
+                templateId={template.meta.id}
+                visualMode={visualMode}
+                tasks={tasks}
+                fieldValues={fieldValues}
+                rawReportText={renderedText}
+                title={template.meta.title}
+              />
             </div>
 
-            {/* Barra de Ações do Relatório Final */}
             <div className="runner-footer-actions">
               <Button
                 variant="primary"
@@ -409,7 +352,7 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
                 style={{ flex: 1, justifyContent: 'center' }}
               >
                 {copied ? <Check size={18} /> : <Copy size={18} />}
-                {copied ? 'Copiado para Transferência!' : 'Copiar Relatório'}
+                {copied ? 'Copiado para o Chat!' : 'Copiar Relatório'}
               </Button>
 
               <Button
@@ -421,23 +364,16 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
                 Salvar
               </Button>
 
-              <Button
-                variant="secondary"
-                icon={<BookmarkPlus size={15} />}
-                onClick={handleOpenSaveAs}
-                title="Salvar no Histórico personalizando título, data e notas"
-              >
-                Salvar como...
-              </Button>
-
-              <Button
-                variant="secondary"
-                onClick={handleDownloadFilled}
-                title="Baixar este relatório em arquivo .md"
-              >
-                <Download size={16} />
-                Baixar .md
-              </Button>
+              {canSaveAs && (
+                <Button
+                  variant="secondary"
+                  icon={<BookmarkPlus size={15} />}
+                  onClick={handleOpenSaveAs}
+                  title="Salvar no Histórico personalizando título, data e notas"
+                >
+                  Salvar como...
+                </Button>
+              )}
             </div>
           </Panel>
         </div>
@@ -446,92 +382,10 @@ export const MarkdownTemplateRunner: React.FC<Props> = ({
       <SaveReportModal
         isOpen={isSaveAsModalOpen}
         defaultTitle={defaultSaveTitle}
+        isOperator={isOperator}
         onClose={() => setIsSaveAsModalOpen(false)}
         onSave={handleConfirmSaveAs}
       />
-    </div>
-  );
-};
-
-// Renderizador visual elegante de Markdown puro (sem dependências externas)
-const FormattedMarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
-  const lines = content.split('\n');
-
-  return (
-    <div className="rendered-doc">
-      {lines.map((line, idx) => {
-        const trimmed = line.trim();
-
-        if (!trimmed) {
-          return <div key={idx} className="doc-spacer" />;
-        }
-
-        if (trimmed.startsWith('# ')) {
-          return (
-            <h1 key={idx} className="doc-h1">
-              {trimmed.slice(2)}
-            </h1>
-          );
-        }
-
-        if (trimmed.startsWith('## ')) {
-          return (
-            <h2 key={idx} className="doc-h2">
-              {trimmed.slice(3)}
-            </h2>
-          );
-        }
-
-        if (trimmed.startsWith('### ')) {
-          return (
-            <h3 key={idx} className="doc-h3">
-              {trimmed.slice(4)}
-            </h3>
-          );
-        }
-
-        if (trimmed === '---') {
-          return <hr key={idx} className="doc-hr" />;
-        }
-
-        if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
-          // Renderização de linha de tabela
-          const cells = trimmed
-            .split('|')
-            .slice(1, -1)
-            .map((c) => c.trim());
-          const isSeparator = cells.every((c) => /^:?-+:?$/.test(c));
-
-          if (isSeparator) {
-            return null;
-          }
-
-          return (
-            <div key={idx} className="doc-table-row">
-              {cells.map((cell, cIdx) => (
-                <div key={cIdx} className="doc-table-cell">
-                  {cell.replace(/\*\*(.*?)\*\*/g, '$1')}
-                </div>
-              ))}
-            </div>
-          );
-        }
-
-        if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-          return (
-            <div key={idx} className="doc-bullet-line">
-              <span className="doc-bullet-dot">•</span>
-              <span>{trimmed.slice(2)}</span>
-            </div>
-          );
-        }
-
-        return (
-          <p key={idx} className="doc-p">
-            {line}
-          </p>
-        );
-      })}
     </div>
   );
 };
