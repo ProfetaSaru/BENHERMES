@@ -125,3 +125,51 @@ export function clearAuthCookie(res: ServerResponse): void {
   res.setHeader('Set-Cookie', `${COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
 }
 
+export const OPERATOR_ALLOWED_TEMPLATE_IDS = [
+  'atividades-padrao',
+  'produtividade-atendimento',
+] as const;
+
+export function formatFirstAndLastName(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '';
+  if (parts.length === 1) return parts[0];
+  return `${parts[0]} ${parts[parts.length - 1]}`;
+}
+
+export function formatOperatorReportTitle(
+  user: { displayName?: string; username: string },
+  displayDate?: string,
+  displayTime?: string
+): string {
+  const rawName = user.displayName?.trim() || user.username?.trim() || 'Operador';
+  const shortName = formatFirstAndLastName(rawName);
+
+  let dateFormatted = '';
+  if (displayDate && displayDate.includes('-')) {
+    const parts = displayDate.split('-');
+    if (parts.length === 3 && parts[0].length === 4) {
+      dateFormatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
+    } else {
+      dateFormatted = displayDate;
+    }
+  } else if (displayDate) {
+    dateFormatted = displayDate;
+  } else {
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2, '0');
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const yyyy = now.getFullYear();
+    dateFormatted = `${dd}/${mm}/${yyyy}`;
+  }
+
+  let timeFormatted = displayTime?.trim() || '';
+  if (!timeFormatted) {
+    const now = new Date();
+    timeFormatted = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  }
+
+  return `${shortName} - ${dateFormatted} - ${timeFormatted}`;
+}
+
+

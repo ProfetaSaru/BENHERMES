@@ -8,6 +8,8 @@ import {
   signAuthToken,
   verifyAuthToken,
   type UserRole,
+  OPERATOR_ALLOWED_TEMPLATE_IDS,
+  formatOperatorReportTitle,
 } from './auth.ts';
 import { atenderArgus } from './argusProxy.ts';
 import { enforceIpWhitelist } from './ipFilter.ts';
@@ -257,14 +259,34 @@ export function createApiHandler(appDb: AppDatabase, options?: { enforceIp?: boo
 
       if ((pathname === '/api/reports' || pathname === '/api/reports/autosave') && method === 'POST') {
         const body = await readJsonBody(req);
+
+        let finalTemplateId = String(body.templateId || 'atividades-padrao');
+        let finalTemplateTitle = String(body.templateTitle || 'Relatório de Atividades');
+        let finalTemplateCategory = String(body.templateCategory || 'geral');
+        let finalTitle = String(body.title || 'Relatório sem título');
+
+        const displayDate = String(body.displayDate || new Date().toISOString().slice(0, 10));
+        const displayTime = String(body.displayTime || '00:00');
+
+        if (currentUser.role === 'operador') {
+          // Força template permitido: atividades-padrao ou produtividade-atendimento
+          if (!OPERATOR_ALLOWED_TEMPLATE_IDS.includes(finalTemplateId as any)) {
+            finalTemplateId = 'atividades-padrao';
+            finalTemplateTitle = 'Relatório de Atividades Padrão';
+            finalTemplateCategory = 'atividades';
+          }
+          // Força título no formato: Primeiro e Último Nome - Data - Hora
+          finalTitle = formatOperatorReportTitle(currentUser, displayDate, displayTime);
+        }
+
         const saved = appDb.upsertReport(currentUser, {
           id: body.id ? String(body.id) : undefined,
-          title: String(body.title || 'Relatório sem título'),
-          displayDate: String(body.displayDate || new Date().toISOString().slice(0, 10)),
-          displayTime: String(body.displayTime || '00:00'),
-          templateId: String(body.templateId || 'atividades-padrao'),
-          templateTitle: String(body.templateTitle || 'Relatório de Atividades'),
-          templateCategory: String(body.templateCategory || 'geral'),
+          title: finalTitle,
+          displayDate,
+          displayTime,
+          templateId: finalTemplateId,
+          templateTitle: finalTemplateTitle,
+          templateCategory: finalTemplateCategory,
           isExpandable: Boolean(body.isExpandable ?? true),
           fieldValues: body.fieldValues && typeof body.fieldValues === 'object' ? body.fieldValues : {},
           tasks: Array.isArray(body.tasks) ? body.tasks : [],
@@ -291,6 +313,10 @@ export function createApiHandler(appDb: AppDatabase, options?: { enforceIp?: boo
         const reportId = decodeURIComponent(pathname.slice('/api/reports/'.length));
 
         if (method === 'PUT') {
+          if (currentUser.role === 'operador') {
+            sendJson(res, 403, { erro: 'Operadores não podem alterar o título padronizado de relatórios.' });
+            return true;
+          }
           const body = await readJsonBody(req);
           try {
             const updated = appDb.renameReport(reportId, String(body.title || ''), currentUser);
@@ -348,7 +374,7 @@ export function createApiHandler(appDb: AppDatabase, options?: { enforceIp?: boo
           return true;
         }
         const oldMap = appDb.getAppState<any | null>('whatsapp_mapa', null);
-        const check = validateWhatsappPermissions(oldMap, body.mapa, currentUser.role);
+        const check = validateWhatsappPermissions(oldMap, body.mapa, currentUser);
         if (!check.ok) {
           sendJson(res, 403, { erro: check.error });
           return true;
@@ -444,7 +470,7 @@ export function benhermesApiPlugin(customDb?: AppDatabase): Plugin {
   const getHandler = () => {
     if (!handler) {
       const db = customDb || new AppDatabase();
-      handler = createApiHandler(db, { enforceIp: true });
+      handler = createApiHandler(db, { enforceIp: process.env.ENFORCE_IP !== 'false' });
     }
     return handler;
   };

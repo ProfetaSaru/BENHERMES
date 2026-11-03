@@ -666,17 +666,32 @@ export class AppDatabase {
  * Valida se um usuário não-Admin (Supervisor ou Gerente) tentou realizar operações proibidas
  * no mapa do WhatsApp das Baias (colocar em manutenção ou excluir salas, mesas, celulares ou vagas).
  */
+export interface WhatsappUserContext {
+  id?: string;
+  role: UserRole;
+  displayName?: string;
+  username?: string;
+}
+
 export function validateWhatsappPermissions(
   oldMap: any | null,
   newMap: any,
-  role: UserRole
+  userOrRole: UserRole | WhatsappUserContext
 ): { ok: true } | { ok: false; error: string } {
+  const user: WhatsappUserContext =
+    typeof userOrRole === 'string' ? { role: userOrRole } : userOrRole;
+  const role = user.role;
+
   if (role === 'admin') {
     return { ok: true };
   }
 
   if (role === 'operador') {
     return { ok: false, error: 'Operadores não têm acesso ao WhatsApp das Baias.' };
+  }
+
+  if (!oldMap) {
+    return { ok: false, error: 'Apenas o Admin pode inicializar o mapa do WhatsApp.' };
   }
 
   // Supervisor e Gerente não podem iniciar, alterar ou concluir manutenção
@@ -691,34 +706,77 @@ export function validateWhatsappPermissions(
 
   const oldManutCount = Array.isArray(oldMap?.manutencoes) ? oldMap.manutencoes.length : 0;
   const newManutCount = Array.isArray(newMap?.manutencoes) ? newMap.manutencoes.length : 0;
-  if (oldMap && newManutCount !== oldManutCount) {
+  if (newManutCount !== oldManutCount) {
     return {
       ok: false,
       error: 'Apenas o Admin pode registrar ou alterar manutenções.',
     };
   }
 
-  if (!oldMap) {
-    return { ok: true };
-  }
-
-  // Verificar que nenhuma sala existente foi excluída
+  // Verificar que nenhuma sala existente foi excluída nem adicionada
   const oldSalas: any[] = Array.isArray(oldMap.salas) ? oldMap.salas : [];
   const newSalas: any[] = Array.isArray(newMap.salas) ? newMap.salas : [];
   const newSalaIds = new Set(newSalas.map((s) => s.id));
+  const oldSalaIds = new Set(oldSalas.map((s) => s.id));
+
   for (const oldSala of oldSalas) {
     if (!newSalaIds.has(oldSala.id)) {
       return { ok: false, error: 'Apenas o Admin pode excluir salas.' };
     }
   }
 
-  // Verificar que nenhuma mesa existente foi excluída
-  const oldMesas = oldSalas.flatMap((s) => (Array.isArray(s.mesas) ? s.mesas : []));
-  const newMesas = newSalas.flatMap((s) => (Array.isArray(s.mesas) ? s.mesas : []));
-  const newMesaIds = new Set(newMesas.map((m) => m.id));
+  for (const newSala of newSalas) {
+    if (!oldSalaIds.has(newSala.id)) {
+      return { ok: false, error: 'Apenas o Admin pode criar salas.' };
+    }
+  }
+
+  // Verificar que nenhuma mesa existente foi excluída nem adicionada
+  const oldMesas: any[] = oldSalas.flatMap((s) => (Array.isArray(s.mesas) ? s.mesas : []));
+  const newMesas: any[] = newSalas.flatMap((s) => (Array.isArray(s.mesas) ? s.mesas : []));
+  const newMesaMap = new Map(newMesas.map((m) => [m.id, m]));
+  const oldMesaMap = new Map(oldMesas.map((m) => [m.id, m]));
+
   for (const oldMesa of oldMesas) {
-    if (!newMesaIds.has(oldMesa.id)) {
+    if (!newMesaMap.has(oldMesa.id)) {
       return { ok: false, error: 'Apenas o Admin pode excluir mesas.' };
+    }
+  }
+
+  for (const newMesa of newMesas) {
+    if (!oldMesaMap.has(newMesa.id)) {
+      return { ok: false, error: 'Apenas o Admin pode criar mesas.' };
+    }
+  }
+
+  // Supervisor e Gerente não podem alterar a alocação de supervisor (supervisorUserId)
+  for (const oldMesa of oldMesas) {
+    const newMesa = newMesaMap.get(oldMesa.id);
+    if (newMesa && (newMesa.supervisorUserId ?? null) !== (oldMesa.supervisorUserId ?? null)) {
+      return { ok: false, error: 'Apenas o Admin pode alocar ou alterar o supervisor da mesa.' };
+    }
+  }
+
+  // Regra específica do Supervisor: só pode alterar lugares/baias da sua própria mesa
+  if (role === 'supervisor') {
+    const isOwnMesa = (m: any) => {
+      if (user.id && m.supervisorUserId && m.supervisorUserId === user.id) {
+        return true;
+      }
+      const supName = (m.supervisor || '').trim().toLowerCase();
+      if (!supName) return false;
+      if (user.displayName && supName === user.displayName.trim().toLowerCase()) return true;
+      if (user.username && supName === user.username.trim().toLowerCase()) return true;
+      return false;
+    };
+
+    for (const oldMesa of oldMesas) {
+      const newMesa = newMesaMap.get(oldMesa.id);
+      if (newMesa && JSON.stringify(oldMesa) !== JSON.stringify(newMesa)) {
+        if (!isOwnMesa(oldMesa) && !isOwnMesa(newMesa)) {
+          return { ok: false, error: 'Supervisores só podem alterar lugares da sua própria mesa.' };
+        }
+      }
     }
   }
 

@@ -170,6 +170,7 @@ describe('API Router, RBAC, Auto-Save e Permissões do WhatsApp Baias', () => {
       },
     });
     expect(auto1.status).toBe(200);
+    expect(auto1.data.report.title).toBe('Operador A1 - 28/10/2026 - 10:00');
 
     const auto2 = await callApi(handler, {
       method: 'POST',
@@ -263,6 +264,91 @@ describe('API Router, RBAC, Auto-Save e Permissões do WhatsApp Baias', () => {
       token: adminToken,
     });
     expect(delByAdmin.status).toBe(200);
+  });
+
+  it('aplica restrições de operadores nos relatórios (título automático, renomeação proibida e restrição de templates)', async () => {
+    // 1. Criar operador
+    const adminLogin = await callApi(handler, {
+      method: 'POST',
+      url: '/api/auth/login',
+      body: { username: 'admin', password: process.env.ADMIN_PASSWORD || 'admin123' },
+    });
+    const adminToken = adminLogin.data.token as string;
+
+    const opRes = await callApi(handler, {
+      method: 'POST',
+      url: '/api/users',
+      token: adminToken,
+      body: {
+        username: 'carlos_op',
+        displayName: 'Carlos Eduardo da Silva',
+        password: '123',
+        role: 'operador',
+      },
+    });
+    expect(opRes.status).toBe(201);
+    const opToken = signAuthToken({ id: opRes.data.user.id, username: 'carlos_op', role: 'operador' });
+
+    // 2. Operador salva relatório de atividades: título deve ser padronizado para "Carlos Silva - 30/10/2026 - 12:45"
+    const saveRes = await callApi(handler, {
+      method: 'POST',
+      url: '/api/reports',
+      token: opToken,
+      body: {
+        id: 'rep-carlos-1',
+        title: 'Título Ignorado Pelo Servidor',
+        displayDate: '2026-10-30',
+        displayTime: '12:45',
+        templateId: 'atividades-padrao',
+        tasks: [{ id: 't1', title: 'Atendimento', start: '12:00', end: '12:45', category: 'Rotina' }],
+      },
+    });
+    expect(saveRes.status).toBe(200);
+    expect(saveRes.data.report.title).toBe('Carlos Silva - 30/10/2026 - 12:45');
+
+    // 3. Operador salva relatório de TMA & Produtividade (permitido):
+    const saveTmaRes = await callApi(handler, {
+      method: 'POST',
+      url: '/api/reports',
+      token: opToken,
+      body: {
+        id: 'rep-carlos-tma',
+        displayDate: '2026-10-30',
+        displayTime: '14:00',
+        templateId: 'produtividade-atendimento',
+        tasks: [],
+      },
+    });
+    expect(saveTmaRes.status).toBe(200);
+    expect(saveTmaRes.data.report.templateId).toBe('produtividade-atendimento');
+    expect(saveTmaRes.data.report.title).toBe('Carlos Silva - 30/10/2026 - 14:00');
+
+    // 4. Operador tentando salvar modelo não permitido (ex: relatorio-incidente) é forçado para atividades-padrao:
+    const saveRestritoRes = await callApi(handler, {
+      method: 'POST',
+      url: '/api/reports',
+      token: opToken,
+      body: {
+        id: 'rep-carlos-restrito',
+        displayDate: '2026-10-30',
+        displayTime: '15:30',
+        templateId: 'relatorio-incidente',
+        tasks: [],
+      },
+    });
+    expect(saveRestritoRes.status).toBe(200);
+    expect(saveRestritoRes.data.report.templateId).toBe('atividades-padrao');
+    expect(saveRestritoRes.data.report.title).toBe('Carlos Silva - 30/10/2026 - 15:30');
+
+    // 5. Operador não pode renomear relatório:
+    const renameRes = await callApi(handler, {
+      method: 'PUT',
+      url: '/api/reports/rep-carlos-1',
+      token: opToken,
+      body: { title: 'Tentativa de Alterar Título' },
+    });
+    expect(renameRes.status).toBe(403);
+    expect(renameRes.data.erro).toContain('Operadores não podem alterar o título');
   });
 
   it('aplica permissões do WhatsApp das Baias (Supervisor pode registrar/alterar mas não manutenção nem excluir)', async () => {
@@ -562,6 +648,178 @@ describe('API Router, RBAC, Auto-Save e Permissões do WhatsApp Baias', () => {
     });
     expect(getDrafts.status).toBe(200);
     expect(getDrafts.data.drafts.theme).toBe('dark');
+  });
+
+  it('aplica permissões estritas para Supervisor e Gerente no WhatsApp das Baias', async () => {
+    // 1. Admin faz login
+    const adminLogin = await callApi(handler, {
+      method: 'POST',
+      url: '/api/auth/login',
+      body: { username: 'admin', password: process.env.ADMIN_PASSWORD || 'admin123' },
+    });
+    const adminToken = adminLogin.data.token as string;
+
+    // 2. Cria 2 Supervisores e 1 Gerente
+    const sup1Res = await callApi(handler, {
+      method: 'POST',
+      url: '/api/users',
+      token: adminToken,
+      body: { username: 'sup_maria', displayName: 'Maria Silva', password: '123', role: 'supervisor' },
+    });
+    const sup1 = sup1Res.data.user;
+
+    const sup2Res = await callApi(handler, {
+      method: 'POST',
+      url: '/api/users',
+      token: adminToken,
+      body: { username: 'sup_joao', displayName: 'João Santos', password: '123', role: 'supervisor' },
+    });
+    const sup2 = sup2Res.data.user;
+
+    const gerRes = await callApi(handler, {
+      method: 'POST',
+      url: '/api/users',
+      token: adminToken,
+      body: { username: 'ger_carlos', displayName: 'Carlos Gerente', password: '123', role: 'gerente' },
+    });
+    const gerente = gerRes.data.user;
+
+    const sup1Token = signAuthToken({ id: sup1.id, username: sup1.username, role: sup1.role });
+    const sup2Token = signAuthToken({ id: sup2.id, username: sup2.username, role: sup2.role });
+    const gerToken = signAuthToken({ id: gerente.id, username: gerente.username, role: gerente.role });
+
+    // 3. Admin cria mapa com 2 mesas: Mesa 1 (alocada para Maria) e Mesa 2 (alocada para João)
+    const baseMap = {
+      versao: 3,
+      atualizadoEm: new Date().toISOString(),
+      salas: [
+        {
+          id: 'sala-1',
+          nome: 'Operação Central',
+          mesas: [
+            {
+              id: 'mesa-1',
+              nome: 'Equipe Maria',
+              sigla: 'EQ1',
+              supervisor: 'Maria Silva',
+              supervisorUserId: sup1.id,
+              whatsappSupervisor: 'PC',
+              esq: 2,
+              dir: 2,
+              centro: 'SUP',
+              inicio: 'sup',
+              desativadas: [],
+              lugares: {
+                SUP: { operador: 'Maria Silva', whatsapp: { situacao: 'OK', mudouEm: new Date().toISOString() } },
+                E1: { operador: 'Op 1A', whatsapp: { situacao: 'OK', mudouEm: new Date().toISOString() } },
+                D1: { operador: 'Op 1B', whatsapp: { situacao: 'OK', mudouEm: new Date().toISOString() } },
+              },
+            },
+            {
+              id: 'mesa-2',
+              nome: 'Equipe João',
+              sigla: 'EQ2',
+              supervisor: 'João Santos',
+              supervisorUserId: sup2.id,
+              whatsappSupervisor: 'PC',
+              esq: 2,
+              dir: 2,
+              centro: 'SUP',
+              inicio: 'sup',
+              desativadas: [],
+              lugares: {
+                SUP: { operador: 'João Santos', whatsapp: { situacao: 'OK', mudouEm: new Date().toISOString() } },
+                E1: { operador: 'Op 2A', whatsapp: { situacao: 'OK', mudouEm: new Date().toISOString() } },
+                D1: { operador: 'Op 2B', whatsapp: { situacao: 'OK', mudouEm: new Date().toISOString() } },
+              },
+            },
+          ],
+        },
+      ],
+      celulares: [],
+      historico: [],
+      manutencoes: [],
+      manutencaoAtual: null,
+      inicioDoHistorico: new Date().toISOString(),
+    };
+
+    const saveMapAdmin = await callApi(handler, {
+      method: 'PUT',
+      url: '/api/whatsapp',
+      token: adminToken,
+      body: { mapa: baseMap },
+    });
+    expect(saveMapAdmin.status).toBe(200);
+
+    // 4. Supervisor 1 (Maria) edita o status na sua própria mesa -> Sucesso 200
+    const sup1EditOwn = JSON.parse(JSON.stringify(baseMap));
+    sup1EditOwn.salas[0].mesas[0].lugares.E1.whatsapp.situacao = 'BANIDO';
+    const resSup1Own = await callApi(handler, {
+      method: 'PUT',
+      url: '/api/whatsapp',
+      token: sup1Token,
+      body: { mapa: sup1EditOwn },
+    });
+    expect(resSup1Own.status).toBe(200);
+
+    // 5. Supervisor 1 tenta alterar um lugar na mesa do Supervisor 2 (João) -> Erro 403
+    const sup1EditOther = JSON.parse(JSON.stringify(sup1EditOwn));
+    sup1EditOther.salas[0].mesas[1].lugares.E1.whatsapp.situacao = 'BANIDO';
+    const resSup1Other = await callApi(handler, {
+      method: 'PUT',
+      url: '/api/whatsapp',
+      token: sup1Token,
+      body: { mapa: sup1EditOther },
+    });
+    expect(resSup1Other.status).toBe(403);
+    expect(resSup1Other.data.erro).toContain('Supervisores só podem alterar lugares da sua própria mesa');
+
+    // 6. Supervisor 1 tenta iniciar manutenção -> Erro 403
+    const sup1Maintenance = JSON.parse(JSON.stringify(sup1EditOwn));
+    sup1Maintenance.manutencaoAtual = { id: 'manut-1', inicio: new Date().toISOString() };
+    const resSup1Maint = await callApi(handler, {
+      method: 'PUT',
+      url: '/api/whatsapp',
+      token: sup1Token,
+      body: { mapa: sup1Maintenance },
+    });
+    expect(resSup1Maint.status).toBe(403);
+    expect(resSup1Maint.data.erro).toContain('manutenção');
+
+    // 7. Supervisor 1 tenta alterar a alocação de supervisor de sua mesa -> Erro 403
+    const sup1ChangeSup = JSON.parse(JSON.stringify(sup1EditOwn));
+    sup1ChangeSup.salas[0].mesas[0].supervisorUserId = sup2.id;
+    const resSup1ChangeSup = await callApi(handler, {
+      method: 'PUT',
+      url: '/api/whatsapp',
+      token: sup1Token,
+      body: { mapa: sup1ChangeSup },
+    });
+    expect(resSup1ChangeSup.status).toBe(403);
+    expect(resSup1ChangeSup.data.erro).toContain('Apenas o Admin pode alocar ou alterar o supervisor da mesa');
+
+    // 8. Gerente pode alterar lugares em qualquer mesa -> Sucesso 200
+    const gerEdit = JSON.parse(JSON.stringify(sup1EditOwn));
+    gerEdit.salas[0].mesas[0].lugares.D1.whatsapp.situacao = 'RESTRINGIDO';
+    gerEdit.salas[0].mesas[1].lugares.D1.whatsapp.situacao = 'ANALISE';
+    const resGerEdit = await callApi(handler, {
+      method: 'PUT',
+      url: '/api/whatsapp',
+      token: gerToken,
+      body: { mapa: gerEdit },
+    });
+    expect(resGerEdit.status).toBe(200);
+
+    // 9. Gerente tenta iniciar manutenção ou excluir mesa -> Erro 403
+    const gerMaint = JSON.parse(JSON.stringify(gerEdit));
+    gerMaint.manutencaoAtual = { id: 'manut-2', inicio: new Date().toISOString() };
+    const resGerMaint = await callApi(handler, {
+      method: 'PUT',
+      url: '/api/whatsapp',
+      token: gerToken,
+      body: { mapa: gerMaint },
+    });
+    expect(resGerMaint.status).toBe(403);
   });
 });
 
