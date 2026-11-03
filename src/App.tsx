@@ -42,6 +42,9 @@ const WhatsappHub = lazy(() =>
 const UsersManagementHub = lazy(() =>
   import('./components/users/UsersManagementHub').then((m) => ({ default: m.UsersManagementHub }))
 );
+const NotesHub = lazy(() =>
+  import('./components/notes/NotesHub').then((m) => ({ default: m.NotesHub }))
+);
 
 interface ServerUserDrafts {
   activeTemplateId: string;
@@ -99,6 +102,7 @@ export const App: React.FC = () => {
   const [isNewReportChoiceModalOpen, setIsNewReportChoiceModalOpen] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [lastAutoSavedTime, setLastAutoSavedTime] = useState<string | null>(null);
+  const [unreadNotesCount, setUnreadNotesCount] = useState(0);
   const lastSignatureByTemplateRef = useRef<Record<string, string>>({});
 
   const clearWorkingReportState = useCallback(() => {
@@ -424,10 +428,29 @@ export const App: React.FC = () => {
     notify,
   ]);
 
+  const refreshUnreadNotes = useCallback(() => {
+    if (!currentUser) {
+      setUnreadNotesCount(0);
+      return;
+    }
+    apiRequest<{ unreadCount: number }>('/api/notes/unread-count')
+      .then((res) => {
+        setUnreadNotesCount(res.unreadCount || 0);
+      })
+      .catch(() => {});
+  }, [currentUser]);
+
+  useEffect(() => {
+    refreshUnreadNotes();
+    const interval = setInterval(refreshUnreadNotes, 30000);
+    return () => clearInterval(interval);
+  }, [refreshUnreadNotes]);
+
   const navItems = getNavigationItems(
     tasks.length,
     savedReports.length,
-    currentUser?.role || 'admin'
+    currentUser?.role || 'admin',
+    unreadNotesCount
   );
   const activeItem = navItems.find((item) => item.id === activeToolId) || navItems[0];
 
@@ -673,6 +696,14 @@ export const App: React.FC = () => {
                     onNotify={notify}
                     onNavigateToGenerator={() => setActiveToolId('relatorios')}
                     currentUser={currentUser}
+                  />
+                </main>
+              ) : activeToolId === 'anotacoes' ? (
+                <main className="container" style={{ maxWidth: '1480px', padding: '0 16px', boxSizing: 'border-box', width: '100%' }}>
+                  <NotesHub
+                    currentUser={currentUser}
+                    onNotify={notify}
+                    onUnreadCountChanged={refreshUnreadNotes}
                   />
                 </main>
               ) : activeToolId === 'usuarios' && currentUser.role === 'admin' ? (

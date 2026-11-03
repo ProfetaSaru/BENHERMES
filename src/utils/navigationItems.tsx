@@ -7,6 +7,7 @@ import {
   History,
   Settings,
   Users,
+  StickyNote,
 } from 'lucide-react';
 import { NavigationItem } from '../types/navigation';
 import { canSeeTool, UserRole } from '../types/auth';
@@ -14,7 +15,8 @@ import { canSeeTool, UserRole } from '../types/auth';
 export const getNavigationItems = (
   taskCount: number,
   savedReportsCount = 0,
-  role: UserRole = 'admin'
+  role: UserRole = 'admin',
+  unreadNotesCount = 0
 ): NavigationItem[] => {
   const allItems: NavigationItem[] = [
     {
@@ -71,6 +73,17 @@ export const getNavigationItems = (
       badgeVariant: 'muted',
       isReady: false,
       icon: <BarChart3 size={20} />,
+    },
+    {
+      id: 'anotacoes',
+      name: 'Mural de Anotações',
+      shortName: 'Anotações',
+      description: 'Anotações e recados com suporte a comentários e filtros por pessoa.',
+      category: 'sistema',
+      badge: unreadNotesCount > 0 ? `${unreadNotesCount} novos` : 'Ativo',
+      badgeVariant: unreadNotesCount > 0 ? 'warning' : 'success',
+      isReady: true,
+      icon: <StickyNote size={20} />,
     },
     {
       id: 'historico',

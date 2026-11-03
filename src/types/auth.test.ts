@@ -29,6 +29,7 @@ describe('RBAC e Visibilidade de Abas por Perfil', () => {
       'relatorio-ura',
       'whatsapp',
       'metricas',
+      'anotacoes',
       'historico',
       'usuarios',
       'configuracoes',
@@ -43,7 +44,7 @@ describe('RBAC e Visibilidade de Abas por Perfil', () => {
   it('Supervisor e Gerente veem Central de Relatórios, WhatsApp Baias, Histórico e Configurações, sem manutenção ou exclusão', () => {
     for (const role of ['supervisor', 'gerente'] as const) {
       const ids = getNavigationItems(0, 0, role).map((i) => i.id);
-      expect(ids).toEqual(['relatorios', 'whatsapp', 'historico', 'configuracoes']);
+      expect(ids).toEqual(['relatorios', 'whatsapp', 'anotacoes', 'historico', 'configuracoes']);
       expect(canManageWhatsappMaintenance(role)).toBe(false);
       expect(canDeleteWhatsappItems(role)).toBe(false);
       expect(canImportOverwriteWhatsappMap(role)).toBe(false);
@@ -54,7 +55,7 @@ describe('RBAC e Visibilidade de Abas por Perfil', () => {
 
   it('Operador vê apenas Central de Relatórios, Histórico e Configurações', () => {
     const ids = getNavigationItems(0, 0, 'operador').map((i) => i.id);
-    expect(ids).toEqual(['relatorios', 'historico', 'configuracoes']);
+    expect(ids).toEqual(['relatorios', 'anotacoes', 'historico', 'configuracoes']);
     expect(canManageWhatsappMaintenance('operador')).toBe(false);
     expect(canDeleteWhatsappItems('operador')).toBe(false);
   });

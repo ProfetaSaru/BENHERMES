@@ -11,6 +11,11 @@
   --line: #e2e8f0;
   --line-strong: #cbd5e1;
 
+  /* Aliases Semânticos de Superfície e Borda */
+  --surface: var(--paper);
+  --border: var(--line);
+  --bg: var(--paper-surface);
+
   /* Brand Azul */
   --blue: #1d4ed8;
   --blue-dark: #1e40af;
@@ -76,6 +81,11 @@
   --muted: #94a3b8;
   --line: #172554;     /* Linhas em Azul Escuro */
   --line-strong: #1e3a8a;
+
+  /* Aliases Semânticos de Superfície e Borda */
+  --surface: var(--paper);
+  --border: var(--line);
+  --bg: var(--paper-surface);
 
   /* Brand Azul */
   --blue: #3b82f6;

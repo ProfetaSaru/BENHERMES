@@ -24,6 +24,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 export function canSeeTool(role: UserRole, toolId: string): boolean {
   if (toolId === 'formatador') return false;
   if (toolId === 'usuarios') return role === 'admin';
+  if (toolId === 'anotacoes') return true;
 
   switch (role) {
     case 'admin':
