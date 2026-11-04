@@ -26,7 +26,19 @@ function sendJson(res: ServerResponse, status: number, data: unknown): void {
 function readJsonBody(req: IncomingMessage & { body?: unknown }): Promise<any> {
   if (req.body !== undefined) {
     if (typeof req.body === 'string') {
-      return Promise.resolve(req.body ? JSON.parse(req.body) : {});
+      try {
+        let parsed = req.body ? JSON.parse(req.body) : {};
+        if (typeof parsed === 'string') {
+          try {
+            parsed = JSON.parse(parsed);
+          } catch {
+            // mantém como string se não for JSON válido
+          }
+        }
+        return Promise.resolve(parsed);
+      } catch {
+        return Promise.resolve({});
+      }
     }
     return Promise.resolve(req.body || {});
   }
@@ -46,7 +58,15 @@ function readJsonBody(req: IncomingMessage & { body?: unknown }): Promise<any> {
     req.on('end', () => {
       try {
         const raw = Buffer.concat(chunks).toString('utf-8').trim();
-        resolve(raw ? JSON.parse(raw) : {});
+        let parsed = raw ? JSON.parse(raw) : {};
+        if (typeof parsed === 'string') {
+          try {
+            parsed = JSON.parse(parsed);
+          } catch {
+            // mantém como string se não for JSON válido
+          }
+        }
+        resolve(parsed);
       } catch {
         reject(new Error('JSON inválido no corpo da requisição.'));
       }
@@ -503,7 +523,13 @@ export function createApiHandler(appDb: AppDatabase, options?: { enforceIp?: boo
           if (method === 'POST') {
             const body = await readJsonBody(req);
             try {
-              const comment = appDb.addNoteComment(noteId, currentUser, String(body.content || ''));
+              const textContent =
+                typeof body === 'object' && body !== null && 'content' in body
+                  ? (body as any).content
+                  : typeof body === 'string'
+                  ? body
+                  : '';
+              const comment = appDb.addNoteComment(noteId, currentUser, String(textContent || ''));
               sendJson(res, 201, { comment });
             } catch (err: any) {
               sendJson(res, 400, { erro: err.message || 'Erro ao adicionar comentário.' });

@@ -64,6 +64,7 @@ export interface StoredNoteCommentRow {
   authorRole: UserRole;
   content: string;
   createdAt: string;
+  isUnread?: boolean;
 }
 
 export interface UserDraftState {
@@ -941,6 +942,11 @@ export class AppDatabase {
     const note = this.getNoteById(noteId, user);
     if (!note) throw new Error('Anotação não encontrada ou sem permissão de visualização.');
 
+    const readRow = this.db
+      .prepare(`SELECT last_read_at FROM note_reads WHERE note_id = ? AND user_id = ?`)
+      .get(noteId, user.id) as { last_read_at?: string } | undefined;
+    const lastReadAt = readRow?.last_read_at || null;
+
     const rows = this.db
       .prepare(
         `SELECT
@@ -962,6 +968,7 @@ export class AppDatabase {
       authorRole: r.author_role as UserRole,
       content: r.content,
       createdAt: r.created_at,
+      isUnread: Boolean(r.user_id !== user.id && (!lastReadAt || r.created_at > lastReadAt)),
     }));
   }
 
@@ -981,6 +988,20 @@ export class AppDatabase {
          VALUES (?, ?, ?, ?, ?)`
       )
       .run(id, noteId, user.id, text, now);
+
+    // Limita o histórico a 100 comentários por anotação (remove os mais antigos excedentes)
+    this.db
+      .prepare(
+        `DELETE FROM note_comments
+         WHERE note_id = ?
+           AND id NOT IN (
+             SELECT id FROM note_comments
+             WHERE note_id = ?
+             ORDER BY created_at DESC
+             LIMIT 100
+           )`
+      )
+      .run(noteId, noteId);
 
     this.db.prepare(`UPDATE notes SET updated_at = ? WHERE id = ?`).run(now, noteId);
     this.markNoteAsRead(noteId, user);

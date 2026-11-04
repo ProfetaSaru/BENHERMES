@@ -125,6 +125,15 @@ export const NotesHub: React.FC<NotesHubProps> = ({
     setIsEditorOpen(true);
   };
 
+  const handleOpenDetailModal = (note: NoteItem) => {
+    setDetailNote(note);
+    if (note.unreadCommentsCount > 0) {
+      setNotes((prev) =>
+        prev.map((n) => (n.id === note.id ? { ...n, unreadCommentsCount: 0 } : n))
+      );
+    }
+  };
+
   const handleOpenEditModal = (note: NoteItem) => {
     setNoteToEdit(note);
     setIsEditorOpen(true);
@@ -368,7 +377,7 @@ export const NotesHub: React.FC<NotesHubProps> = ({
                 key={note.id}
                 note={note}
                 currentUser={currentUser}
-                onClick={() => setDetailNote(note)}
+                onClick={() => handleOpenDetailModal(note)}
                 onEdit={(e) => {
                   e.stopPropagation();
                   handleOpenEditModal(note);
@@ -399,7 +408,7 @@ export const NotesHub: React.FC<NotesHubProps> = ({
                     key={note.id}
                     note={note}
                     currentUser={currentUser}
-                    onClick={() => setDetailNote(note)}
+                    onClick={() => handleOpenDetailModal(note)}
                     onEdit={(e) => {
                       e.stopPropagation();
                       handleOpenEditModal(note);
@@ -430,7 +439,10 @@ export const NotesHub: React.FC<NotesHubProps> = ({
         isOpen={Boolean(detailNote)}
         note={detailNote}
         currentUser={currentUser}
-        onClose={() => setDetailNote(null)}
+        onClose={() => {
+          setDetailNote(null);
+          fetchNotes();
+        }}
         onEdit={(note) => {
           setDetailNote(null);
           handleOpenEditModal(note);

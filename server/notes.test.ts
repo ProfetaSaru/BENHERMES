@@ -242,6 +242,26 @@ describe('Módulo de Anotações: RBAC, Filtros, Comentários em Thread e Notifi
     expect(commentRes.data.comment.authorName).toBe('Marcos Supervisor A');
     expect(commentRes.data.comment.authorRole).toBe('supervisor');
 
+    // Validação de erro: comentário vazio é rejeitado com 400
+    const emptyCommentRes = await callApi(handler, {
+      method: 'POST',
+      url: `/api/notes/${noteId}/comments`,
+      token: supervisorAToken,
+      body: { content: '   ' },
+    });
+    expect(emptyCommentRes.status).toBe(400);
+    expect(emptyCommentRes.data.erro).toContain('O comentário não pode ser vazio');
+
+    // Resiliência: aceita payload com string JSON serializada
+    const stringifiedCommentRes = await callApi(handler, {
+      method: 'POST',
+      url: `/api/notes/${noteId}/comments`,
+      token: supervisorAToken,
+      body: JSON.stringify({ content: 'Segundo comentário via payload stringificado.' }),
+    });
+    expect(stringifiedCommentRes.status).toBe(201);
+    expect(stringifiedCommentRes.data.comment.content).toBe('Segundo comentário via payload stringificado.');
+
     // Consulta a sub-rota GET /api/notes/:id/comments
     const listCommentsRes = await callApi(handler, {
       method: 'GET',
@@ -249,8 +269,10 @@ describe('Módulo de Anotações: RBAC, Filtros, Comentários em Thread e Notifi
       token: operadorAToken,
     });
     expect(listCommentsRes.status).toBe(200);
-    expect(listCommentsRes.data.comments).toHaveLength(1);
+    expect(listCommentsRes.data.comments).toHaveLength(2);
     expect(listCommentsRes.data.comments[0].content).toBe('Já acionamos a equipe de TI, favor acompanhar.');
+    expect(listCommentsRes.data.comments[0].isUnread).toBe(true);
+    expect(listCommentsRes.data.comments[1].isUnread).toBe(true);
 
     // O texto original da anotação PERMANECE INTACTO
     const getNote = await callApi(handler, {
@@ -259,8 +281,9 @@ describe('Módulo de Anotações: RBAC, Filtros, Comentários em Thread e Notifi
       token: operadorAToken,
     });
     expect(getNote.data.note.content).toBe('Instabilidade na fila de atendimento.');
-    expect(getNote.data.comments).toHaveLength(1);
+    expect(getNote.data.comments).toHaveLength(2);
     expect(getNote.data.comments[0].content).toBe('Já acionamos a equipe de TI, favor acompanhar.');
+    expect(getNote.data.comments[1].content).toBe('Segundo comentário via payload stringificado.');
 
     // Agora o originador (Operador A) recebe a notificação: unreadCount = 1
     const unreadAfterComment = await callApi(handler, {
@@ -270,9 +293,9 @@ describe('Módulo de Anotações: RBAC, Filtros, Comentários em Thread e Notifi
     });
     expect(unreadAfterComment.data.unreadCount).toBe(1);
 
-    // Na listagem do operador, o note indica unreadCommentsCount = 1
+    // Na listagem do operador, o note indica unreadCommentsCount = 2 (ambos os comentários do supervisor)
     const opList = await callApi(handler, { method: 'GET', url: '/api/notes', token: operadorAToken });
-    expect(opList.data.notes[0].unreadCommentsCount).toBe(1);
+    expect(opList.data.notes[0].unreadCommentsCount).toBe(2);
 
     // Operador abre/marca como lido
     const markReadRes = await callApi(handler, {
@@ -304,8 +327,8 @@ describe('Módulo de Anotações: RBAC, Filtros, Comentários em Thread e Notifi
       url: `/api/notes/${noteId}`,
       token: supervisorAToken,
     });
-    expect(commentsFinal.data.comments).toHaveLength(2);
-    expect(commentsFinal.data.comments[1].authorRole).toBe('operador');
+    expect(commentsFinal.data.comments).toHaveLength(3);
+    expect(commentsFinal.data.comments[2].authorRole).toBe('operador');
   });
 
   it('permite que o autor edite/exclua sua anotação e restringe terceiros, com admin irrestrito', async () => {
@@ -371,5 +394,41 @@ describe('Módulo de Anotações: RBAC, Filtros, Comentários em Thread e Notifi
       token: adminToken,
     });
     expect(getDeleted.status).toBe(404);
+  });
+
+  it('limita o histórico de comentários a 100 mensagens por anotação, expurgando as mais antigas ao exceder 100', async () => {
+    // 1. Cria uma anotação de teste
+    const createRes = await callApi(handler, {
+      method: 'POST',
+      url: '/api/notes',
+      token: operadorAToken,
+      body: { title: 'Nota com Limite de 100 Comentários', content: 'Testando teto de 100 mensagens.' },
+    });
+    const testNoteId = createRes.data.note.id;
+
+    // 2. Insere 105 comentários consecutivamente
+    for (let i = 1; i <= 105; i++) {
+      const cRes = await callApi(handler, {
+        method: 'POST',
+        url: `/api/notes/${testNoteId}/comments`,
+        token: supervisorAToken,
+        body: { content: `Comentário #${i}` },
+      });
+      expect(cRes.status).toBe(201);
+    }
+
+    // 3. Consulta a lista de comentários: deve conter exatamente 100
+    const listRes = await callApi(handler, {
+      method: 'GET',
+      url: `/api/notes/${testNoteId}/comments`,
+      token: operadorAToken,
+    });
+    expect(listRes.status).toBe(200);
+    expect(listRes.data.comments).toHaveLength(100);
+
+    // 4. Os 5 comentários mais antigos (#1 a #5) foram expurgados; o mais antigo restante é o #6
+    expect(listRes.data.comments[0].content).toBe('Comentário #6');
+    // 5. O comentário mais recente preservado é o #105
+    expect(listRes.data.comments[99].content).toBe('Comentário #105');
   });
 });

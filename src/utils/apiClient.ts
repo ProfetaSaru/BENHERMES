@@ -27,7 +27,12 @@ export async function apiRequest<T = any>(
     method: options.method || 'GET',
     headers,
     credentials: 'same-origin',
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    body:
+      options.body !== undefined
+        ? typeof options.body === 'string'
+          ? options.body
+          : JSON.stringify(options.body)
+        : undefined,
   });
 
   const data = await response.json().catch(() => ({}));
