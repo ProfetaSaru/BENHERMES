@@ -86,12 +86,21 @@ export const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
   useEffect(() => {
     if (isOpen && note) {
       fetchComments();
+      if (note.unreadCommentsCount > 0) {
+        apiRequest(`/api/notes/${note.id}/read`, { method: 'POST' })
+          .then(() => {
+            if (onCommentsUpdated) {
+              onCommentsUpdated();
+            }
+          })
+          .catch(() => {});
+      }
     } else {
       setComments([]);
       setNewComment('');
       setErrorMsg(null);
     }
-  }, [isOpen, note, fetchComments]);
+  }, [isOpen, note, fetchComments, onCommentsUpdated]);
 
   if (!isOpen || !note) return null;
 
