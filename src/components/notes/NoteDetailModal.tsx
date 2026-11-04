@@ -15,6 +15,7 @@ import {
   MessageCircle,
   FileText,
   Bell,
+  Info,
 } from 'lucide-react';
 import type { NoteItem, NoteCommentItem } from '../../types/notes';
 import { getAuthorInitials } from '../../types/notes';
@@ -69,22 +70,40 @@ export const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const unreadDividerRef = useRef<HTMLDivElement>(null);
+  const commentsEndRef = useRef<HTMLDivElement>(null);
+  const hasAutoScrolledRef = useRef(false);
 
   // Encontra o índice da mensagem nova mais antiga (o primeiro comentário não lido)
   const firstUnreadIndex = comments.findIndex((c) => Boolean(c.isUnread));
 
-  // Auto-scroll suave para começar pela mensagem nova mais antiga
+  // Posicionamento inteligente ao carregar os comentários:
+  // - Se há mensagens novas: rola suavemente até o divisor Discord (começando pela mais antiga não lida)
+  // - Se NÃO há mensagens novas: começa mostrando a mensagem mais nova (instantaneamente na abertura)
   useEffect(() => {
-    if (!isLoading && firstUnreadIndex !== -1 && unreadDividerRef.current) {
-      const timer = setTimeout(() => {
-        unreadDividerRef.current?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start',
+    if (!isLoading && comments.length > 0) {
+      if (firstUnreadIndex !== -1 && unreadDividerRef.current) {
+        const timer = setTimeout(() => {
+          unreadDividerRef.current?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+          });
+        }, 150);
+        return () => clearTimeout(timer);
+      } else if (firstUnreadIndex === -1 && commentsEndRef.current && !hasAutoScrolledRef.current) {
+        hasAutoScrolledRef.current = true;
+        commentsEndRef.current.scrollIntoView({
+          behavior: 'auto',
+          block: 'end',
         });
-      }, 150);
-      return () => clearTimeout(timer);
+      }
     }
-  }, [isLoading, firstUnreadIndex]);
+  }, [isLoading, firstUnreadIndex, comments.length]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      hasAutoScrolledRef.current = false;
+    }
+  }, [isOpen]);
 
   const fetchComments = useCallback(async () => {
     if (!note) return;
@@ -150,6 +169,9 @@ export const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
       if (onNotify) {
         onNotify('Comentário enviado com sucesso!', 'success');
       }
+      setTimeout(() => {
+        commentsEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }, 100);
     } catch (err: any) {
       setErrorMsg(err.message || 'Erro ao enviar comentário.');
     } finally {
@@ -281,6 +303,12 @@ export const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
             {errorMsg && <div className="modal-error-banner">{errorMsg}</div>}
 
             <div className="comments-list-thread">
+              {comments.length > 0 && (
+                <div className="comments-history-cap-hint">
+                  <Info size={12} />
+                  <span>Histórico limitado aos últimos 100 comentários</span>
+                </div>
+              )}
               {isLoading ? (
                 <div className="comments-loading">Carregando comentários...</div>
               ) : comments.length === 0 ? (
@@ -327,6 +355,7 @@ export const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
                   );
                 })
               )}
+              <div ref={commentsEndRef} />
             </div>
 
             <form onSubmit={handleSendComment} className="comment-composer-form">

@@ -989,6 +989,20 @@ export class AppDatabase {
       )
       .run(id, noteId, user.id, text, now);
 
+    // Limita o histórico a 100 comentários por anotação (remove os mais antigos excedentes)
+    this.db
+      .prepare(
+        `DELETE FROM note_comments
+         WHERE note_id = ?
+           AND id NOT IN (
+             SELECT id FROM note_comments
+             WHERE note_id = ?
+             ORDER BY created_at DESC
+             LIMIT 100
+           )`
+      )
+      .run(noteId, noteId);
+
     this.db.prepare(`UPDATE notes SET updated_at = ? WHERE id = ?`).run(now, noteId);
     this.markNoteAsRead(noteId, user);
 

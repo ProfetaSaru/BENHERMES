@@ -395,4 +395,40 @@ describe('Módulo de Anotações: RBAC, Filtros, Comentários em Thread e Notifi
     });
     expect(getDeleted.status).toBe(404);
   });
+
+  it('limita o histórico de comentários a 100 mensagens por anotação, expurgando as mais antigas ao exceder 100', async () => {
+    // 1. Cria uma anotação de teste
+    const createRes = await callApi(handler, {
+      method: 'POST',
+      url: '/api/notes',
+      token: operadorAToken,
+      body: { title: 'Nota com Limite de 100 Comentários', content: 'Testando teto de 100 mensagens.' },
+    });
+    const testNoteId = createRes.data.note.id;
+
+    // 2. Insere 105 comentários consecutivamente
+    for (let i = 1; i <= 105; i++) {
+      const cRes = await callApi(handler, {
+        method: 'POST',
+        url: `/api/notes/${testNoteId}/comments`,
+        token: supervisorAToken,
+        body: { content: `Comentário #${i}` },
+      });
+      expect(cRes.status).toBe(201);
+    }
+
+    // 3. Consulta a lista de comentários: deve conter exatamente 100
+    const listRes = await callApi(handler, {
+      method: 'GET',
+      url: `/api/notes/${testNoteId}/comments`,
+      token: operadorAToken,
+    });
+    expect(listRes.status).toBe(200);
+    expect(listRes.data.comments).toHaveLength(100);
+
+    // 4. Os 5 comentários mais antigos (#1 a #5) foram expurgados; o mais antigo restante é o #6
+    expect(listRes.data.comments[0].content).toBe('Comentário #6');
+    // 5. O comentário mais recente preservado é o #105
+    expect(listRes.data.comments[99].content).toBe('Comentário #105');
+  });
 });
