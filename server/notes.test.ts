@@ -242,6 +242,26 @@ describe('Módulo de Anotações: RBAC, Filtros, Comentários em Thread e Notifi
     expect(commentRes.data.comment.authorName).toBe('Marcos Supervisor A');
     expect(commentRes.data.comment.authorRole).toBe('supervisor');
 
+    // Validação de erro: comentário vazio é rejeitado com 400
+    const emptyCommentRes = await callApi(handler, {
+      method: 'POST',
+      url: `/api/notes/${noteId}/comments`,
+      token: supervisorAToken,
+      body: { content: '   ' },
+    });
+    expect(emptyCommentRes.status).toBe(400);
+    expect(emptyCommentRes.data.erro).toContain('O comentário não pode ser vazio');
+
+    // Resiliência: aceita payload com string JSON serializada
+    const stringifiedCommentRes = await callApi(handler, {
+      method: 'POST',
+      url: `/api/notes/${noteId}/comments`,
+      token: supervisorAToken,
+      body: JSON.stringify({ content: 'Segundo comentário via payload stringificado.' }),
+    });
+    expect(stringifiedCommentRes.status).toBe(201);
+    expect(stringifiedCommentRes.data.comment.content).toBe('Segundo comentário via payload stringificado.');
+
     // Consulta a sub-rota GET /api/notes/:id/comments
     const listCommentsRes = await callApi(handler, {
       method: 'GET',
@@ -249,7 +269,7 @@ describe('Módulo de Anotações: RBAC, Filtros, Comentários em Thread e Notifi
       token: operadorAToken,
     });
     expect(listCommentsRes.status).toBe(200);
-    expect(listCommentsRes.data.comments).toHaveLength(1);
+    expect(listCommentsRes.data.comments).toHaveLength(2);
     expect(listCommentsRes.data.comments[0].content).toBe('Já acionamos a equipe de TI, favor acompanhar.');
 
     // O texto original da anotação PERMANECE INTACTO
@@ -259,8 +279,9 @@ describe('Módulo de Anotações: RBAC, Filtros, Comentários em Thread e Notifi
       token: operadorAToken,
     });
     expect(getNote.data.note.content).toBe('Instabilidade na fila de atendimento.');
-    expect(getNote.data.comments).toHaveLength(1);
+    expect(getNote.data.comments).toHaveLength(2);
     expect(getNote.data.comments[0].content).toBe('Já acionamos a equipe de TI, favor acompanhar.');
+    expect(getNote.data.comments[1].content).toBe('Segundo comentário via payload stringificado.');
 
     // Agora o originador (Operador A) recebe a notificação: unreadCount = 1
     const unreadAfterComment = await callApi(handler, {
@@ -270,9 +291,9 @@ describe('Módulo de Anotações: RBAC, Filtros, Comentários em Thread e Notifi
     });
     expect(unreadAfterComment.data.unreadCount).toBe(1);
 
-    // Na listagem do operador, o note indica unreadCommentsCount = 1
+    // Na listagem do operador, o note indica unreadCommentsCount = 2 (ambos os comentários do supervisor)
     const opList = await callApi(handler, { method: 'GET', url: '/api/notes', token: operadorAToken });
-    expect(opList.data.notes[0].unreadCommentsCount).toBe(1);
+    expect(opList.data.notes[0].unreadCommentsCount).toBe(2);
 
     // Operador abre/marca como lido
     const markReadRes = await callApi(handler, {
@@ -304,8 +325,8 @@ describe('Módulo de Anotações: RBAC, Filtros, Comentários em Thread e Notifi
       url: `/api/notes/${noteId}`,
       token: supervisorAToken,
     });
-    expect(commentsFinal.data.comments).toHaveLength(2);
-    expect(commentsFinal.data.comments[1].authorRole).toBe('operador');
+    expect(commentsFinal.data.comments).toHaveLength(3);
+    expect(commentsFinal.data.comments[2].authorRole).toBe('operador');
   });
 
   it('permite que o autor edite/exclua sua anotação e restringe terceiros, com admin irrestrito', async () => {

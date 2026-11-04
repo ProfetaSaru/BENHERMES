@@ -109,7 +109,7 @@ export const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
       setErrorMsg(null);
       await apiRequest(`/api/notes/${note.id}/comments`, {
         method: 'POST',
-        body: JSON.stringify({ content: newComment.trim() }),
+        body: { content: newComment.trim() },
       });
       setNewComment('');
       await fetchComments();
