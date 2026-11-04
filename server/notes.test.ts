@@ -271,6 +271,8 @@ describe('Módulo de Anotações: RBAC, Filtros, Comentários em Thread e Notifi
     expect(listCommentsRes.status).toBe(200);
     expect(listCommentsRes.data.comments).toHaveLength(2);
     expect(listCommentsRes.data.comments[0].content).toBe('Já acionamos a equipe de TI, favor acompanhar.');
+    expect(listCommentsRes.data.comments[0].isUnread).toBe(true);
+    expect(listCommentsRes.data.comments[1].isUnread).toBe(true);
 
     // O texto original da anotação PERMANECE INTACTO
     const getNote = await callApi(handler, {

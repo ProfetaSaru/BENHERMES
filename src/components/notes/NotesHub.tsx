@@ -131,11 +131,6 @@ export const NotesHub: React.FC<NotesHubProps> = ({
       setNotes((prev) =>
         prev.map((n) => (n.id === note.id ? { ...n, unreadCommentsCount: 0 } : n))
       );
-      apiRequest(`/api/notes/${note.id}/read`, { method: 'POST' })
-        .then(() => {
-          if (onUnreadCountChanged) onUnreadCountChanged();
-        })
-        .catch(() => {});
     }
   };
 

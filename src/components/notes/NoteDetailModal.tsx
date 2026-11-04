@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   X,
   MessageSquare,
@@ -14,6 +14,7 @@ import {
   PhoneCall,
   MessageCircle,
   FileText,
+  Bell,
 } from 'lucide-react';
 import type { NoteItem, NoteCommentItem } from '../../types/notes';
 import { getAuthorInitials } from '../../types/notes';
@@ -67,6 +68,24 @@ export const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
   const [isSending, setIsSending] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  const unreadDividerRef = useRef<HTMLDivElement>(null);
+
+  // Encontra o índice da mensagem nova mais antiga (o primeiro comentário não lido)
+  const firstUnreadIndex = comments.findIndex((c) => Boolean(c.isUnread));
+
+  // Auto-scroll suave para começar pela mensagem nova mais antiga
+  useEffect(() => {
+    if (!isLoading && firstUnreadIndex !== -1 && unreadDividerRef.current) {
+      const timer = setTimeout(() => {
+        unreadDividerRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        });
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading, firstUnreadIndex]);
+
   const fetchComments = useCallback(async () => {
     if (!note) return;
     try {
@@ -75,18 +94,11 @@ export const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
       const res = await apiRequest<{ comments: NoteCommentItem[] }>(
         `/api/notes/${note.id}/comments`
       );
-      setComments(res.comments || []);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Erro ao carregar comentários.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [note]);
+      const fetched = res.comments || [];
+      setComments(fetched);
 
-  useEffect(() => {
-    if (isOpen && note) {
-      fetchComments();
-      if (note.unreadCommentsCount > 0) {
+      // Se havia comentários não lidos, dá baixa via POST /read e sincroniza contadores
+      if (fetched.some((c) => c.isUnread) || (note.unreadCommentsCount && note.unreadCommentsCount > 0)) {
         apiRequest(`/api/notes/${note.id}/read`, { method: 'POST' })
           .then(() => {
             if (onCommentsUpdated) {
@@ -95,12 +107,22 @@ export const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
           })
           .catch(() => {});
       }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Erro ao carregar comentários.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [note, onCommentsUpdated]);
+
+  useEffect(() => {
+    if (isOpen && note) {
+      fetchComments();
     } else {
       setComments([]);
       setNewComment('');
       setErrorMsg(null);
     }
-  }, [isOpen, note, fetchComments, onCommentsUpdated]);
+  }, [isOpen, note, fetchComments]);
 
   if (!isOpen || !note) return null;
 
@@ -267,28 +289,41 @@ export const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
                   <p>Nenhum comentário registrado ainda. Deixe um feedback ou observação abaixo.</p>
                 </div>
               ) : (
-                comments.map((c) => {
+                comments.map((c, index) => {
                   const commentInitials = getAuthorInitials(c.authorName);
                   const isMe = c.userId === currentUser.id;
+                  const isFirstUnread = index === firstUnreadIndex;
                   return (
-                    <div
-                      key={c.id}
-                      className={`comment-card ${isMe ? 'comment-is-me' : ''} role-card-${c.authorRole}`}
-                    >
-                      <div className="comment-card-header">
-                        <div className="comment-author-group">
-                          <div className={`author-avatar-circle avatar-small avatar-${c.authorRole}`}>
-                            {commentInitials}
-                          </div>
-                          <span className="comment-author-name">{c.authorName}</span>
-                          <span className={`role-badge role-badge-${c.authorRole}`}>
-                            {ROLE_LABELS[c.authorRole as UserRole] || c.authorRole}
+                    <React.Fragment key={c.id}>
+                      {isFirstUnread && (
+                        <div ref={unreadDividerRef} className="discord-unread-divider">
+                          <span className="discord-unread-divider-badge">
+                            <Bell size={11} className="unread-divider-icon" />
+                            <span>Novas Mensagens</span>
                           </span>
                         </div>
-                        <span className="comment-timestamp">{formatDate(c.createdAt)}</span>
+                      )}
+                      <div
+                        className={`comment-card ${isMe ? 'comment-is-me' : ''} ${c.isUnread ? 'comment-is-unread' : ''} role-card-${c.authorRole}`}
+                      >
+                        <div className="comment-card-header">
+                          <div className="comment-author-group">
+                            <div className={`author-avatar-circle avatar-small avatar-${c.authorRole}`}>
+                              {commentInitials}
+                            </div>
+                            <span className="comment-author-name">{c.authorName}</span>
+                            <span className={`role-badge role-badge-${c.authorRole}`}>
+                              {ROLE_LABELS[c.authorRole as UserRole] || c.authorRole}
+                            </span>
+                            {c.isUnread && (
+                              <span className="unread-comment-indicator">Novo</span>
+                            )}
+                          </div>
+                          <span className="comment-timestamp">{formatDate(c.createdAt)}</span>
+                        </div>
+                        <div className="comment-card-body">{c.content}</div>
                       </div>
-                      <div className="comment-card-body">{c.content}</div>
-                    </div>
+                    </React.Fragment>
                   );
                 })
               )}

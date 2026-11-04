@@ -27,6 +27,7 @@ export interface NoteCommentItem {
   authorRole: UserRole;
   content: string;
   createdAt: string;
+  isUnread?: boolean;
 }
 
 export type NoteComment = NoteCommentItem;
