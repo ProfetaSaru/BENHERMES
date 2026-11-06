@@ -334,7 +334,7 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
           onClick={() => setSelectedCategory('atividades')}
         >
           <Clock size={14} />
-          Atividades Diárias
+          Atividades
           <span className="pill-count">{categoryCounts.atividades}</span>
         </button>
 
@@ -354,7 +354,7 @@ export const ReportsHistoryHub: React.FC<ReportsHistoryHubProps> = ({
           onClick={() => setSelectedCategory('rh')}
         >
           <UserCheck size={14} />
-          RH & Acesso
+          RH
           <span className="pill-count">{categoryCounts.rh}</span>
         </button>
 

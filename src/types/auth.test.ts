@@ -21,7 +21,7 @@ describe('RBAC e Visibilidade de Abas por Perfil', () => {
     }
   });
 
-  it('Admin vê todas as abas (incluindo Gestão de Contas) e tem acesso total no WhatsApp Baias', () => {
+  it('Admin vê todas as abas (incluindo Gestão de Contas e Arquivos) e tem acesso total no WhatsApp Baias', () => {
     const ids = getNavigationItems(0, 0, 'admin').map((i) => i.id);
     expect(ids).toEqual([
       'relatorios',
@@ -30,6 +30,7 @@ describe('RBAC e Visibilidade de Abas por Perfil', () => {
       'whatsapp',
       'metricas',
       'anotacoes',
+      'arquivos',
       'historico',
       'usuarios',
       'configuracoes',
@@ -41,10 +42,10 @@ describe('RBAC e Visibilidade de Abas por Perfil', () => {
     expect(canEditFeriados('admin')).toBe(true);
   });
 
-  it('Supervisor e Gerente veem Central de Relatórios, WhatsApp Baias, Histórico e Configurações, sem manutenção ou exclusão', () => {
+  it('Supervisor e Gerente veem Central de Relatórios, WhatsApp Baias, Anotações, Arquivos, Histórico e Configurações, sem manutenção ou exclusão', () => {
     for (const role of ['supervisor', 'gerente'] as const) {
       const ids = getNavigationItems(0, 0, role).map((i) => i.id);
-      expect(ids).toEqual(['relatorios', 'whatsapp', 'anotacoes', 'historico', 'configuracoes']);
+      expect(ids).toEqual(['relatorios', 'whatsapp', 'anotacoes', 'arquivos', 'historico', 'configuracoes']);
       expect(canManageWhatsappMaintenance(role)).toBe(false);
       expect(canDeleteWhatsappItems(role)).toBe(false);
       expect(canImportOverwriteWhatsappMap(role)).toBe(false);
@@ -53,9 +54,10 @@ describe('RBAC e Visibilidade de Abas por Perfil', () => {
     }
   });
 
-  it('Operador vê apenas Central de Relatórios, Histórico e Configurações', () => {
+  it('Operador vê apenas Central de Relatórios, Anotações, Histórico e Configurações (sem Arquivos)', () => {
     const ids = getNavigationItems(0, 0, 'operador').map((i) => i.id);
     expect(ids).toEqual(['relatorios', 'anotacoes', 'historico', 'configuracoes']);
+    expect(ids).not.toContain('arquivos');
     expect(canManageWhatsappMaintenance('operador')).toBe(false);
     expect(canDeleteWhatsappItems('operador')).toBe(false);
   });

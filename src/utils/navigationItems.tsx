@@ -8,6 +8,7 @@ import {
   Settings,
   Users,
   StickyNote,
+  FolderOpen,
 } from 'lucide-react';
 import { NavigationItem } from '../types/navigation';
 import { canSeeTool, UserRole } from '../types/auth';
@@ -21,7 +22,8 @@ export const getNavigationItems = (
   const allItems: NavigationItem[] = [
     {
       id: 'relatorios',
-      name: 'Central de Relatórios',
+      name: 'Relatórios',
+      fullName: 'Central de Relatórios',
       shortName: 'Relatórios',
       description: 'Central unificada de relatórios diários expansíveis e modelos dinâmicos.',
       category: 'automacoes',
@@ -32,7 +34,8 @@ export const getNavigationItems = (
     },
     {
       id: 'escala',
-      name: 'Escala de Bases',
+      name: 'Escala',
+      fullName: 'Escala de Bases',
       shortName: 'Escala',
       description: 'Sorteio diário das bases do Ativo 2 entre os grupos dos supervisores.',
       category: 'automacoes',
@@ -43,7 +46,8 @@ export const getNavigationItems = (
     },
     {
       id: 'relatorio-ura',
-      name: 'Relatório URA',
+      name: 'URA',
+      fullName: 'Relatório URA',
       shortName: 'URA',
       description: 'Relatório diário de produtividade da URA a partir das exportações do Argus e do Vanguard.',
       category: 'automacoes',
@@ -55,6 +59,7 @@ export const getNavigationItems = (
     {
       id: 'whatsapp',
       name: 'Controle de WhatsApps',
+      fullName: 'Controle de WhatsApps',
       shortName: 'WhatsApp',
       description: 'Mapa das baias com a situação do WhatsApp de cada lugar.',
       category: 'automacoes',
@@ -65,7 +70,8 @@ export const getNavigationItems = (
     },
     {
       id: 'metricas',
-      name: 'Métricas & Produtividade',
+      name: 'Métricas',
+      fullName: 'Métricas & Produtividade',
       shortName: 'Métricas',
       description: 'Análise de tempo consumido por tipo de atividade e indicadores de foco.',
       category: 'automacoes',
@@ -76,7 +82,8 @@ export const getNavigationItems = (
     },
     {
       id: 'anotacoes',
-      name: 'Mural de Anotações',
+      name: 'Anotações',
+      fullName: 'Mural de Anotações',
       shortName: 'Anotações',
       description: 'Anotações e recados com suporte a comentários e filtros por pessoa.',
       category: 'sistema',
@@ -86,8 +93,21 @@ export const getNavigationItems = (
       icon: <StickyNote size={20} />,
     },
     {
+      id: 'arquivos',
+      name: 'Arquivos',
+      fullName: 'Compartilhamento de Arquivos',
+      shortName: 'Arquivos',
+      description: 'Repositório de pastas e arquivos da gestão (PDFs, planilhas, documentos e procedimentos).',
+      category: 'sistema',
+      badge: 'Novo',
+      badgeVariant: 'success',
+      isReady: true,
+      icon: <FolderOpen size={20} />,
+    },
+    {
       id: 'historico',
-      name: 'Histórico & Arquivos',
+      name: 'Histórico',
+      fullName: 'Histórico de Relatórios',
       shortName: 'Histórico',
       description: 'Consolidação de atividades anteriores e relatórios salvos no servidor.',
       category: 'sistema',
@@ -98,8 +118,9 @@ export const getNavigationItems = (
     },
     {
       id: 'usuarios',
-      name: 'Gestão de Contas',
-      shortName: 'Contas',
+      name: 'Usuários',
+      fullName: 'Gestão de Contas',
+      shortName: 'Usuários',
       description: 'Criação de logins (Admin, Gerente, Supervisor, Operador) e vínculo de equipes.',
       category: 'sistema',
       badge: 'Admin',
@@ -109,8 +130,9 @@ export const getNavigationItems = (
     },
     {
       id: 'configuracoes',
-      name: 'Configurações do Hub',
-      shortName: 'Ajustes',
+      name: 'Configurações',
+      fullName: 'Configurações do Hub',
+      shortName: 'Configurações',
       description: 'Dados da conta, feriados locais e ajustes que valem para todas as ferramentas.',
       category: 'sistema',
       badge: 'Ativo',
