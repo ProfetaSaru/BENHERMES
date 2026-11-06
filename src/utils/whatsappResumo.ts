@@ -10,7 +10,7 @@ import { Estatisticas, calcularEstatisticas, formatarDuracao } from './whatsappE
 import { GRUPO_SEM_CELULAR, ROTULO_JANELA } from './whatsappManutencao';
 
 /**
- * Planilha do WhatsApp das Baias, minimalista: Painel (estreito, para o celular), Mapa, Celulares,
+ * Planilha do Controle de WhatsApps, minimalista: Painel (estreito, para o celular), Mapa, Celulares,
  * Lista (tabela com filtro), Estatísticas e Histórico (últimos 30 dias) e a aba oculta "dados"
  * (o .json do mapa), que faz a planilha voltar exatamente igual quando importada no BenHermes.
  */
@@ -44,7 +44,7 @@ const dataCurta = (iso: string) => {
 const dataHora = (d: Date) => `${dois(d.getDate())}/${dois(d.getMonth() + 1)}/${d.getFullYear()} · ${dois(d.getHours())}:${dois(d.getMinutes())}`;
 
 export const nomeDoResumoWhatsapp = (agora: Date): string =>
-  `whatsapp_baias_${agora.getFullYear()}-${dois(agora.getMonth() + 1)}-${dois(agora.getDate())}.xlsx`;
+  `controle_whatsapps_${agora.getFullYear()}-${dois(agora.getMonth() + 1)}-${dois(agora.getDate())}.xlsx`;
 
 // ---------------------------------------------------------------------------
 // Ajudantes de estilo
@@ -146,7 +146,7 @@ const ROTULO_DO_ALERTA: Record<Alerta['tipo'], string> = {
 
 const abaPainel = (livro: Workbook, mapa: MapaWhatsapp, agora: Date) => {
   const ws = novaAba(livro, 'Painel', [2, 34, 22, 18, 16], false);
-  let r = cabecalho(ws, 2, 2, 'WhatsApp das Baias', dataHora(agora));
+  let r = cabecalho(ws, 2, 2, 'Controle de WhatsApps', dataHora(agora));
   const resumo = resumoGeral(mapa, agora);
   const numeros: [string, number, string][] = [
     ['OK', resumo.ok, SITUACAO.OK.texto],

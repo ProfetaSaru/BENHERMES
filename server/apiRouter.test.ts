@@ -351,7 +351,7 @@ describe('API Router, RBAC, Auto-Save e Permissões do WhatsApp Baias', () => {
     expect(renameRes.data.erro).toContain('Operadores não podem alterar o título');
   });
 
-  it('aplica permissões do WhatsApp das Baias (Supervisor pode registrar/alterar mas não manutenção nem excluir)', async () => {
+  it('aplica permissões do Controle de WhatsApps (Supervisor pode registrar/alterar mas não manutenção nem excluir)', async () => {
     const adminLogin = await callApi(handler, {
       method: 'POST',
       url: '/api/auth/login',
@@ -650,7 +650,7 @@ describe('API Router, RBAC, Auto-Save e Permissões do WhatsApp Baias', () => {
     expect(getDrafts.data.drafts.theme).toBe('dark');
   });
 
-  it('aplica permissões estritas para Supervisor e Gerente no WhatsApp das Baias', async () => {
+  it('aplica permissões estritas para Supervisor e Gerente no Controle de WhatsApps', async () => {
     // 1. Admin faz login
     const adminLogin = await callApi(handler, {
       method: 'POST',

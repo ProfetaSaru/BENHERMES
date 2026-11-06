@@ -54,7 +54,7 @@ export const getNavigationItems = (
     },
     {
       id: 'whatsapp',
-      name: 'WhatsApp das Baias',
+      name: 'Controle de WhatsApps',
       shortName: 'WhatsApp',
       description: 'Mapa das baias com a situação do WhatsApp de cada lugar.',
       category: 'automacoes',

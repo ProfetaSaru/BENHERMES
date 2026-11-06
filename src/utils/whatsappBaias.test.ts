@@ -319,7 +319,7 @@ describe('versão 3', () => {
       { ...base, inicioDoHistorico: undefined },
     ];
     for (const r of ruins) {
-      expect(() => importarMapa(exportarMapa(r as MapaWhatsapp, AGORA), AGORA)).toThrow('não é um mapa do WhatsApp das Baias válido');
+      expect(() => importarMapa(exportarMapa(r as MapaWhatsapp, AGORA), AGORA)).toThrow('não é um mapa do Controle de WhatsApps válido');
     }
   });
 });

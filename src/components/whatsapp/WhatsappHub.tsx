@@ -21,7 +21,7 @@ import { nomeDoCelular, ondeEstaABaia, textoDoLocal } from '../../utils/celulare
 import { codigoDoLugar } from '../../utils/mapaMesas';
 import { baixarPlanilha } from '../../utils/planilhaColorida';
 import { AlvoAlerta, ResumoWhatsapp, alertas, resumoDaSala, resumoGeral } from '../../utils/whatsappAlertas';
-import { exportarMapa, filtrarMapaParaSupervisor, importarMapa } from '../../utils/whatsappBaias';
+import { estado, exportarMapa, filtrarMapaParaSupervisor, importarMapa } from '../../utils/whatsappBaias';
 import { lerArquivoDoMapa } from '../../utils/whatsappPlanilha';
 import { gerarResumoWhatsapp, nomeDoResumoWhatsapp } from '../../utils/whatsappResumo';
 import { Alertas } from './Alertas';
@@ -32,6 +32,8 @@ import { Celulares } from './Celulares';
 import { ConfigurarCelulares } from './ConfigurarCelulares';
 import { Manutencao } from './Manutencao';
 import { Estatisticas } from './Estatisticas';
+import { ChamadosBenCalls } from './ChamadosBenCalls';
+import { useChamadosBenCalls } from '../../hooks/useChamadosBenCalls';
 
 interface WhatsappHubProps {
   /** Aviso atual do app: aparece flutuando, porque as ações acontecem em qualquer ponto da página */
@@ -107,6 +109,7 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({
   const wpp = useWhatsappBaias();
   const { mapa } = wpp;
   const { feriados } = useFeriados();
+  const bencalls = useChamadosBenCalls();
   const [agora, setAgora] = useState(() => new Date());
   const [filtro, setFiltro] = useState<FiltroMapa>('todas');
   const [selecao, setSelecao] = useState<Selecao | null>(null);
@@ -278,7 +281,7 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({
           <p className="eyebrow">AUTOMAÇÕES & DADOS</p>
           <h1>
             <MessageCircle size={32} />
-            WhatsApp das Baias
+            Controle de WhatsApps
           </h1>
           <p>
             Mapa das mesas com a situação do WhatsApp de cada lugar e os celulares corporativos. Clique numa baia
@@ -299,7 +302,7 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({
         </div>
       )}
 
-      <div className="wpp-abas" role="tablist" aria-label="Telas do WhatsApp das Baias">
+      <div className="wpp-abas" role="tablist" aria-label="Telas do Controle de WhatsApps">
         <button type="button" role="tab" aria-selected={aba === 'mapa'} className={`wpp-aba ${aba === 'mapa' ? 'ativa' : ''}`} onClick={() => setAba('mapa')}>
           <MapIcon size={16} />
           Mapa
@@ -376,6 +379,17 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({
             </div>
 
             <Contagens resumo={geral} celulares />
+            <ChamadosBenCalls
+              chamados={bencalls.chamados}
+              mapa={mapaExibido}
+              agora={agora}
+              onAbrir={abrir}
+              onMarcarBanido={(alvo) => {
+                wpp.alterarLugar(alvo.salaId, alvo.mesaId, alvo.posicao, { whatsapp: estado('BANIDO', new Date()) });
+                onNotify('WhatsApp marcado como banido. A análise é pedida na manutenção.', 'success');
+              }}
+              onDispensar={bencalls.dispensar}
+            />
             <Alertas itens={listaDeAlertas} agora={agora} onAbrir={abrir} />
             {mapaExibido.salas.length > 1 && (
               <div className="wpp-resumo-salas">

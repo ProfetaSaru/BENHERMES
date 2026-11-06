@@ -13,6 +13,7 @@ import {
 } from './auth.ts';
 import { atenderArgus } from './argusProxy.ts';
 import { enforceIpWhitelist } from './ipFilter.ts';
+import { criarIntegracaoBenCalls } from './integracaoBenCalls.ts';
 
 const MAX_BODY_BYTES = 5 * 1024 * 1024; // 5 MB (para mapas/relatórios grandes)
 
@@ -85,8 +86,13 @@ function getAuthenticatedUser(req: IncomingMessage, appDb: AppDatabase): PublicU
   return user;
 }
 
-export function createApiHandler(appDb: AppDatabase, options?: { enforceIp?: boolean }) {
+export function createApiHandler(
+  appDb: AppDatabase,
+  options?: { enforceIp?: boolean; integracao?: ReturnType<typeof criarIntegracaoBenCalls> }
+) {
   const shouldEnforceIp = options?.enforceIp ?? true;
+  // Integração com o BenCalls (server/integracaoBenCalls.ts): desligada sem BENCALLS_SEGREDO
+  const integracao = options?.integracao ?? criarIntegracaoBenCalls(appDb);
 
   return async (req: IncomingMessage, res: ServerResponse): Promise<boolean> => {
     const urlObj = new URL(req.url || '/', 'http://localhost');
@@ -106,6 +112,12 @@ export function createApiHandler(appDb: AppDatabase, options?: { enforceIp?: boo
       // 1. Healthcheck
       if (pathname === '/api/health' && method === 'GET') {
         sendJson(res, 200, { ok: true, timestamp: new Date().toISOString() });
+        return true;
+      }
+
+      // 1.1 Integração: o BenCalls avisa os chamados de WhatsApp (autenticado pela assinatura, sem login)
+      if (pathname === '/api/integracoes/bencalls/eventos' && method === 'POST') {
+        await integracao.receber(req, res);
         return true;
       }
 
@@ -372,10 +384,10 @@ export function createApiHandler(appDb: AppDatabase, options?: { enforceIp?: boo
         return true;
       }
 
-      // 9. Mapa do WhatsApp das Baias (/api/whatsapp)
+      // 9. Mapa do Controle de WhatsApps (/api/whatsapp)
       if (pathname === '/api/whatsapp' && method === 'GET') {
         if (currentUser.role === 'operador') {
-          sendJson(res, 403, { erro: 'Operadores não têm acesso à aba WhatsApp das Baias.' });
+          sendJson(res, 403, { erro: 'Operadores não têm acesso à aba Controle de WhatsApps.' });
           return true;
         }
         const mapa = appDb.getAppState<any | null>('whatsapp_mapa', null);
@@ -385,7 +397,7 @@ export function createApiHandler(appDb: AppDatabase, options?: { enforceIp?: boo
 
       if (pathname === '/api/whatsapp' && method === 'PUT') {
         if (currentUser.role === 'operador') {
-          sendJson(res, 403, { erro: 'Operadores não têm acesso à aba WhatsApp das Baias.' });
+          sendJson(res, 403, { erro: 'Operadores não têm acesso à aba Controle de WhatsApps.' });
           return true;
         }
         const body = await readJsonBody(req);
@@ -400,7 +412,48 @@ export function createApiHandler(appDb: AppDatabase, options?: { enforceIp?: boo
           return true;
         }
         appDb.setAppState('whatsapp_mapa', body.mapa);
+        // O que mudou vai para o BenCalls (ex.: baia liberada na manutenção fecha o chamado lá)
+        integracao.mapaSalvo(oldMap, body.mapa);
         sendJson(res, 200, { mapa: body.mapa });
+        return true;
+      }
+
+      // 9.1 Integração com o BenCalls: chamados de WhatsApp abertos lá
+      if (pathname === '/api/integracoes/bencalls/chamados' && method === 'GET') {
+        if (currentUser.role === 'operador') {
+          sendJson(res, 403, { erro: 'Operadores não têm acesso à aba Controle de WhatsApps.' });
+          return true;
+        }
+        sendJson(res, 200, { ativa: integracao.entradaAtiva, chamados: integracao.listarChamados(currentUser) });
+        return true;
+      }
+
+      const dispensar = /^\/api\/integracoes\/bencalls\/chamados\/([A-Za-z0-9_-]{1,40})\/dispensar$/.exec(pathname);
+      if (dispensar && method === 'POST') {
+        if (currentUser.role === 'operador') {
+          sendJson(res, 403, { erro: 'Operadores não têm acesso à aba Controle de WhatsApps.' });
+          return true;
+        }
+        const visivel = integracao.listarChamados(currentUser).some((c) => c.id === dispensar[1]);
+        if (!visivel || !integracao.dispensarChamado(dispensar[1])) {
+          sendJson(res, 404, { erro: 'Chamado não encontrado.' });
+          return true;
+        }
+        sendJson(res, 200, { ok: true });
+        return true;
+      }
+
+      if (pathname === '/api/integracoes/bencalls/status' && method === 'GET') {
+        if (currentUser.role !== 'admin') {
+          sendJson(res, 403, { erro: 'Apenas o Admin vê o status da integração.' });
+          return true;
+        }
+        sendJson(res, 200, {
+          saidaAtiva: integracao.saidaAtiva,
+          entradaAtiva: integracao.entradaAtiva,
+          pendentes: integracao.pendentes(),
+          ...integracao.status(),
+        });
         return true;
       }
 
