@@ -56,8 +56,8 @@ const hojeArquivo = (d: Date) => `${d.getFullYear()}-${doisDigitos(d.getMonth() 
 
 const FILTROS: [FiltroMapa, string][] = [
   ['todas', 'Todas'],
-  ['problemas', 'Só problemas'],
-  ['vazias', 'Vagas vazias'],
+  ['problemas', 'Problemas'],
+  ['vazias', 'Vazias'],
 ];
 
 /** Chips de contagem das 6 situações e das vagas vazias */

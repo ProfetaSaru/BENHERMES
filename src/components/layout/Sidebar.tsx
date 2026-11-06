@@ -56,7 +56,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onCloseMobile();
                   }
                 }}
-                title={isCollapsed ? `${item.name}${item.badge ? ` (${item.badge})` : ''}` : undefined}
+                title={
+                  isCollapsed
+                    ? `${item.fullName || item.name}${item.badge ? ` (${item.badge})` : ''}`
+                    : item.fullName && item.fullName !== item.name
+                    ? `${item.fullName} – ${item.description}`
+                    : item.description
+                }
                 aria-current={isActive ? 'page' : undefined}
               >
                 <span className="sidebar-nav-icon">{item.icon}</span>
@@ -134,8 +140,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         <div className="sidebar-scrollable">
-          {renderNavGroup('Ferramentas & Automação', automationItems)}
-          {renderNavGroup('Sistema & Apoio', systemItems)}
+          {renderNavGroup('Automações', automationItems)}
+          {renderNavGroup('Sistema', systemItems)}
         </div>
 
         <div className="sidebar-footer">
