@@ -956,7 +956,7 @@ export class AppDatabase {
          FROM note_comments c
          JOIN users u ON c.user_id = u.id
          WHERE c.note_id = ?
-         ORDER BY c.created_at ASC`
+         ORDER BY c.created_at ASC, c.rowid ASC`
       )
       .all(noteId) as any[];
 
@@ -989,7 +989,8 @@ export class AppDatabase {
       )
       .run(id, noteId, user.id, text, now);
 
-    // Limita o histórico a 100 comentários por anotação (remove os mais antigos excedentes)
+    // Limita o histórico a 100 comentários por anotação (remove os mais antigos excedentes).
+    // Comentários no mesmo milissegundo desempatam pela ordem de gravação (rowid).
     this.db
       .prepare(
         `DELETE FROM note_comments
@@ -997,7 +998,7 @@ export class AppDatabase {
            AND id NOT IN (
              SELECT id FROM note_comments
              WHERE note_id = ?
-             ORDER BY created_at DESC
+             ORDER BY created_at DESC, rowid DESC
              LIMIT 100
            )`
       )
