@@ -3,6 +3,7 @@ module.exports = {
     {
       name: 'benhermes',
       script: 'server/index.ts',
+      node_args: '--experimental-strip-types',
       interpreter: 'node',
       instances: 1,
       exec_mode: 'fork',
