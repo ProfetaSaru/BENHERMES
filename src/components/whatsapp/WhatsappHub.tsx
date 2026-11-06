@@ -281,7 +281,7 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({
           <p className="eyebrow">AUTOMAÇÕES & DADOS</p>
           <h1>
             <MessageCircle size={32} />
-            WhatsApp das Baias
+            Controle de WhatsApps
           </h1>
           <p>
             Mapa das mesas com a situação do WhatsApp de cada lugar e os celulares corporativos. Clique numa baia
@@ -302,7 +302,7 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({
         </div>
       )}
 
-      <div className="wpp-abas" role="tablist" aria-label="Telas do WhatsApp das Baias">
+      <div className="wpp-abas" role="tablist" aria-label="Telas do Controle de WhatsApps">
         <button type="button" role="tab" aria-selected={aba === 'mapa'} className={`wpp-aba ${aba === 'mapa' ? 'ativa' : ''}`} onClick={() => setAba('mapa')}>
           <MapIcon size={16} />
           Mapa

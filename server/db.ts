@@ -1050,7 +1050,7 @@ export class AppDatabase {
 
 /**
  * Valida se um usuário não-Admin (Supervisor ou Gerente) tentou realizar operações proibidas
- * no mapa do WhatsApp das Baias (colocar em manutenção ou excluir salas, mesas, celulares ou vagas).
+ * no mapa do Controle de WhatsApps (colocar em manutenção ou excluir salas, mesas, celulares ou vagas).
  */
 export interface WhatsappUserContext {
   id?: string;
@@ -1073,7 +1073,7 @@ export function validateWhatsappPermissions(
   }
 
   if (role === 'operador') {
-    return { ok: false, error: 'Operadores não têm acesso ao WhatsApp das Baias.' };
+    return { ok: false, error: 'Operadores não têm acesso ao Controle de WhatsApps.' };
   }
 
   if (!oldMap) {

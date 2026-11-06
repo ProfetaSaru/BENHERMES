@@ -5,7 +5,7 @@ import { codigoDoLugar } from './mapaMesas';
 import { estado, importarMapa, novaMesa } from './whatsappBaias';
 
 /**
- * Planilha do WhatsApp das Baias: leitura da RELATORIO-WHATSAPP-INTUITIVO.xlsx
+ * Planilha do Controle de WhatsApps: leitura da RELATORIO-WHATSAPP-INTUITIVO.xlsx
  * (salas, equipes lado a lado e supervisor) e o arquivo baixado pelo próprio BenHermes (aba dados).
  */
 

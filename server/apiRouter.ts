@@ -384,10 +384,10 @@ export function createApiHandler(
         return true;
       }
 
-      // 9. Mapa do WhatsApp das Baias (/api/whatsapp)
+      // 9. Mapa do Controle de WhatsApps (/api/whatsapp)
       if (pathname === '/api/whatsapp' && method === 'GET') {
         if (currentUser.role === 'operador') {
-          sendJson(res, 403, { erro: 'Operadores não têm acesso à aba WhatsApp das Baias.' });
+          sendJson(res, 403, { erro: 'Operadores não têm acesso à aba Controle de WhatsApps.' });
           return true;
         }
         const mapa = appDb.getAppState<any | null>('whatsapp_mapa', null);
@@ -397,7 +397,7 @@ export function createApiHandler(
 
       if (pathname === '/api/whatsapp' && method === 'PUT') {
         if (currentUser.role === 'operador') {
-          sendJson(res, 403, { erro: 'Operadores não têm acesso à aba WhatsApp das Baias.' });
+          sendJson(res, 403, { erro: 'Operadores não têm acesso à aba Controle de WhatsApps.' });
           return true;
         }
         const body = await readJsonBody(req);
@@ -421,7 +421,7 @@ export function createApiHandler(
       // 9.1 Integração com o BenCalls: chamados de WhatsApp abertos lá
       if (pathname === '/api/integracoes/bencalls/chamados' && method === 'GET') {
         if (currentUser.role === 'operador') {
-          sendJson(res, 403, { erro: 'Operadores não têm acesso à aba WhatsApp das Baias.' });
+          sendJson(res, 403, { erro: 'Operadores não têm acesso à aba Controle de WhatsApps.' });
           return true;
         }
         sendJson(res, 200, { ativa: integracao.entradaAtiva, chamados: integracao.listarChamados(currentUser) });
@@ -431,7 +431,7 @@ export function createApiHandler(
       const dispensar = /^\/api\/integracoes\/bencalls\/chamados\/([A-Za-z0-9_-]{1,40})\/dispensar$/.exec(pathname);
       if (dispensar && method === 'POST') {
         if (currentUser.role === 'operador') {
-          sendJson(res, 403, { erro: 'Operadores não têm acesso à aba WhatsApp das Baias.' });
+          sendJson(res, 403, { erro: 'Operadores não têm acesso à aba Controle de WhatsApps.' });
           return true;
         }
         const visivel = integracao.listarChamados(currentUser).some((c) => c.id === dispensar[1]);

@@ -67,7 +67,7 @@ describe('planilha nova', () => {
   const mapa = montar();
 
   it('nome do arquivo', () => {
-    expect(nomeDoResumoWhatsapp(AGORA)).toBe('whatsapp_baias_2026-10-27.xlsx');
+    expect(nomeDoResumoWhatsapp(AGORA)).toBe('controle_whatsapps_2026-10-27.xlsx');
   });
 
   it('abas na ordem, dados oculta e sem linhas de grade', async () => {

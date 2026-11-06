@@ -6,7 +6,7 @@ import { gravarAlteracao } from '../utils/whatsappHistorico';
 import { apiRequest } from '../utils/apiClient';
 
 /**
- * Mapa do WhatsApp das Baias sincronizado com o servidor (/api/whatsapp).
+ * Mapa do Controle de WhatsApps sincronizado com o servidor (/api/whatsapp).
  */
 export function useWhatsappBaias() {
   const [mapa, setMapa] = useState<MapaWhatsapp>(() => carregarMapa(null, new Date()));

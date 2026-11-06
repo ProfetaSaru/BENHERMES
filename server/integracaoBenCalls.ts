@@ -12,7 +12,7 @@ import type { AppDatabase, PublicUser } from './db.ts';
  *   → lá o WhatsApp da baia fica OK e o chamado de WhatsApp daquela baia é concluído.
  *   Se o BenCalls estiver fora do ar, os eventos ficam guardados e são reenviados depois.
  * - Entrada: o BenCalls avisa os chamados de WhatsApp abertos (POST /api/integracoes/bencalls/eventos),
- *   que aparecem no WhatsApp das Baias para quem cuida daquela mesa.
+ *   que aparecem no Controle de WhatsApps para quem cuida daquela mesa.
  *
  * As mensagens são assinadas com HMAC-SHA256 e um segredo combinado (BENCALLS_SEGREDO, o mesmo
  * BENHERMES_SEGREDO do BenCalls). Este arquivo não depende de src/: roda direto no Node.

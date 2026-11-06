@@ -34,7 +34,7 @@ tudo no navegador, sem instalar nada.
 | 🎲 [Escala de Bases](#-escala-de-bases-ativo-2) | 🚀 [Como executar localmente](#-como-executar-localmente) |
 | 📞 [Relatório URA](#-relatório-de-produtividade-ura) | 🏗️ [Arquitetura](#️-arquitetura) |
 | 🔌 [API do Argus](#-api-do-argus) | 🐉 [BenHermes × BENZAITEN](#-benhermes--benzaiten) |
-| 💬 [WhatsApp das Baias](#-whatsapp-das-baias) | 🛠️ [Tecnologias](#️-tecnologias) |
+| 💬 [Controle de WhatsApps](#-controle-de-whatsapps) | 🛠️ [Tecnologias](#️-tecnologias) |
 | ⚙️ [Configurações (feriados)](#️-configurações-do-hub) | 🔌 [Integração com o BenCalls](#-integração-com-o-bencalls) |
 | 📋 [Central de Relatórios](#-central-de-relatórios) | 📊 [Formatador de Planilhas](#-formatador-de-planilhas) |
 
@@ -46,7 +46,7 @@ tudo no navegador, sem instalar nada.
 |:-:|---|---|---|
 | 🎲 | **Escala de Bases** | Rodízio diário das bases do INSS entre os grupos dos supervisores do Ativo 2 | Todo dia útil, de manhã |
 | 📞 | **Relatório URA** | TMA, TMO, leads, custo, vendas e clientes por operador e equipe, com setas e cores | Todo dia útil (relatório do dia anterior) |
-| 💬 | **WhatsApp das Baias** | Mapa das mesas com a situação do WhatsApp de cada baia, os celulares, o ciclo do banimento, a manutenção com o texto do grupo, as estatísticas e a planilha | Na manutenção (manhã e almoço) e sempre que um número cair ou voltar |
+| 💬 | **Controle de WhatsApps** | Mapa das mesas com a situação do WhatsApp de cada baia, os celulares, o ciclo do banimento, a manutenção com o texto do grupo, as estatísticas e a planilha | Na manutenção (manhã e almoço) e sempre que um número cair ou voltar |
 | 📊 | **Formatador de Planilhas** | Converte qualquer planilha no CSV de mailing `CPF;BENEFICIO;NOME;TELEFONE1..5` | Quando chega uma base nova |
 | 📋 | **Central de Relatórios** | Relatórios de atividades e formulários a partir de modelos Markdown | No fim do expediente |
 | 🗂️ | **Histórico & Arquivos** | Relatórios de atividades salvos, com restauração completa | Quando precisar rever um dia |
@@ -66,14 +66,14 @@ flowchart LR
     E --> G[▶️ Gerar relatório]
     F --> G
     G --> H[📋 Copiar tabela<br/>ou ⬇️ Baixar planilha]
-    A --> I[💬 WhatsApp das Baias<br/>🔧 manutenção 9h e 13h]
+    A --> I[💬 Controle de WhatsApps<br/>🔧 manutenção 9h e 13h]
     I --> J[📋 Copiar texto<br/>e mandar com os vídeos]
 ```
 
 - [ ] **Escala:** abrir **Escala de Bases**, clicar nos nomes de quem faltou e em **Gerar escala do dia**. Depois, **Copiar texto** para o chat.
 - [ ] **Relatório:** abrir **Relatório URA** (a data já vem como o dia útil anterior), clicar em **Baixar do Argus**, arrastar a tarifação e a esteira, digitar o **valor real da fatura** de cada tarifação (se já tiver) e clicar em **Gerar relatório**.
 - [ ] **Entregar:** **Copiar tabela** (cola com as cores no Excel e no Outlook) ou **Baixar planilha**.
-- [ ] **Manutenção dos WhatsApps (manhã e almoço da operação):** **WhatsApp das Baias** → **🔧 Iniciar manutenção** →
+- [ ] **Manutenção dos WhatsApps (manhã e almoço da operação):** **Controle de WhatsApps** → **🔧 Iniciar manutenção** →
   conferir celular por celular → **Concluir** → **📋 Copiar** o texto e mandar no grupo com os vídeos.
 
 > [!TIP]
@@ -191,7 +191,7 @@ sequenceDiagram
 
 ---
 
-## 💬 WhatsApp das Baias
+## 💬 Controle de WhatsApps
 
 Substitui a planilha **RELATORIO-WHATSAPP-INTUITIVO**. Cada sala (Comercial 1, Comercial 2) tem suas mesas no mesmo
 desenho do mapa do **Sistema de Chamados**: supervisor no topo, baias do lado esquerdo (`OP1-E1`…) e do direito
@@ -333,13 +333,13 @@ fica numa **equipe** ou **guardado**. As **vagas** (cada WhatsApp do aparelho) n
 
 ## 🔌 Integração com o BenCalls
 
-O WhatsApp das Baias conversa com o **BenCalls** (sistema de chamados) por eventos assinados:
+O Controle de WhatsApps conversa com o **BenCalls** (sistema de chamados) por eventos assinados:
 
 - **Manutenção daqui fecha o chamado de lá.** Ao salvar o mapa, o que mudou vai para o BenCalls: baia
   **Liberada**, chip **trocado** ou restrição que **voltou** deixa o WhatsApp OK lá e **conclui o chamado** de
   WhatsApp daquela baia. Manutenção concluída também é avisada.
 - **Chamados de lá aparecem aqui.** Os chamados de WhatsApp abertos no BenCalls aparecem em
-  *WhatsApp das Baias › Chamados do BenCalls* (o supervisor vê só os da própria mesa), com **⛔ Marcar como banido**.
+  *Controle de WhatsApps › Chamados do BenCalls* (o supervisor vê só os da própria mesa), com **⛔ Marcar como banido**.
 - Se o BenCalls estiver fora do ar, os eventos ficam numa fila e são reenviados a cada minuto.
 
 | Variável | O quê |
@@ -356,7 +356,7 @@ O WhatsApp das Baias conversa com o **BenCalls** (sistema de chamados) por event
 
 > [!IMPORTANT]
 > A rota de recebimento passa pela lista de IPs (`ALLOWED_IPS`): inclua o IP de saída do servidor do BenCalls.
-> A integração precisa do servidor Node (Docker/pm2); o site na Vercel não tem o banco do WhatsApp das Baias.
+> A integração precisa do servidor Node (Docker/pm2); o site na Vercel não tem o banco do Controle de WhatsApps.
 
 O contrato completo (eventos, segurança, como testar) está no BenCalls, em `docs/API-INTEGRACAO.md`.
 O código fica em `server/integracaoBenCalls.ts`, com testes em `server/integracaoBenCalls.test.ts`.
@@ -615,7 +615,7 @@ repetir coluna), completa o CPF que perdeu o zero à esquerda e gera UTF-8 com B
 | `benhermes_relatorio_ura` | Cadastro de operadores (sem CPF/e-mail), apelidos, metas e **totais** de cada dia |
 | `benhermes_argus` | Token e endereço da API do Argus |
 | `benhermes_feriados` | Feriados locais |
-| `benhermes_whatsapp` | Mapa do WhatsApp das Baias (salas, mesas, operadores, situações, celulares, histórico de 12 meses e manutenções) |
+| `benhermes_whatsapp` | Mapa do Controle de WhatsApps (salas, mesas, operadores, situações, celulares, histórico de 12 meses e manutenções) |
 | `benhermes_template_tasks` e outras | Central de Relatórios (tarefas, rascunhos e histórico) |
 
 > [!WARNING]
