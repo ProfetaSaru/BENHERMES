@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import os from 'node:os';
 import { DatabaseSync } from 'node:sqlite';
 import { hashPassword, verifyPassword, type UserRole } from './auth.ts';
 
@@ -13,6 +14,40 @@ export interface PublicUser {
   supervisorName: string | null;
   active: boolean;
   createdAt: string;
+}
+
+export interface StoredSharedFolderRow {
+  id: string;
+  name: string;
+  parentId: string | null;
+  userId: string;
+  authorName: string;
+  authorRole: UserRole;
+  createdAt: string;
+  updatedAt: string;
+  canEdit?: boolean;
+}
+
+export interface StoredSharedFileRow {
+  id: string;
+  folderId: string | null;
+  name: string;
+  originalName: string;
+  storagePath: string;
+  mimeType: string;
+  sizeBytes: number;
+  userId: string;
+  authorName: string;
+  authorRole: UserRole;
+  createdAt: string;
+  updatedAt: string;
+  canEdit?: boolean;
+}
+
+export interface FolderStats {
+  folderCount: number;
+  fileCount: number;
+  totalBytes: number;
 }
 
 export interface StoredReportRow {
@@ -78,6 +113,7 @@ export interface UserDraftState {
 
 export class AppDatabase {
   public db: DatabaseSync;
+  public uploadsDir: string;
 
   constructor(dbFilePath?: string) {
     const resolvedPath =
@@ -89,6 +125,13 @@ export class AppDatabase {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
       }
+      this.uploadsDir = process.env.UPLOADS_DIR || path.join(dir, 'uploads');
+    } else {
+      this.uploadsDir = path.join(os.tmpdir(), `benhermes_uploads_${crypto.randomUUID()}`);
+    }
+
+    if (!fs.existsSync(this.uploadsDir)) {
+      fs.mkdirSync(this.uploadsDir, { recursive: true });
     }
 
     this.db = new DatabaseSync(resolvedPath);
@@ -190,6 +233,38 @@ export class AppDatabase {
         FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       );
+
+      CREATE TABLE IF NOT EXISTS shared_folders (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        parent_id TEXT NULL,
+        user_id TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (parent_id) REFERENCES shared_folders(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_shared_folders_parent_id ON shared_folders(parent_id);
+      CREATE INDEX IF NOT EXISTS idx_shared_folders_user_id ON shared_folders(user_id);
+
+      CREATE TABLE IF NOT EXISTS shared_files (
+        id TEXT PRIMARY KEY,
+        folder_id TEXT NULL,
+        name TEXT NOT NULL,
+        original_name TEXT NOT NULL,
+        storage_path TEXT NOT NULL,
+        mime_type TEXT NOT NULL,
+        size_bytes INTEGER NOT NULL,
+        user_id TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (folder_id) REFERENCES shared_folders(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_shared_files_folder_id ON shared_files(folder_id);
+      CREATE INDEX IF NOT EXISTS idx_shared_files_user_id ON shared_files(user_id);
     `);
 
     try {
@@ -1046,6 +1121,431 @@ export class AppDatabase {
       .get(user.id, user.id, user.id, user.id) as { total: number } | undefined;
 
     return Number(row?.total || 0);
+  }
+
+  // ==========================================
+  // Compartilhamento de Arquivos (/api/files)
+  // ==========================================
+
+  private mapFolderRow(row: any, currentUser: PublicUser): StoredSharedFolderRow {
+    return {
+      id: row.id,
+      name: row.name,
+      parentId: row.parent_id ?? null,
+      userId: row.user_id,
+      authorName: row.author_name || 'Desconhecido',
+      authorRole: row.author_role || 'supervisor',
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      canEdit: currentUser.role === 'admin' || currentUser.id === row.user_id,
+    };
+  }
+
+  private mapFileRow(row: any, currentUser: PublicUser): StoredSharedFileRow {
+    return {
+      id: row.id,
+      folderId: row.folder_id ?? null,
+      name: row.name,
+      originalName: row.original_name,
+      storagePath: row.storage_path,
+      mimeType: row.mime_type,
+      sizeBytes: Number(row.size_bytes || 0),
+      userId: row.user_id,
+      authorName: row.author_name || 'Desconhecido',
+      authorRole: row.author_role || 'supervisor',
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      canEdit: currentUser.role === 'admin' || currentUser.id === row.user_id,
+    };
+  }
+
+  public getFolderBreadcrumbs(folderId: string | null): Array<{ id: string | null; name: string }> {
+    const crumbs: Array<{ id: string | null; name: string }> = [];
+    let currentId = folderId;
+    let depth = 0;
+
+    while (currentId && depth < 50) {
+      depth++;
+      const row = this.db
+        .prepare(`SELECT id, name, parent_id FROM shared_folders WHERE id = ?`)
+        .get(currentId) as { id: string; name: string; parent_id: string | null } | undefined;
+      if (!row) break;
+      crumbs.unshift({ id: row.id, name: row.name });
+      currentId = row.parent_id;
+    }
+
+    crumbs.unshift({ id: null, name: 'Início' });
+    return crumbs;
+  }
+
+  public listSharedItems(
+    currentUser: PublicUser,
+    folderId?: string | null,
+    search?: string
+  ): {
+    currentFolder: StoredSharedFolderRow | null;
+    breadcrumbs: Array<{ id: string | null; name: string }>;
+    folders: StoredSharedFolderRow[];
+    files: StoredSharedFileRow[];
+  } {
+    const term = (search || '').trim().toLowerCase();
+
+    // Se houver busca textual, pesquisa em todo o drive
+    if (term) {
+      const folderRows = this.db
+        .prepare(
+          `SELECT f.*, u.display_name AS author_name, u.role AS author_role
+           FROM shared_folders f
+           JOIN users u ON f.user_id = u.id
+           WHERE LOWER(f.name) LIKE ?
+           ORDER BY f.name COLLATE NOCASE ASC`
+        )
+        .all(`%${term}%`) as any[];
+
+      const fileRows = this.db
+        .prepare(
+          `SELECT f.*, u.display_name AS author_name, u.role AS author_role
+           FROM shared_files f
+           JOIN users u ON f.user_id = u.id
+           WHERE LOWER(f.name) LIKE ? OR LOWER(f.original_name) LIKE ?
+           ORDER BY f.name COLLATE NOCASE ASC`
+        )
+        .all(`%${term}%`, `%${term}%`) as any[];
+
+      return {
+        currentFolder: null,
+        breadcrumbs: [{ id: null, name: 'Início' }],
+        folders: folderRows.map((r) => this.mapFolderRow(r, currentUser)),
+        files: fileRows.map((r) => this.mapFileRow(r, currentUser)),
+      };
+    }
+
+    // Navegação normal na pasta
+    let currentFolder: StoredSharedFolderRow | null = null;
+    const targetFolderId = folderId || null;
+
+    if (targetFolderId) {
+      const row = this.db
+        .prepare(
+          `SELECT f.*, u.display_name AS author_name, u.role AS author_role
+           FROM shared_folders f
+           JOIN users u ON f.user_id = u.id
+           WHERE f.id = ?`
+        )
+        .get(targetFolderId) as any;
+      if (row) {
+        currentFolder = this.mapFolderRow(row, currentUser);
+      }
+    }
+
+    const breadcrumbs = this.getFolderBreadcrumbs(targetFolderId);
+
+    const folderRows = targetFolderId
+      ? (this.db
+          .prepare(
+            `SELECT f.*, u.display_name AS author_name, u.role AS author_role
+             FROM shared_folders f
+             JOIN users u ON f.user_id = u.id
+             WHERE f.parent_id = ?
+             ORDER BY f.name COLLATE NOCASE ASC`
+          )
+          .all(targetFolderId) as any[])
+      : (this.db
+          .prepare(
+            `SELECT f.*, u.display_name AS author_name, u.role AS author_role
+             FROM shared_folders f
+             JOIN users u ON f.user_id = u.id
+             WHERE f.parent_id IS NULL
+             ORDER BY f.name COLLATE NOCASE ASC`
+          )
+          .all() as any[]);
+
+    const fileRows = targetFolderId
+      ? (this.db
+          .prepare(
+            `SELECT f.*, u.display_name AS author_name, u.role AS author_role
+             FROM shared_files f
+             JOIN users u ON f.user_id = u.id
+             WHERE f.folder_id = ?
+             ORDER BY f.name COLLATE NOCASE ASC`
+          )
+          .all(targetFolderId) as any[])
+      : (this.db
+          .prepare(
+            `SELECT f.*, u.display_name AS author_name, u.role AS author_role
+             FROM shared_files f
+             JOIN users u ON f.user_id = u.id
+             WHERE f.folder_id IS NULL
+             ORDER BY f.name COLLATE NOCASE ASC`
+          )
+          .all() as any[]);
+
+    return {
+      currentFolder,
+      breadcrumbs,
+      folders: folderRows.map((r) => this.mapFolderRow(r, currentUser)),
+      files: fileRows.map((r) => this.mapFileRow(r, currentUser)),
+    };
+  }
+
+  public createSharedFolder(
+    currentUser: PublicUser,
+    data: { name: string; parentId?: string | null }
+  ): StoredSharedFolderRow {
+    const name = (data.name || '').trim();
+    if (!name) throw new Error('O nome da pasta é obrigatório.');
+
+    const parentId = data.parentId || null;
+    if (parentId) {
+      const parent = this.db.prepare(`SELECT id FROM shared_folders WHERE id = ?`).get(parentId);
+      if (!parent) throw new Error('Pasta pai não encontrada.');
+    }
+
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+
+    this.db
+      .prepare(
+        `INSERT INTO shared_folders (id, name, parent_id, user_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      )
+      .run(id, name, parentId, currentUser.id, now, now);
+
+    const created = this.db
+      .prepare(
+        `SELECT f.*, u.display_name AS author_name, u.role AS author_role
+         FROM shared_folders f
+         JOIN users u ON f.user_id = u.id
+         WHERE f.id = ?`
+      )
+      .get(id);
+
+    return this.mapFolderRow(created, currentUser);
+  }
+
+  public renameSharedFolder(
+    currentUser: PublicUser,
+    folderId: string,
+    newName: string
+  ): StoredSharedFolderRow {
+    const name = (newName || '').trim();
+    if (!name) throw new Error('O novo nome da pasta é obrigatório.');
+
+    const folder = this.db.prepare(`SELECT * FROM shared_folders WHERE id = ?`).get(folderId) as any;
+    if (!folder) throw new Error('Pasta não encontrada.');
+
+    if (currentUser.role !== 'admin' && folder.user_id !== currentUser.id) {
+      throw new Error('Você não tem permissão para renomear esta pasta.');
+    }
+
+    const now = new Date().toISOString();
+    this.db
+      .prepare(`UPDATE shared_folders SET name = ?, updated_at = ? WHERE id = ?`)
+      .run(name, now, folderId);
+
+    const updated = this.db
+      .prepare(
+        `SELECT f.*, u.display_name AS author_name, u.role AS author_role
+         FROM shared_folders f
+         JOIN users u ON f.user_id = u.id
+         WHERE f.id = ?`
+      )
+      .get(folderId);
+
+    return this.mapFolderRow(updated, currentUser);
+  }
+
+  public getFolderStats(folderId: string): FolderStats {
+    const subfolderRows = this.db
+      .prepare(
+        `WITH RECURSIVE subfolders AS (
+           SELECT id FROM shared_folders WHERE id = ?
+           UNION ALL
+           SELECT f.id FROM shared_folders f JOIN subfolders s ON f.parent_id = s.id
+         )
+         SELECT id FROM subfolders`
+      )
+      .all(folderId) as { id: string }[];
+
+    const folderIds = subfolderRows.map((r) => r.id);
+    const folderCount = Math.max(0, folderIds.length - 1);
+
+    if (folderIds.length === 0) {
+      return { folderCount: 0, fileCount: 0, totalBytes: 0 };
+    }
+
+    const placeholders = folderIds.map(() => '?').join(',');
+    const fileStats = this.db
+      .prepare(
+        `SELECT COUNT(*) AS count, COALESCE(SUM(size_bytes), 0) AS total_bytes
+         FROM shared_files
+         WHERE folder_id IN (${placeholders})`
+      )
+      .get(...folderIds) as { count: number; total_bytes: number };
+
+    return {
+      folderCount,
+      fileCount: Number(fileStats?.count || 0),
+      totalBytes: Number(fileStats?.total_bytes || 0),
+    };
+  }
+
+  public deleteSharedFolder(currentUser: PublicUser, folderId: string): { ok: boolean } {
+    const folder = this.db.prepare(`SELECT * FROM shared_folders WHERE id = ?`).get(folderId) as any;
+    if (!folder) throw new Error('Pasta não encontrada.');
+
+    if (currentUser.role !== 'admin' && folder.user_id !== currentUser.id) {
+      throw new Error('Você não tem permissão para excluir esta pasta.');
+    }
+
+    const subfolderRows = this.db
+      .prepare(
+        `WITH RECURSIVE subfolders AS (
+           SELECT id FROM shared_folders WHERE id = ?
+           UNION ALL
+           SELECT f.id FROM shared_folders f JOIN subfolders s ON f.parent_id = s.id
+         )
+         SELECT id FROM subfolders`
+      )
+      .all(folderId) as { id: string }[];
+
+    const folderIds = subfolderRows.map((r) => r.id);
+    if (folderIds.length > 0) {
+      const placeholders = folderIds.map(() => '?').join(',');
+      const fileRows = this.db
+        .prepare(`SELECT storage_path FROM shared_files WHERE folder_id IN (${placeholders})`)
+        .all(...folderIds) as { storage_path: string }[];
+
+      for (const row of fileRows) {
+        if (row.storage_path) {
+          const filePath = path.join(this.uploadsDir, row.storage_path);
+          try {
+            if (fs.existsSync(filePath)) {
+              fs.unlinkSync(filePath);
+            }
+          } catch {
+            // Ignora erro ao excluir arquivo em disco
+          }
+        }
+      }
+    }
+
+    this.db.prepare(`DELETE FROM shared_folders WHERE id = ?`).run(folderId);
+
+    return { ok: true };
+  }
+
+  public createSharedFile(
+    currentUser: PublicUser,
+    params: {
+      folderId?: string | null;
+      name: string;
+      originalName: string;
+      storagePath: string;
+      mimeType: string;
+      sizeBytes: number;
+    }
+  ): StoredSharedFileRow {
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const folderId = params.folderId || null;
+
+    if (folderId) {
+      const parent = this.db.prepare(`SELECT id FROM shared_folders WHERE id = ?`).get(folderId);
+      if (!parent) throw new Error('Pasta de destino não encontrada.');
+    }
+
+    this.db
+      .prepare(
+        `INSERT INTO shared_files (id, folder_id, name, original_name, storage_path, mime_type, size_bytes, user_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        id,
+        folderId,
+        params.name.trim() || params.originalName.trim(),
+        params.originalName.trim(),
+        params.storagePath,
+        params.mimeType || 'application/octet-stream',
+        params.sizeBytes,
+        currentUser.id,
+        now,
+        now
+      );
+
+    const created = this.db
+      .prepare(
+        `SELECT f.*, u.display_name AS author_name, u.role AS author_role
+         FROM shared_files f
+         JOIN users u ON f.user_id = u.id
+         WHERE f.id = ?`
+      )
+      .get(id);
+
+    return this.mapFileRow(created, currentUser);
+  }
+
+  public renameSharedFile(currentUser: PublicUser, fileId: string, newName: string): StoredSharedFileRow {
+    const name = (newName || '').trim();
+    if (!name) throw new Error('O novo nome do arquivo é obrigatório.');
+
+    const file = this.db.prepare(`SELECT * FROM shared_files WHERE id = ?`).get(fileId) as any;
+    if (!file) throw new Error('Arquivo não encontrado.');
+
+    if (currentUser.role !== 'admin' && file.user_id !== currentUser.id) {
+      throw new Error('Você não tem permissão para renomear este arquivo.');
+    }
+
+    const now = new Date().toISOString();
+    this.db.prepare(`UPDATE shared_files SET name = ?, updated_at = ? WHERE id = ?`).run(name, now, fileId);
+
+    const updated = this.db
+      .prepare(
+        `SELECT f.*, u.display_name AS author_name, u.role AS author_role
+         FROM shared_files f
+         JOIN users u ON f.user_id = u.id
+         WHERE f.id = ?`
+      )
+      .get(fileId);
+
+    return this.mapFileRow(updated, currentUser);
+  }
+
+  public deleteSharedFile(currentUser: PublicUser, fileId: string): { ok: boolean } {
+    const file = this.db.prepare(`SELECT * FROM shared_files WHERE id = ?`).get(fileId) as any;
+    if (!file) throw new Error('Arquivo não encontrado.');
+
+    if (currentUser.role !== 'admin' && file.user_id !== currentUser.id) {
+      throw new Error('Você não tem permissão para excluir este arquivo.');
+    }
+
+    if (file.storage_path) {
+      const filePath = path.join(this.uploadsDir, file.storage_path);
+      try {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      } catch {
+        // Ignora erro ao excluir arquivo físico
+      }
+    }
+
+    this.db.prepare(`DELETE FROM shared_files WHERE id = ?`).run(fileId);
+    return { ok: true };
+  }
+
+  public getSharedFileById(fileId: string, currentUser?: PublicUser | null): StoredSharedFileRow | null {
+    const row = this.db
+      .prepare(
+        `SELECT f.*, u.display_name AS author_name, u.role AS author_role
+         FROM shared_files f
+         JOIN users u ON f.user_id = u.id
+         WHERE f.id = ?`
+      )
+      .get(fileId) as any;
+
+    if (!row) return null;
+    return this.mapFileRow(row, currentUser || ({ id: '', role: 'operador' } as any));
   }
 }
 

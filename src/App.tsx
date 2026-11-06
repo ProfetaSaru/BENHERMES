@@ -45,6 +45,9 @@ const UsersManagementHub = lazy(() =>
 const NotesHub = lazy(() =>
   import('./components/notes/NotesHub').then((m) => ({ default: m.NotesHub }))
 );
+const FilesHub = lazy(() =>
+  import('./components/files/FilesHub').then((m) => ({ default: m.FilesHub }))
+);
 
 interface ServerUserDrafts {
   activeTemplateId: string;
@@ -685,7 +688,11 @@ export const App: React.FC = () => {
                 </div>
               }
             >
-              {activeToolId === 'historico' ? (
+              {activeToolId === 'arquivos' && currentUser.role !== 'operador' ? (
+                <main className="container" style={{ maxWidth: '1480px', padding: '0 16px', boxSizing: 'border-box', width: '100%' }}>
+                  <FilesHub currentUser={currentUser} onNotify={notify} />
+                </main>
+              ) : activeToolId === 'historico' ? (
                 <main className="container" style={{ maxWidth: '1200px' }}>
                   <ReportsHistoryHub
                     savedReports={savedReports}

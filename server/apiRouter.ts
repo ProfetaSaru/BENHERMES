@@ -1,4 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
 import type { Plugin } from 'vite';
 import { AppDatabase, validateWhatsappPermissions, type PublicUser } from './db.ts';
 import {
@@ -16,6 +19,71 @@ import { enforceIpWhitelist } from './ipFilter.ts';
 import { criarIntegracaoBenCalls } from './integracaoBenCalls.ts';
 
 const MAX_BODY_BYTES = 5 * 1024 * 1024; // 5 MB (para mapas/relatórios grandes)
+const MAX_UPLOAD_FILE_BYTES = 50 * 1024 * 1024; // 50 MB (para arquivos compartilhados)
+
+const BLOCKED_FILE_EXTENSIONS = new Set([
+  '.exe',
+  '.bat',
+  '.cmd',
+  '.sh',
+  '.vbs',
+  '.msi',
+  '.ps1',
+  '.scr',
+  '.com',
+  '.pif',
+  '.reg',
+  '.dll',
+  '.jar',
+  '.hta',
+  '.cpl',
+]);
+
+function streamUploadToFile(
+  req: IncomingMessage,
+  targetFilePath: string,
+  maxBytes: number
+): Promise<{ size: number }> {
+  return new Promise((resolve, reject) => {
+    let bytesWritten = 0;
+    const writeStream = fs.createWriteStream(targetFilePath);
+
+    req.on('data', (chunk: Buffer) => {
+      bytesWritten += chunk.length;
+      if (bytesWritten > maxBytes) {
+        req.destroy();
+        writeStream.destroy();
+        try {
+          if (fs.existsSync(targetFilePath)) fs.unlinkSync(targetFilePath);
+        } catch {}
+        reject(new Error('Tamanho do arquivo excede o limite permitido de 50 MB.'));
+        return;
+      }
+      writeStream.write(chunk);
+    });
+
+    req.on('end', () => {
+      writeStream.end(() => {
+        resolve({ size: bytesWritten });
+      });
+    });
+
+    req.on('error', (err) => {
+      writeStream.destroy();
+      try {
+        if (fs.existsSync(targetFilePath)) fs.unlinkSync(targetFilePath);
+      } catch {}
+      reject(err);
+    });
+
+    writeStream.on('error', (err) => {
+      try {
+        if (fs.existsSync(targetFilePath)) fs.unlinkSync(targetFilePath);
+      } catch {}
+      reject(err);
+    });
+  });
+}
 
 function sendJson(res: ServerResponse, status: number, data: unknown): void {
   res.statusCode = status;
@@ -76,8 +144,11 @@ function readJsonBody(req: IncomingMessage & { body?: unknown }): Promise<any> {
   });
 }
 
-function getAuthenticatedUser(req: IncomingMessage, appDb: AppDatabase): PublicUser | null {
-  const token = extractTokenFromRequest(req);
+function getAuthenticatedUser(req: IncomingMessage, appDb: AppDatabase, urlObj?: URL): PublicUser | null {
+  let token = extractTokenFromRequest(req);
+  if (!token && urlObj) {
+    token = urlObj.searchParams.get('token') || null;
+  }
   if (!token) return null;
   const payload = verifyAuthToken(token);
   if (!payload) return null;
@@ -153,7 +224,7 @@ export function createApiHandler(
 
       // 4. Auth: Me
       if (pathname === '/api/auth/me' && method === 'GET') {
-        const user = getAuthenticatedUser(req, appDb);
+        const user = getAuthenticatedUser(req, appDb, urlObj);
         if (!user) {
           sendJson(res, 401, { erro: 'Não autenticado.' });
           return true;
@@ -163,7 +234,7 @@ export function createApiHandler(
       }
 
       // Todas as demais rotas de /api exigem autenticação
-      const currentUser = getAuthenticatedUser(req, appDb);
+      const currentUser = getAuthenticatedUser(req, appDb, urlObj);
       if (!currentUser) {
         sendJson(res, 401, { erro: 'Sessão expirada ou não autenticada. Faça login novamente.' });
         return true;
@@ -635,6 +706,223 @@ export function createApiHandler(
             sendJson(res, 200, { ok: true });
           } catch (err: any) {
             sendJson(res, 403, { erro: err.message || 'Erro ao excluir anotação.' });
+          }
+          return true;
+        }
+      }
+
+      // 14. Compartilhamento de Arquivos (/api/files)
+      if (pathname.startsWith('/api/files')) {
+        // RBAC: restrito a Admin, Gerente e Supervisor
+        if (currentUser.role === 'operador') {
+          sendJson(res, 403, { erro: 'Acesso restrito à equipe de gestão.' });
+          return true;
+        }
+
+        // Listar itens e breadcrumbs: GET /api/files/items?folderId=...&search=...
+        if (pathname === '/api/files/items' && method === 'GET') {
+          const folderId = urlObj.searchParams.get('folderId') || undefined;
+          const search = urlObj.searchParams.get('search') || undefined;
+          const result = appDb.listSharedItems(currentUser, folderId, search);
+          sendJson(res, 200, result);
+          return true;
+        }
+
+        // Criar pasta: POST /api/files/folders
+        if (pathname === '/api/files/folders' && method === 'POST') {
+          const body = await readJsonBody(req);
+          try {
+            const folder = appDb.createSharedFolder(currentUser, {
+              name: String(body.name || ''),
+              parentId: body.parentId ? String(body.parentId) : undefined,
+            });
+            sendJson(res, 201, { folder });
+          } catch (err: any) {
+            sendJson(res, 400, { erro: err.message || 'Erro ao criar pasta.' });
+          }
+          return true;
+        }
+
+        // Sub-rotas de pastas: /api/files/folders/:id e /api/files/folders/:id/stats
+        if (pathname.startsWith('/api/files/folders/')) {
+          const rest = pathname.slice('/api/files/folders/'.length);
+
+          // GET /api/files/folders/:id/stats
+          if (rest.endsWith('/stats') && method === 'GET') {
+            const folderId = decodeURIComponent(rest.slice(0, -'/stats'.length));
+            try {
+              const stats = appDb.getFolderStats(folderId);
+              sendJson(res, 200, { stats });
+            } catch (err: any) {
+              sendJson(res, 400, { erro: err.message || 'Erro ao obter estatísticas da pasta.' });
+            }
+            return true;
+          }
+
+          const folderId = decodeURIComponent(rest);
+
+          // Renomear pasta: PUT /api/files/folders/:id
+          if (method === 'PUT') {
+            const body = await readJsonBody(req);
+            try {
+              const updated = appDb.renameSharedFolder(currentUser, folderId, String(body.name || ''));
+              sendJson(res, 200, { folder: updated });
+            } catch (err: any) {
+              sendJson(res, 403, { erro: err.message || 'Erro ao renomear pasta.' });
+            }
+            return true;
+          }
+
+          // Excluir pasta: DELETE /api/files/folders/:id
+          if (method === 'DELETE') {
+            try {
+              appDb.deleteSharedFolder(currentUser, folderId);
+              sendJson(res, 200, { ok: true });
+            } catch (err: any) {
+              sendJson(res, 403, { erro: err.message || 'Erro ao excluir pasta.' });
+            }
+            return true;
+          }
+        }
+
+        // Upload de arquivo: POST /api/files/upload
+        if (pathname === '/api/files/upload' && method === 'POST') {
+          const rawHeaderName = req.headers['x-file-name'];
+          let originalName = 'arquivo';
+          if (typeof rawHeaderName === 'string') {
+            try {
+              originalName = decodeURIComponent(rawHeaderName);
+            } catch {
+              originalName = rawHeaderName;
+            }
+          } else {
+            const queryName = urlObj.searchParams.get('name');
+            if (queryName) originalName = queryName;
+          }
+
+          const rawFolderId = req.headers['x-folder-id'] || urlObj.searchParams.get('folderId');
+          const folderId = typeof rawFolderId === 'string' && rawFolderId.trim() ? rawFolderId.trim() : null;
+
+          const ext = path.extname(originalName).toLowerCase();
+          if (BLOCKED_FILE_EXTENSIONS.has(ext)) {
+            sendJson(res, 400, {
+              erro: `Arquivos com extensão "${ext}" não são permitidos por motivos de segurança.`,
+            });
+            return true;
+          }
+
+          const fileUuid = crypto.randomUUID();
+          const storageFilename = `${fileUuid}${ext || ''}`;
+          const targetFilePath = path.join(appDb.uploadsDir, storageFilename);
+
+          try {
+            const { size } = await streamUploadToFile(req, targetFilePath, MAX_UPLOAD_FILE_BYTES);
+            if (size === 0) {
+              try {
+                if (fs.existsSync(targetFilePath)) fs.unlinkSync(targetFilePath);
+              } catch {}
+              sendJson(res, 400, { erro: 'O arquivo enviado está vazio.' });
+              return true;
+            }
+
+            const contentTypeHeader = (req.headers['content-type'] as string) || 'application/octet-stream';
+            const file = appDb.createSharedFile(currentUser, {
+              folderId,
+              name: originalName,
+              originalName,
+              storagePath: storageFilename,
+              mimeType: contentTypeHeader,
+              sizeBytes: size,
+            });
+
+            sendJson(res, 201, { file });
+          } catch (err: any) {
+            try {
+              if (fs.existsSync(targetFilePath)) fs.unlinkSync(targetFilePath);
+            } catch {}
+            sendJson(res, 400, { erro: err.message || 'Erro durante o envio do arquivo.' });
+          }
+          return true;
+        }
+
+        // Operações em arquivos: /api/files/:id, /api/files/:id/download, /api/files/:id/view
+        const rest = pathname.slice('/api/files/'.length);
+
+        if (rest.endsWith('/download') && method === 'GET') {
+          const fileId = decodeURIComponent(rest.slice(0, -'/download'.length));
+          const file = appDb.getSharedFileById(fileId, currentUser);
+          if (!file) {
+            sendJson(res, 404, { erro: 'Arquivo não encontrado.' });
+            return true;
+          }
+
+          const filePath = path.join(appDb.uploadsDir, file.storagePath);
+          if (!fs.existsSync(filePath)) {
+            sendJson(res, 404, { erro: 'Arquivo físico não encontrado no servidor.' });
+            return true;
+          }
+
+          const safeFilename = encodeURIComponent(file.name || file.originalName);
+          res.statusCode = 200;
+          res.setHeader('Content-Type', file.mimeType || 'application/octet-stream');
+          res.setHeader('Content-Length', String(file.sizeBytes));
+          res.setHeader(
+            'Content-Disposition',
+            `attachment; filename="${(file.name || file.originalName).replace(/["\\]/g, '_')}"; filename*=UTF-8''${safeFilename}`
+          );
+          const stream = fs.createReadStream(filePath);
+          stream.pipe(res);
+          return true;
+        }
+
+        if (rest.endsWith('/view') && method === 'GET') {
+          const fileId = decodeURIComponent(rest.slice(0, -'/view'.length));
+          const file = appDb.getSharedFileById(fileId, currentUser);
+          if (!file) {
+            sendJson(res, 404, { erro: 'Arquivo não encontrado.' });
+            return true;
+          }
+
+          const filePath = path.join(appDb.uploadsDir, file.storagePath);
+          if (!fs.existsSync(filePath)) {
+            sendJson(res, 404, { erro: 'Arquivo físico não encontrado no servidor.' });
+            return true;
+          }
+
+          const safeFilename = encodeURIComponent(file.name || file.originalName);
+          res.statusCode = 200;
+          res.setHeader('Content-Type', file.mimeType || 'application/octet-stream');
+          res.setHeader('Content-Length', String(file.sizeBytes));
+          res.setHeader(
+            'Content-Disposition',
+            `inline; filename="${(file.name || file.originalName).replace(/["\\]/g, '_')}"; filename*=UTF-8''${safeFilename}`
+          );
+          const stream = fs.createReadStream(filePath);
+          stream.pipe(res);
+          return true;
+        }
+
+        const fileId = decodeURIComponent(rest);
+
+        // Renomear arquivo: PUT /api/files/:id
+        if (method === 'PUT') {
+          const body = await readJsonBody(req);
+          try {
+            const updated = appDb.renameSharedFile(currentUser, fileId, String(body.name || ''));
+            sendJson(res, 200, { file: updated });
+          } catch (err: any) {
+            sendJson(res, 403, { erro: err.message || 'Erro ao renomear arquivo.' });
+          }
+          return true;
+        }
+
+        // Excluir arquivo: DELETE /api/files/:id
+        if (method === 'DELETE') {
+          try {
+            appDb.deleteSharedFile(currentUser, fileId);
+            sendJson(res, 200, { ok: true });
+          } catch (err: any) {
+            sendJson(res, 403, { erro: err.message || 'Erro ao excluir arquivo.' });
           }
           return true;
         }

@@ -25,6 +25,7 @@ export function canSeeTool(role: UserRole, toolId: string): boolean {
   if (toolId === 'formatador') return false;
   if (toolId === 'usuarios') return role === 'admin';
   if (toolId === 'anotacoes') return true;
+  if (toolId === 'arquivos') return ['admin', 'gerente', 'supervisor'].includes(role);
 
   switch (role) {
     case 'admin':
