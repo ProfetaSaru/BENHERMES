@@ -1697,3 +1697,28 @@
     grid-row: 2;
   }
 }
+
+/* Chamados de WhatsApp abertos no BenCalls (integração) */
+.wpp-chamado-bencalls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wpp-chamado-bencalls .wpp-alerta {
+  flex: 1;
+  min-width: 0;
+}
+
+.wpp-chamado-acoes {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+@media (max-width: 720px) {
+  .wpp-chamado-bencalls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

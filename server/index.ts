@@ -4,6 +4,7 @@ import path from 'node:path';
 import { AppDatabase } from './db.ts';
 import { createApiHandler } from './apiRouter.ts';
 import { enforceIpWhitelist, getAllowedIpsFromEnv } from './ipFilter.ts';
+import { criarIntegracaoBenCalls } from './integracaoBenCalls.ts';
 
 const PORT = Number(process.env.PORT || 3000);
 const DIST_DIR = path.resolve(process.cwd(), 'dist');
@@ -24,7 +25,11 @@ const MIME_TYPES: Record<string, string> = {
 };
 
 const appDb = new AppDatabase();
-const apiHandler = createApiHandler(appDb, { enforceIp: false });
+const integracao = criarIntegracaoBenCalls(appDb);
+const apiHandler = createApiHandler(appDb, { enforceIp: false, integracao });
+
+// Reenvia para o BenCalls o que ficou na fila (BenCalls fora do ar na hora da manutenção)
+if (integracao.saidaAtiva) setInterval(() => void integracao.esvaziar(), 60_000).unref();
 
 const server = http.createServer(async (req, res) => {
   // 1. Verifica a whitelist de IPs (IPv4 e CIDR IPv6 /48) antes de qualquer rota ou arquivo estático
@@ -83,4 +88,5 @@ server.listen(PORT, () => {
   const allowed = getAllowedIpsFromEnv();
   console.log(`[BENHERMES] Servidor iniciado na porta ${PORT}`);
   console.log(`[BENHERMES] IPs/CIDRs liberados (${allowed.length}): ${allowed.join(', ')}`);
+  console.log(`[BENHERMES] Integração BenCalls: envio ${integracao.saidaAtiva ? 'ligado' : 'desligado'} · recebimento ${integracao.entradaAtiva ? 'ligado' : 'desligado'}`);
 });

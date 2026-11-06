@@ -35,7 +35,7 @@ tudo no navegador, sem instalar nada.
 | 📞 [Relatório URA](#-relatório-de-produtividade-ura) | 🏗️ [Arquitetura](#️-arquitetura) |
 | 🔌 [API do Argus](#-api-do-argus) | 🐉 [BenHermes × BENZAITEN](#-benhermes--benzaiten) |
 | 💬 [WhatsApp das Baias](#-whatsapp-das-baias) | 🛠️ [Tecnologias](#️-tecnologias) |
-| ⚙️ [Configurações (feriados)](#️-configurações-do-hub) | |
+| ⚙️ [Configurações (feriados)](#️-configurações-do-hub) | 🔌 [Integração com o BenCalls](#-integração-com-o-bencalls) |
 | 📋 [Central de Relatórios](#-central-de-relatórios) | 📊 [Formatador de Planilhas](#-formatador-de-planilhas) |
 
 ---
@@ -330,6 +330,36 @@ fica numa **equipe** ou **guardado**. As **vagas** (cada WhatsApp do aparelho) n
 </details>
 
 ---
+
+## 🔌 Integração com o BenCalls
+
+O WhatsApp das Baias conversa com o **BenCalls** (sistema de chamados) por eventos assinados:
+
+- **Manutenção daqui fecha o chamado de lá.** Ao salvar o mapa, o que mudou vai para o BenCalls: baia
+  **Liberada**, chip **trocado** ou restrição que **voltou** deixa o WhatsApp OK lá e **conclui o chamado** de
+  WhatsApp daquela baia. Manutenção concluída também é avisada.
+- **Chamados de lá aparecem aqui.** Os chamados de WhatsApp abertos no BenCalls aparecem em
+  *WhatsApp das Baias › Chamados do BenCalls* (o supervisor vê só os da própria mesa), com **⛔ Marcar como banido**.
+- Se o BenCalls estiver fora do ar, os eventos ficam numa fila e são reenviados a cada minuto.
+
+| Variável | O quê |
+|---|---|
+| `BENCALLS_URL` | Endereço do BenCalls, ex.: `https://chamados.benconsig.com` |
+| `BENCALLS_SEGREDO` (ou `BENCALLS_SEGREDO_ARQUIVO`) | O segredo combinado (o mesmo `BENHERMES_SEGREDO` do BenCalls), com 32+ caracteres: `openssl rand -hex 32` |
+
+| Rota | O quê |
+|---|---|
+| `POST /api/integracoes/bencalls/eventos` | Recebe os chamados do BenCalls (assinatura HMAC, sem login) |
+| `GET /api/integracoes/bencalls/chamados` | Chamados abertos para as mesas da pessoa |
+| `POST /api/integracoes/bencalls/chamados/<id>/dispensar` | Tira da lista (continua no BenCalls) |
+| `GET /api/integracoes/bencalls/status` | Admin: ligada, fila, último envio e último erro |
+
+> [!IMPORTANT]
+> A rota de recebimento passa pela lista de IPs (`ALLOWED_IPS`): inclua o IP de saída do servidor do BenCalls.
+> A integração precisa do servidor Node (Docker/pm2); o site na Vercel não tem o banco do WhatsApp das Baias.
+
+O contrato completo (eventos, segurança, como testar) está no BenCalls, em `docs/API-INTEGRACAO.md`.
+O código fica em `server/integracaoBenCalls.ts`, com testes em `server/integracaoBenCalls.test.ts`.
 
 ## ⚙️ Configurações do Hub
 
