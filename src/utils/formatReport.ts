@@ -12,6 +12,6 @@ export function generateReport(tasks: Task[]): string {
     return 'Nenhuma tarefa para mostrar.';
   }
 
-  const lines = ['RELATÓRIO DE CONCLUSÃO DE ATIVIDADES', ...tasks.map(formatTaskLine)];
+  const lines = ['---', '# 📋 RELATÓRIO DE CONCLUSÃO DE ATIVIDADES', '', ...tasks.map(formatTaskLine), '---'];
   return lines.join('\n');
 }

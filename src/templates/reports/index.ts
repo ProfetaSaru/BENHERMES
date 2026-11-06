@@ -21,8 +21,8 @@ const RAW_BUILTIN_TEMPLATES: MarkdownTemplateMeta[] = [
         systemSource: 'tarefas',
       },
     ],
-    templateBody: `RELATÓRIO DE CONCLUSÃO DE ATIVIDADES\n\n{{tarefas}}`,
-    rawContent: `RELATÓRIO DE CONCLUSÃO DE ATIVIDADES\n\n{{tarefas}}`,
+    templateBody: `---\n# 📋 RELATÓRIO DE CONCLUSÃO DE ATIVIDADES\n\n{{tarefas}}\n---`,
+    rawContent: `---\n# 📋 RELATÓRIO DE CONCLUSÃO DE ATIVIDADES\n\n{{tarefas}}\n---`,
   },
   {
     id: 'produtividade-atendimento',
