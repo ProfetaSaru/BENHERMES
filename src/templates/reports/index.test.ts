@@ -62,5 +62,26 @@ describe('Modelos Nativos em TypeScript (BUILTIN_TEMPLATES)', () => {
     expect(colabText).toContain('SETOR - Ativo');
     expect(colabText).toContain('EQUIPE: OP1.');
   });
+
+  it('renderiza corretamente o modelo de Relatório de Atividades Padrão com novo formato', () => {
+    const padrao = BUILTIN_TEMPLATES.find((t) => t.id === 'atividades-padrao')!;
+    const rendered = renderTemplate(
+      padrao.templateBody!,
+      {},
+      [
+        {
+          id: '1',
+          title: 'Atendimento',
+          description: 'Chamados',
+          start: '08:00',
+          end: '12:00',
+        },
+      ]
+    );
+
+    expect(rendered).toContain('---\n# 📋 RELATÓRIO DE CONCLUSÃO DE ATIVIDADES\n\n');
+    expect(rendered).toContain('08:00 – 12:00 *ATENDIMENTO:* - Chamados;');
+    expect(rendered.endsWith('---')).toBe(true);
+  });
 });
 
