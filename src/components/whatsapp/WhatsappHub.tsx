@@ -284,7 +284,7 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({
           </h1>
           <p>
             Mapa das mesas com a situação do WhatsApp de cada lugar e os celulares corporativos. Clique numa baia
-            para trocar o operador ou a situação, ou num alerta para agir; tudo fica salvo neste navegador.
+            para trocar o operador ou a situação, ou num alerta para agir; tudo fica salvo no servidor do BenHermes.
             Atualizado em {dataHora(mapa.atualizadoEm)}.
           </p>
         </div>
@@ -296,8 +296,8 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({
 
       {wpp.erroAoSalvar && (
         <div className="escala-aviso wpp-armazenamento" role="alert">
-          Armazenamento cheio: exporte o mapa e baixe a planilha. As mudanças continuam na tela, mas não estão sendo salvas
-          neste navegador.
+          Não consegui salvar no servidor: as mudanças continuam na tela, mas ainda não foram salvas. Confira a conexão e,
+          por segurança, exporte o mapa ou baixe a planilha.
         </div>
       )}
 

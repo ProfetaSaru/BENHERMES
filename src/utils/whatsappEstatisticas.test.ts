@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { EventoWhatsapp, MapaWhatsapp, Situacao } from '../types/whatsapp';
 import { estado, mapaInicial, novaMesa } from './whatsappBaias';
-import { calcularEstatisticas, formatarDuracao, trechos } from './whatsappEstatisticas';
+import { calcularEstatisticas, formatarDuracao, larguraDaBarra, trechos } from './whatsappEstatisticas';
 
 const t = (iso: string) => new Date(iso);
 const AGORA = t('2026-10-28T12:00:00');
@@ -178,5 +178,15 @@ describe('revisão final', () => {
     const e = calcularEstatisticas(mapa, 30, t('2026-10-28T16:30:00'), []);
     expect(e.calendario).toEqual([{ dia: '2026-10-28', manha: null, almoco: null }]);
     expect(e.manutencoes).toEqual({ feitas: 0, total: 0 });
+  });
+});
+
+describe('largura das barras', () => {
+  it('sem dado ou zero: barra vazia; valor pequeno aparece com no mínimo 2%', () => {
+    expect(larguraDaBarra(null, 1)).toBe(0);
+    expect(larguraDaBarra(0, 1)).toBe(0);
+    expect(larguraDaBarra(0.001, 1)).toBe(2);
+    expect(larguraDaBarra(0.5, 1)).toBe(50);
+    expect(larguraDaBarra(3, 0)).toBe(0);
   });
 });

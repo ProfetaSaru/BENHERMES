@@ -86,7 +86,12 @@ const ms = (iso: string) => new Date(iso).getTime();
 
 const porChave = (historico: EventoWhatsapp[]) => {
   const mapa = new Map<string, EventoWhatsapp[]>();
-  for (const e of historico) mapa.set(e.chave, [...(mapa.get(e.chave) ?? []), e]);
+  // Acrescenta na lista da chave, sem copiar (copiar a cada evento ficava quadrático em 12 meses)
+  for (const e of historico) {
+    const lista = mapa.get(e.chave);
+    if (lista) lista.push(e);
+    else mapa.set(e.chave, [e]);
+  }
   return mapa;
 };
 
@@ -158,6 +163,10 @@ const diasEntre = (de: Date, ate: Date): string[] => {
 };
 
 /** "45min", "3h 20min", "2d 4h" */
+/** Largura da barra em %: sem dado ou zero, vazia; valor pequeno, no mínimo 2% (para aparecer) */
+export const larguraDaBarra = (valor: number | null, max: number): number =>
+  valor === null || valor <= 0 || max <= 0 ? 0 : Math.max(2, (valor / max) * 100);
+
 export const formatarDuracao = (duracao: number): string => {
   const minutos = Math.round(duracao / 60_000);
   if (minutos < 60) return `${minutos}min`;
@@ -188,6 +197,12 @@ export const calcularEstatisticas = (mapa: MapaWhatsapp, periodo: Periodo, agora
   const noPeriodo = (e: EventoWhatsapp) => ms(e.em) >= desde.getTime() && ms(e.em) <= agora.getTime();
 
   const quedas = mapa.historico.filter((e) => e.tipo === 'SITUACAO' && e.de === 'OK' && QUEDA.includes(e.para as Situacao) && noPeriodo(e));
+  // Quedas por dia contadas de uma vez (antes: cada dia do período varria todas as quedas)
+  const quedasNoDia = new Map<string, number>();
+  for (const q of quedas) {
+    const dia = isoDoDia(new Date(q.em));
+    quedasNoDia.set(dia, (quedasNoDia.get(dia) ?? 0) + 1);
+  }
   const voltas = quedas
     .map((q) => (eventos.get(q.chave) ?? []).find((e) => e.tipo === 'SITUACAO' && e.para === 'OK' && ms(e.em) > ms(q.em)))
     .map((volta, i) => (volta ? ms(volta.em) - ms(quedas[i].em) : null))
@@ -273,7 +288,7 @@ export const calcularEstatisticas = (mapa: MapaWhatsapp, periodo: Periodo, agora
     ateVoltarMs: voltas.length ? voltas.reduce((a, b) => a + b, 0) / voltas.length : null,
     perdidos: mapa.historico.filter((e) => e.tipo === 'SITUACAO' && e.para === 'PERMANENTE' && noPeriodo(e)).length,
     manutencoes: { feitas: janelas.filter(Boolean).length, total: janelas.length },
-    quedasPorDia: diasEntre(desde, agora).map((dia) => ({ dia, quedas: quedas.filter((q) => isoDoDia(new Date(q.em)) === dia).length })),
+    quedasPorDia: diasEntre(desde, agora).map((dia) => ({ dia, quedas: quedasNoDia.get(dia) ?? 0 })),
     maisCairam,
     maisEstaveis,
     porOperador,

@@ -218,6 +218,19 @@ describe('abas Estatísticas e Histórico', () => {
     expect(celulas(livro, 'Histórico').filter((c) => textoDe(c) === 'Manhã')).toHaveLength(1);
   });
 
+  it('Histórico: "Data e hora" é data de verdade (ordena e filtra no Excel), no horário local do evento', async () => {
+    const mapa = comHistorico();
+    const { livro } = await gerar(mapa);
+    const ws = livro.getWorksheet('Histórico')!;
+    const c = ws.getCell(2, 1);
+    expect(c.value).toBeInstanceOf(Date);
+    expect(c.numFmt).toBe('dd/mm/yyyy hh:mm');
+    const evento = [...mapa.historico].reverse()[0];
+    const local = new Date(evento.em);
+    const v = c.value as Date;
+    expect([v.getUTCDate(), v.getUTCHours(), v.getUTCMinutes()]).toEqual([local.getDate(), local.getHours(), local.getMinutes()]);
+  });
+
   it('ida e volta com histórico e manutenção aberta', async () => {
     const mapa = { ...comHistorico(), manutencaoAtual: { ...manutencao(0.5), fim: null, texto: '' } };
     const { buffer } = await gerar(mapa);

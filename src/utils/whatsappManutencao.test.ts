@@ -215,6 +215,19 @@ describe('texto do grupo', () => {
   });
 });
 
+describe('cancelar a manutenção', () => {
+  it('os eventos feitos durante ela perdem o vínculo (ela não existe mais)', () => {
+    const base = mapaInicial(INICIO);
+    const { id: salaId, mesas } = base.salas[0];
+    const iniciada = iniciarManutencao(base, INICIO);
+    const comEvento = gravarAlteracao(iniciada, alterarLugarNoMapa(iniciada, salaId, mesas[0].id, 'E1', { operador: 'ANA' }, em('09:15')), em('09:15'));
+    expect(comEvento.historico.some((e) => e.manutencaoId === iniciada.manutencaoAtual!.id)).toBe(true);
+    const cancelada = cancelarManutencao(comEvento);
+    expect(cancelada.historico.length).toBe(comEvento.historico.length);
+    expect(cancelada.historico.some((e) => e.manutencaoId !== undefined)).toBe(false);
+  });
+});
+
 describe('revisão final', () => {
   it('linha 📱: conferidos primeiro, não conferidos no fim', () => {
     const { mapa, vermelho } = montar();

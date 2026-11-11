@@ -211,7 +211,7 @@ export const EscalaBasesHub: React.FC<EscalaBasesHubProps> = ({ onNotify }) => {
           <p>
             Rodízio diário das bases entre os grupos dos supervisores: a cada dia, cada pessoa anda uma base para
             frente, então ninguém repete uma base antes de passar por todas. Mesmas regras do BENZAITEN e da
-            planilha de escala, com tudo salvo apenas no seu navegador.
+            planilha de escala, com tudo salvo no servidor do BenHermes.
           </p>
         </div>
 

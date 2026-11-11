@@ -614,6 +614,15 @@ const abaEstatisticas = (livro: Workbook, e: Estatisticas, mapa: MapaWhatsapp) =
   }
 };
 
+/**
+ * Data de verdade para o Excel, no horário local do evento: o Excel não tem fuso, e o exceljs grava a data
+ * em UTC; então os números do relógio local vão como se fossem UTC (10:00 aqui aparece 10:00 na planilha).
+ */
+const comoDataDoExcel = (iso: string): Date => {
+  const d = new Date(iso);
+  return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds()));
+};
+
 const COLUNAS_HISTORICO = ['Data e hora', 'Tipo', 'Código', 'Operador', 'Equipe', 'Celular', 'Vaga', 'De', 'Para', 'Manutenção'];
 const TIPO_DO_EVENTO: Record<EventoWhatsapp['tipo'], string> = { SITUACAO: 'Situação', OPERADOR: 'Operador', ENTROU: 'Entrou', SAIU: 'Saiu' };
 const comoTexto = (e: EventoWhatsapp, valor: string) => (e.tipo === 'OPERADOR' ? valor : ROTULOS[valor as Situacao] ?? valor);
@@ -628,7 +637,7 @@ const abaHistorico = (livro: Workbook, mapa: MapaWhatsapp, e: Estatisticas) => {
   };
   const eventos = mapa.historico.filter((x) => new Date(x.em).getTime() >= desde).reverse();
   const linhas = eventos.map((x) => [
-    dataCurta(x.em),
+    comoDataDoExcel(x.em),
     TIPO_DO_EVENTO[x.tipo],
     x.codigo,
     x.operador,
@@ -648,6 +657,7 @@ const abaHistorico = (livro: Workbook, mapa: MapaWhatsapp, e: Estatisticas) => {
     rows: linhas.length ? linhas : [COLUNAS_HISTORICO.map(() => '')],
   });
   eventos.forEach((x, i) => {
+    ws.getCell(i + 2, 1).numFmt = 'dd/mm/yyyy hh:mm';
     if (x.tipo !== 'SITUACAO') return;
     const c = ws.getCell(i + 2, 9);
     c.font = { name: 'Calibri', size: 10, bold: true, color: { argb: corDa(x.para as Situacao) } };
