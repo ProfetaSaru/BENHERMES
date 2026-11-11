@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { BarChart3, Download, FileJson, FileUp, Map as MapIcon, MessageCircle, Upload, Users } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { NotificationState, NotificationType } from '../../types/task';
+import { NotificationType } from '../../types/task';
 import {
   AuthUser,
   UserRole,
@@ -13,7 +13,6 @@ import {
   canImportOverwriteWhatsappMap,
   canManageWhatsappMaintenance,
 } from '../../types/auth';
-import { NotificationToast } from '../common/NotificationToast';
 import { MapaWhatsapp } from '../../types/whatsapp';
 import { useWhatsappBaias } from '../../hooks/useWhatsappBaias';
 import { useFeriados } from '../../hooks/useFeriados';
@@ -37,7 +36,6 @@ import { useChamadosBenCalls } from '../../hooks/useChamadosBenCalls';
 
 interface WhatsappHubProps {
   /** Aviso atual do app: aparece flutuando, porque as ações acontecem em qualquer ponto da página */
-  notification: NotificationState;
   onNotify: (message: string, type?: NotificationType) => void;
   userRole?: UserRole;
   currentUser?: AuthUser | null;
@@ -93,7 +91,6 @@ const Contagens: React.FC<{ resumo: ResumoWhatsapp; celulares?: boolean }> = ({ 
 );
 
 export const WhatsappHub: React.FC<WhatsappHubProps> = ({
-  notification,
   onNotify,
   userRole = 'admin',
   currentUser = null,
@@ -527,11 +524,6 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({
 
       {painel}
 
-      {notification.message && (
-        <div className="wpp-aviso">
-          <NotificationToast message={notification.message} type={notification.type} />
-        </div>
-      )}
     </div>
   );
 };
