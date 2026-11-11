@@ -462,9 +462,12 @@ const abaLista = (livro: Workbook, mapa: MapaWhatsapp) => {
     }
   }
   for (const cel of mapa.celulares) {
+    // Backup de um celular de equipe fica com a Sala e a Equipe dele (para o filtro); guardado fica sem
+    const sala = mapa.salas.find((s) => s.mesas.some((m) => m.id === cel.mesaId));
+    const equipe = sala?.mesas.find((m) => m.id === cel.mesaId);
     for (const vaga of cel.vagas.filter((v) => v.baia === null)) {
       linhas.push({
-        valores: ['Backup', '', '', nomeDoCelular(cel), cel.nomeBackup, textoDoLocal(cel, vaga), ROTULOS[vaga.whatsapp.situacao], desdeOuAte(vaga.whatsapp), vaga.numero],
+        valores: ['Backup', sala?.nome ?? '', equipe?.nome ?? '', nomeDoCelular(cel), cel.nomeBackup, textoDoLocal(cel, vaga), ROTULOS[vaga.whatsapp.situacao], desdeOuAte(vaga.whatsapp), vaga.numero],
         situacao: vaga.whatsapp.situacao,
       });
     }

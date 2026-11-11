@@ -381,6 +381,15 @@ const manutencaoValida = (m: any): boolean =>
   ehTexto(m.observacao) &&
   ehTexto(m.texto);
 
+/** Celular de mesa que não existe fica guardado; vaga ligada a baia que não existe vira backup */
+const ligacoesValidas = (salas: Sala[], celulares: MapaWhatsapp['celulares']): MapaWhatsapp['celulares'] =>
+  celulares.map((c) => {
+    const mesa = salas.flatMap((s) => s.mesas).find((m) => m.id === c.mesaId);
+    if (!mesa) return c.mesaId === null && c.vagas.every((v) => v.baia === null) ? c : { ...c, mesaId: null, vagas: c.vagas.map((v) => ({ ...v, baia: null })) };
+    const ativas = new Set(posicoesAtivas(mesa));
+    return c.vagas.every((v) => !v.baia || ativas.has(v.baia)) ? c : { ...c, vagas: c.vagas.map((v) => (v.baia && !ativas.has(v.baia) ? { ...v, baia: null } : v)) };
+  });
+
 /**
  * Valida a estrutura e devolve só os campos do mapa. Versão 1 → 2 → 3; da 2 para a 3 o histórico
  * começa vazio, contando de `agora`.
@@ -409,7 +418,7 @@ const lerMapa = (bruto: any, agora: Date): MapaWhatsapp => {
   return {
     versao: 3,
     salas: dados.salas,
-    celulares: dados.celulares,
+    celulares: ligacoesValidas(dados.salas, dados.celulares),
     historico: dados.historico,
     manutencoes: dados.manutencoes,
     manutencaoAtual: dados.manutencaoAtual,

@@ -139,6 +139,17 @@ describe('planilha nova', () => {
     ]);
   });
 
+  it('Lista: backup de celular de uma equipe traz a Sala e a Equipe; o guardado fica sem', async () => {
+    const { livro } = await gerar(mapa);
+    const ws = livro.getWorksheet('Lista')!;
+    const linhas: string[][] = [];
+    ws.eachRow((r) => linhas.push((r.values as any[]).slice(1, 10).map((v) => (v == null ? '' : String(v)))));
+    const backupAzul = linhas.find((l) => l[0] === 'Backup' && /Azul/.test(l[3]))!;
+    const backupPreto = linhas.find((l) => l[0] === 'Backup' && /Preto|Reserva/.test(l[3]))!;
+    expect([backupAzul[1], backupAzul[2]]).toEqual([mapa.salas[0].nome, mapa.salas[0].mesas[0].nome]);
+    expect([backupPreto[1], backupPreto[2]]).toEqual(['', '']);
+  });
+
   it('ida e volta: importar a planilha baixada devolve o mesmo mapa', async () => {
     const { buffer } = await gerar(mapa);
     expect(lerArquivoDoMapa(XLSX.read(buffer, { type: 'array' }), AGORA).mapa).toEqual(mapa);

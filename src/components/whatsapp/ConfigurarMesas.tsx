@@ -19,7 +19,7 @@ import {
   siglaValida,
 } from '../../utils/whatsappBaias';
 import { MapaMesa } from './MapaMesa';
-import { limparLigacoes, nomeDoCelular, removerMesaComCelulares, transferirSituacoes } from '../../utils/celulares';
+import { limparLigacoes, nomeDoCelular, removerMesaComCelulares, transferirSituacoes, vagasQueViramBackup } from '../../utils/celulares';
 
 interface ConfigurarMesasProps {
   mapa: MapaWhatsapp;
@@ -147,12 +147,25 @@ export const ConfigurarMesas: React.FC<ConfigurarMesasProps> = ({
     // Só o que mudou no rascunho: o que mudou no painel enquanto ele estava aberto (ex.: supervisor) continua
     const dados = mesclarRascunhoDaMesa(edicao.inicial ?? original, rascunho, original);
     const { mesa, removidos } = formatarMesa(original, { ...dados, nome: dados.nome.trim(), supervisorUserId: dados.supervisorUserId ?? null }, agora());
+    // Vagas de celular ligadas a baias que deixaram de existir viram backup
+    const depois = transferirSituacoes(mapa, limparLigacoes(alterarMesaNoMapa(mapa, salaId, mesa.id, () => mesa, agora())), agora());
     const linhas = avisoDeRemocao(removidos, { ...original, sigla: mesa.sigla });
-    if (linhas.length > 0 && !window.confirm(`Estas baias deixam de existir:\n${linhas.join('\n')}\n\nSalvar mesmo assim?`)) {
+    const backups = vagasQueViramBackup(mapa, depois);
+    if (
+      (linhas.length > 0 || backups.length > 0) &&
+      !window.confirm(
+        [
+          linhas.length ? `Estas baias deixam de existir:\n${linhas.join('\n')}` : '',
+          backups.length ? `Estas vagas de celular viram backup:\n${backups.join('\n')}` : '',
+          'Salvar mesmo assim?',
+        ]
+          .filter(Boolean)
+          .join('\n\n')
+      )
+    ) {
       return;
     }
-    // Vagas de celular ligadas a baias que deixaram de existir viram backup
-    onMapa(transferirSituacoes(mapa, limparLigacoes(alterarMesaNoMapa(mapa, salaId, mesa.id, () => mesa, agora())), agora()));
+    onMapa(depois);
     onNotify(`Mesa ${mesa.nome} salva.`, 'success');
     setEdicao(null);
   };
@@ -160,15 +173,22 @@ export const ConfigurarMesas: React.FC<ConfigurarMesasProps> = ({
   const removerMesa = () => {
     if (!edicao || edicao.nova) return;
     const celulares = mapa.celulares.filter((c) => c.mesaId === edicao.rascunho.id).map(nomeDoCelular);
-    const aviso = celulares.length ? `\n\nOs celulares ${celulares.join(', ')} ficam guardados (sem equipe).` : '';
+    const depois = removerMesaComCelulares(mapa, edicao.salaId, edicao.rascunho.id, agora());
+    const backups = vagasQueViramBackup(mapa, depois);
+    const aviso =
+      (celulares.length ? `\n\nOs celulares ${celulares.join(', ')} ficam guardados (sem equipe).` : '') +
+      (backups.length ? `\n\nEstas vagas viram backup:\n${backups.join('\n')}` : '');
     if (!window.confirm(`Remover a mesa ${edicao.rascunho.nome} e todos os lugares dela?${aviso}`)) return;
-    onMapa(removerMesaComCelulares(mapa, edicao.salaId, edicao.rascunho.id, agora()));
+    onMapa(depois);
     setEdicao(null);
   };
 
   const removerSala = (salaId: string, nome: string, mesas: number) => {
-    if (!window.confirm(`Remover a sala ${nome}${mesas ? ` e as ${mesas} mesa(s) dela` : ''}?`)) return;
-    onMapa(transferirSituacoes(mapa, limparLigacoes(removerSalaNoMapa(mapa, salaId, agora())), agora()));
+    const depois = transferirSituacoes(mapa, limparLigacoes(removerSalaNoMapa(mapa, salaId, agora())), agora());
+    const backups = vagasQueViramBackup(mapa, depois);
+    const aviso = backups.length ? `\n\nEstas vagas de celular viram backup (e os celulares ficam guardados):\n${backups.join('\n')}` : '';
+    if (!window.confirm(`Remover a sala ${nome}${mesas ? ` e as ${mesas} mesa(s) dela` : ''}?${aviso}`)) return;
+    onMapa(depois);
     if (edicao?.salaId === salaId) setEdicao(null);
   };
 

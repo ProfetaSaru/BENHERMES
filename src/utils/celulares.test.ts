@@ -10,6 +10,8 @@ import {
   ligarBaia,
   mudarEquipe,
   mudarMarcaOuUsuarios,
+  perfilPadraoDoCelular,
+  vagasQueViramBackup,
   nomeDaVaga,
   nomeDoCelular,
   novoCelular,
@@ -21,7 +23,7 @@ import {
   transferirSituacoes,
   vagasDaMarca,
 } from './celulares';
-import { estado, formatarMesa, alterarMesaNoMapa, mapaInicial, novaMesa } from './whatsappBaias';
+import { estado, formatarMesa, alterarMesaNoMapa, mapaInicial, novaMesa, removerSalaNoMapa } from './whatsappBaias';
 
 const AGORA = new Date('2026-10-27T10:00:00');
 const NOMES = ['ANA', 'BIA', 'CAIO', 'DUDA', 'EVA', 'FABIO', 'GABI', 'HUGO'];
@@ -125,6 +127,40 @@ describe('ligar, mudar e remover', () => {
     expect(novo.vagas).toHaveLength(12);
     expect(novo.vagas[2]).toEqual(comNumero.vagas[2]);
     expect(novo.usuarios).toBe(3);
+  });
+
+  it('Outro com duas vagas iguais (mesmo grupo e rótulo): ao virar Samsung, uma fica e a outra aparece nas removidas', () => {
+    const mapa = montarMapa();
+    const { celular } = criar(mapa, 'OUTRO', mapa.salas[0].mesas[0].id);
+    const comDuas = adicionarVaga(adicionarVaga(celular, { grupo: 'Clonado', app: 'MESSENGER', rotulo: 'Messenger 1' }, AGORA), { grupo: 'Clonado', app: 'MESSENGER', rotulo: 'Messenger 1' }, AGORA);
+    const [primeira, segunda] = comDuas.vagas;
+    const { celular: novo, removidas } = mudarMarcaOuUsuarios(comDuas, 'SAMSUNG', 1, AGORA);
+    expect(novo.vagas.find((v) => v.grupo === 'Clonado' && v.rotulo === 'Messenger 1')!.id).toBe(primeira.id);
+    expect(removidas.map((v) => v.id)).toEqual([segunda.id]);
+  });
+
+  it('lista as vagas que viram backup (para as confirmações de salvar mesa e remover sala)', () => {
+    const base = montarMapa();
+    const op1 = base.salas[0].mesas[0];
+    const { celular, mapa } = criar(base, 'SAMSUNG', op1.id);
+    const ligadas = celular.vagas.filter((v) => v.baia);
+    expect(ligadas.length).toBeGreaterThan(0);
+    const semSala = limparLigacoes(removerSalaNoMapa(mapa, mapa.salas[0].id, AGORA));
+    expect(vagasQueViramBackup(mapa, semSala)).toEqual(ligadas.map((v) => `${textoDoLocal(celular, v)} (era OP1-${v.baia})`));
+    expect(vagasQueViramBackup(mapa, mapa)).toEqual([]);
+  });
+
+  it('novo celular aceita compartilhado e nome do backup do formulário (padrão: o da equipe)', () => {
+    const mapa = montarMapa();
+    const op1 = mapa.salas[0].mesas[0];
+    expect(perfilPadraoDoCelular(mapa, op1.id)).toEqual({ compartilhado: false, nomeBackup: 'Benconsig Comercial' });
+    const c = novoCelular(
+      { cor: 'Azul', hex: corDaCapinha('Azul'), apelido: '', marca: 'SAMSUNG', usuarios: 1, mesaId: op1.id, compartilhado: true, nomeBackup: 'Backup do Caio' },
+      mapa,
+      AGORA
+    );
+    expect(c).toMatchObject({ compartilhado: true, nomeBackup: 'Backup do Caio' });
+    expect(c.vagas.every((v) => v.baia === null)).toBe(true);
   });
 
   it('mudar de equipe refaz a ligação; guardar deixa tudo backup', () => {

@@ -1708,3 +1708,12 @@
 .wpp-painel:focus {
   outline: none;
 }
+
+/* Caixa de marcar no formulário do celular novo */
+.wpp-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--ink);
+}

@@ -232,6 +232,21 @@ describe('arquivo do mapa (.json)', () => {
     }
   });
 
+  it('importar limpa ligações de vaga para baia ou mesa que não existem', () => {
+    const m: MapaWhatsapp = structuredClone(mapa);
+    const op1 = m.salas[0].mesas[0];
+    const cel = novoCelular({ cor: 'Azul', hex: '#1E40AF', apelido: '', marca: 'SAMSUNG', usuarios: 1, mesaId: op1.id }, m, AGORA);
+    cel.vagas[0].baia = 'E99';
+    const orfao = { ...novoCelular({ cor: 'Preto', hex: '#000000', apelido: '', marca: 'IPHONE', usuarios: 1, mesaId: null }, m, AGORA), mesaId: 'mesa-apagada' };
+    orfao.vagas[0].baia = 'E1';
+    m.celulares = [cel, orfao];
+    const lido = importarMapa(exportarMapa(m, AGORA), AGORA);
+    expect(lido.celulares[0].vagas[0].baia).toBeNull();
+    expect(lido.celulares[0].mesaId).toBe(op1.id);
+    expect(lido.celulares[1]).toMatchObject({ mesaId: null });
+    expect(lido.celulares[1].vagas[0].baia).toBeNull();
+  });
+
   it('dados salvos ilegíveis são sinalizados para guardar uma cópia antes de sobrescrever', () => {
     expect(lerMapaSalvo('lixo', AGORA).ilegivel).toBe(true);
     expect(lerMapaSalvo('{"versao":2}', AGORA).ilegivel).toBe(true);
