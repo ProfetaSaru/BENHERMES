@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ConfigRanking } from '../../types/ranking';
-import { diasUteis, gerarRelatorio, lerEsteira, normalizar, numeroBr, qualEsteira } from './calculo';
+import { diasUteis, gerarRelatorio, lerEsteira, normalizar, numeroBr, qualEsteira, separarEsteiras } from './calculo';
 
 const FERIADOS = ['2026-11-02', '2026-11-20'];
 const DIA = '2026-11-11';
@@ -15,7 +15,7 @@ const CONFIG: ConfigRanking = {
   feriados: FERIADOS,
   vendedores_clt: ['brúno'],
   supervisores_clt: [],
-  renomear_supervisores: { 'ROBSON - URA': 'ROBSON PAULINO' },
+  renomear_supervisores: { 'CAIO - URA': 'CAIO RAMOS' },
   funcionarios_ativos: ['Ana', 'BRUNO', 'carla', 'DIEGO', 'EVA'],
   ia: { usar_chatgpt: true, usar_claude: true },
 };
@@ -28,16 +28,16 @@ const PAGAMENTO = csv(
   '1;Pago;PORTABILIDADE;ANA - 10;EQUIPE A;100.000,00',
   '2;Pago;PORTABILIDADE;BRUNO - 11;EQUIPE A;200.000,00',
   '3;Pago;CARTAO;BRUNO - 11;EQUIPE A;5.000,00',
-  '4;Pago;CARTAO BENEFICIO;EVA - 14;  robson - ura ;2.000,00',
-  '5;Pago;PORTABILIDADE;FABIO - 15;ROBSON - URA;50.000,00',
+  '4;Pago;CARTAO BENEFICIO;EVA - 14;  caio - ura ;2.000,00',
+  '5;Pago;PORTABILIDADE;FABIO - 15;CAIO - URA;50.000,00',
   '6;Reprovado;PORTABILIDADE;ANA - 10;EQUIPE A;999.999,00'
 );
 // Andamento: proposta 1 repetida (ignorada), ANA 20 mil, CARLA 5 mil, DIEGO 3 mil (DIEGO aparece por último)
 const ANDAMENTO = csv(
   '1;Andamento;PORTABILIDADE;ANA - 10;EQUIPE A;100.000,00',
   '7;Andamento;PORTABILIDADE;ANA - 10;EQUIPE A;20.000,00',
-  '8;Andamento;PORTABILIDADE;CARLA - 12;ROBSON - URA;5.000,00',
-  '9;Andamento;PORTABILIDADE;DIEGO - 13;ROBSON - URA;3.000,00'
+  '8;Andamento;PORTABILIDADE;CARLA - 12;CAIO - URA;5.000,00',
+  '9;Andamento;PORTABILIDADE;DIEGO - 13;CAIO - URA;3.000,00'
 );
 
 const relatorio = () => gerarRelatorio(lerEsteira(ANDAMENTO).linhas, lerEsteira(PAGAMENTO).linhas, CONFIG, DIA);
@@ -54,7 +54,7 @@ describe('utilidades', () => {
     expect(numeroBr('11233.99')).toBeCloseTo(11233.99, 2);
     expect(numeroBr('')).toBe(0);
     expect(numeroBr(undefined)).toBe(0);
-    expect(normalizar(' Stéphanny   marlene ')).toBe('STEPHANNY MARLENE');
+    expect(normalizar(' Débora   lúcia ')).toBe('DEBORA LUCIA');
   });
 });
 
@@ -71,6 +71,25 @@ describe('leitura das esteiras', () => {
     expect(lerEsteira('Proposta;Etapa;Produto;Agente;Equipe\n1;Pago;P;A;E').faltando).toEqual(['Valor Contrato']);
     expect(qualEsteira(lerEsteira(ANDAMENTO).linhas)).toBe('andamento');
     expect(qualEsteira(lerEsteira(CAB).linhas)).toBeNull();
+  });
+});
+
+describe('qual é cada esteira (Review final #1)', () => {
+  const esteira = (etapas: string[]) => etapas.map((Etapa, i) => ({ Proposta: String(i), Etapa }));
+
+  it('a esteira de Andamento com alguns "Pago" continua sendo de andamento (etapa que mais aparece)', () => {
+    expect(qualEsteira(esteira(['Andamento', 'Andamento', 'Pago', 'Cancelado']))).toBe('andamento');
+    expect(qualEsteira(esteira(['Pago', 'Pago', 'Andamento', 'Reprovado']))).toBe('pagamento');
+  });
+
+  it('as duas juntas: a que tem mais Andamento proporcionalmente é a de andamento', () => {
+    const andamento = { nome: 'a.csv', linhas: esteira(['Pago', 'Pago', 'Andamento', 'Cancelado']) };
+    const pagamento = { nome: 'p.csv', linhas: esteira(['Pago', 'Pago', 'Pago', 'Pago', 'Reprovado']) };
+    expect(separarEsteiras([pagamento, andamento]).map((e) => [e.nome, e.tipo])).toEqual([
+      ['p.csv', 'pagamento'],
+      ['a.csv', 'andamento'],
+    ]);
+    expect(separarEsteiras([andamento]).map((e) => e.tipo)).toEqual(['pagamento']);
   });
 });
 
@@ -100,13 +119,13 @@ describe('ranking', () => {
   });
 
   it('supervisores pela equipe, renomeados sem diferenciar maiúsculas e espaços', () => {
-    const [a, robson] = relatorio().supervisores;
-    expect([a.posicao, a.nome, robson.posicao, robson.nome]).toEqual(['1º', 'EQUIPE A', '2º', 'ROBSON PAULINO']);
+    const [a, caio] = relatorio().supervisores;
+    expect([a.posicao, a.nome, caio.posicao, caio.nome]).toEqual(['1º', 'EQUIPE A', '2º', 'CAIO RAMOS']);
     expect(a.potencial).toBeCloseTo(1770, 6);
-    expect(robson.portabilidade).toBe(50000);
-    expect(robson.andamento).toBe(8000);
-    expect(robson.margemCartao).toBe(1);
-    expect(robson.potencial).toBeCloseTo(309, 6);
+    expect(caio.portabilidade).toBe(50000);
+    expect(caio.andamento).toBe(8000);
+    expect(caio.margemCartao).toBe(1);
+    expect(caio.potencial).toBeCloseTo(309, 6);
   });
 
   it('total geral', () => {

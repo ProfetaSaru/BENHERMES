@@ -20,7 +20,7 @@ import {
 import { NotificationType } from '../../types/task';
 import { ProvedorComentarios, RegistroRanking, RelatorioRanking } from '../../types/ranking';
 import { useRanking } from '../../hooks/useRanking';
-import { gerarRelatorio, lerEsteira, qualEsteira } from '../../utils/ranking/calculo';
+import { gerarRelatorio, lerEsteira, qualEsteira, separarEsteiras } from '../../utils/ranking/calculo';
 import { carregarTemplateRanking, gerarPlanilhaRanking, nomeDaPlanilhaRanking } from '../../utils/ranking/planilha';
 import { legendaDoDia } from '../../utils/ranking/legenda';
 import { conferirFrases, descrever } from '../../../server/ranking/frases';
@@ -36,9 +36,8 @@ interface RankingHubProps {
 
 type TipoEsteira = 'andamento' | 'pagamento';
 
-interface Esteira {
+interface Arquivo {
   nome: string;
-  tipo: TipoEsteira;
   linhas: Record<string, string>[];
 }
 
@@ -66,7 +65,7 @@ export const RankingHub: React.FC<RankingHubProps> = ({ onNotify, usuario }) => 
   const ranking = useRanking();
   const { config } = ranking;
 
-  const [esteiras, setEsteiras] = useState<Esteira[]>([]);
+  const [arquivos, setArquivos] = useState<Arquivo[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [dia, setDia] = useState<string>(hojeIso);
   const [relatorio, setRelatorio] = useState<RelatorioRanking | null>(null);
@@ -91,6 +90,8 @@ export const RankingHub: React.FC<RankingHubProps> = ({ onNotify, usuario }) => 
     else onNotify(texto, 'success');
   };
 
+  // As duas esteiras são separadas juntas: a com mais "Andamento" proporcionalmente é a de andamento
+  const esteiras = useMemo(() => separarEsteiras(arquivos), [arquivos]);
   const faltando = (['andamento', 'pagamento'] as const).filter((t) => !esteiras.some((e) => e.tipo === t));
   const registroDoDia = ranking.historico.find((h) => h.dia === dia);
 
@@ -107,7 +108,12 @@ export const RankingHub: React.FC<RankingHubProps> = ({ onNotify, usuario }) => 
         avisar(`${arquivo.name}: não encontrei contratos "Pago" nem "Andamento" na coluna Etapa.`, 'erro');
         continue;
       }
-      setEsteiras((atuais) => [...atuais.filter((e) => e.tipo !== tipo), { nome: arquivo.name, tipo, linhas }]);
+      // Troca a esteira do mesmo tipo (ou o arquivo de mesmo nome) e fica com no máximo duas
+      setArquivos((atuais) => {
+        const tipos = separarEsteiras(atuais);
+        const ficam = atuais.filter((a) => a.nome !== arquivo.name && tipos.find((t) => t.nome === a.nome)?.tipo !== tipo);
+        return [...ficam.slice(-1), { nome: arquivo.name, linhas }];
+      });
     }
   };
 
@@ -182,8 +188,9 @@ export const RankingHub: React.FC<RankingHubProps> = ({ onNotify, usuario }) => 
 
   /** Atualiza o registro aberto no histórico (frases refeitas ou legenda final) */
   const atualizarRegistro = async (mudancas: Partial<RegistroRanking>) => {
-    const atual = ranking.historico.find((h) => h.id === registroId);
-    if (atual) await guardar({ ...atual, ...mudancas });
+    if (!registroId) return;
+    const falha = await ranking.atualizarNoHistorico(registroId, mudancas);
+    if (falha) avisar(`Não foi possível atualizar o histórico: ${falha}`, 'erro');
   };
 
   const handleRefazer = async () => {
@@ -220,8 +227,7 @@ export const RankingHub: React.FC<RankingHubProps> = ({ onNotify, usuario }) => 
     setCopiado(true);
     window.setTimeout(() => setCopiado(false), 2000);
     onNotify('Legenda copiada! É só colar no grupo.', 'success');
-    const atual = ranking.historico.find((h) => h.id === registroId);
-    if (atual && atual.legenda !== legenda) await atualizarRegistro({ legenda });
+    await atualizarRegistro({ legenda });
   };
 
   const handleOutraVersao = () => {
@@ -346,7 +352,7 @@ export const RankingHub: React.FC<RankingHubProps> = ({ onNotify, usuario }) => 
       {esteiras.length > 0 && (
         <div className="ura-arquivos">
           {esteiras.map((e) => (
-            <div key={e.tipo} className="ura-arquivo">
+            <div key={e.nome} className="ura-arquivo">
               <FileSpreadsheet size={18} />
               <div>
                 <strong>{e.nome}</strong>
@@ -357,7 +363,7 @@ export const RankingHub: React.FC<RankingHubProps> = ({ onNotify, usuario }) => 
               <button
                 type="button"
                 className="ura-arquivo-remover"
-                onClick={() => setEsteiras((atuais) => atuais.filter((x) => x.tipo !== e.tipo))}
+                onClick={() => setArquivos((atuais) => atuais.filter((x) => x.nome !== e.nome))}
                 title="Remover"
               >
                 <X size={16} />

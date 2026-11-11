@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ConfigRanking, ProvedorComentarios, RegistroRanking, StatusIa } from '../types/ranking';
 import type { Descricao } from '../../server/ranking/frases';
 import { apiRequest } from '../utils/apiClient';
+import { criarHistoricoRanking } from './rankingHistorico';
 
 /** Configuração, histórico e IAs do ranking, guardados no servidor (rotas só do Admin) */
 export function useRanking() {
@@ -10,6 +11,15 @@ export function useRanking() {
   const [statusIa, setStatusIa] = useState<StatusIa | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erroDeCarga, setErroDeCarga] = useState('');
+  // Gravações do histórico em fila, sempre sobre a lista mais recente (ver rankingHistorico.ts)
+  const historicoRef = useRef(
+    criarHistoricoRanking(
+      [],
+      async (lista) =>
+        (await apiRequest<{ historico: RegistroRanking[] }>('/api/ranking/historico', { method: 'PUT', body: { historico: lista } })).historico,
+      setHistorico
+    )
+  );
 
   useEffect(() => {
     let ativo = true;
@@ -21,7 +31,7 @@ export function useRanking() {
       .then(([c, h, ia]) => {
         if (!ativo) return;
         setConfig(c.config ?? null);
-        setHistorico(Array.isArray(h.historico) ? h.historico : []);
+        historicoRef.current.definir(Array.isArray(h.historico) ? h.historico : []);
         setStatusIa(ia);
       })
       .catch((err: any) => {
@@ -46,23 +56,13 @@ export function useRanking() {
     }
   }, []);
 
-  const gravarHistorico = useCallback(async (lista: RegistroRanking[]): Promise<string> => {
-    try {
-      const r = await apiRequest<{ historico: RegistroRanking[] }>('/api/ranking/historico', { method: 'PUT', body: { historico: lista } });
-      setHistorico(r.historico);
-      return '';
-    } catch (err: any) {
-      return err?.message || 'Não foi possível salvar o histórico.';
-    }
-  }, []);
-
-  /** Mesma data substitui o registro anterior (a confirmação é da tela) */
-  const salvarNoHistorico = useCallback(
-    (registro: RegistroRanking) => gravarHistorico([registro, ...historico.filter((h) => h.dia !== registro.dia && h.id !== registro.id)]),
-    [gravarHistorico, historico]
+  /** Devolvem '' quando gravou ou a mensagem de erro. Mesma data substitui (a confirmação é da tela) */
+  const salvarNoHistorico = useCallback((registro: RegistroRanking) => historicoRef.current.salvar(registro), []);
+  const removerDoHistorico = useCallback((id: string) => historicoRef.current.remover(id), []);
+  const atualizarNoHistorico = useCallback(
+    (id: string, mudancas: Partial<RegistroRanking>) => historicoRef.current.atualizar(id, mudancas),
+    []
   );
-
-  const removerDoHistorico = useCallback((id: string) => gravarHistorico(historico.filter((h) => h.id !== id)), [gravarHistorico, historico]);
 
   const pedirComentarios = useCallback(
     (entrada: { vendedores: Descricao[]; supervisores: Descricao[] }) =>
@@ -73,5 +73,5 @@ export function useRanking() {
     []
   );
 
-  return { config, salvarConfig, historico, salvarNoHistorico, removerDoHistorico, statusIa, carregando, erroDeCarga, pedirComentarios };
+  return { config, salvarConfig, historico, salvarNoHistorico, removerDoHistorico, atualizarNoHistorico, statusIa, carregando, erroDeCarga, pedirComentarios };
 }

@@ -74,11 +74,40 @@ export const lerEsteira = (texto: string): { linhas: Record<string, string>[]; f
 };
 
 /** Qual das duas esteiras é: a de pagamento tem contratos "Pago"; a de andamento, "Andamento" */
+const contarEtapas = (linhas: Record<string, string>[]) => {
+  let pago = 0;
+  let andamento = 0;
+  for (const l of linhas) {
+    const etapa = (l.Etapa ?? '').trim();
+    if (etapa === 'Pago') pago++;
+    else if (etapa === 'Andamento') andamento++;
+  }
+  return { pago, andamento };
+};
+
+/** A etapa que mais aparece decide (a esteira de Andamento pode ter alguns "Pago" e vice-versa) */
 export const qualEsteira = (linhas: Record<string, string>[]): 'pagamento' | 'andamento' | null => {
-  const etapas = new Set(linhas.map((l) => (l.Etapa ?? '').trim()));
-  if (etapas.has('Pago')) return 'pagamento';
-  if (etapas.has('Andamento')) return 'andamento';
-  return null;
+  const { pago, andamento } = contarEtapas(linhas);
+  if (pago === 0 && andamento === 0) return null;
+  return pago >= andamento ? 'pagamento' : 'andamento';
+};
+
+/**
+ * Com as duas esteiras juntas, a que tem mais "Andamento" proporcionalmente é a de andamento e a outra a de
+ * pagamento. Sozinha (ou empatadas), vale a etapa que mais aparece. Arquivos sem nenhuma das duas ficam fora.
+ */
+export const separarEsteiras = <T extends { linhas: Record<string, string>[] }>(arquivos: T[]): (T & { tipo: 'pagamento' | 'andamento' })[] => {
+  if (arquivos.length === 2) {
+    const fracao = arquivos.map((a) => contarEtapas(a.linhas).andamento / Math.max(1, a.linhas.length));
+    if (fracao[0] !== fracao[1] && arquivos.every((a) => qualEsteira(a.linhas) !== null)) {
+      const iAndamento = fracao[0] > fracao[1] ? 0 : 1;
+      return arquivos.map((a, i) => ({ ...a, tipo: i === iAndamento ? ('andamento' as const) : ('pagamento' as const) }));
+    }
+  }
+  return arquivos.flatMap((a) => {
+    const tipo = qualEsteira(a.linhas);
+    return tipo ? [{ ...a, tipo }] : [];
+  });
 };
 
 // ---------------------------------------------------------------------------

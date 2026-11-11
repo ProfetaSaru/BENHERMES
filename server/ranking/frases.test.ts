@@ -13,12 +13,12 @@ const linha = (nome: string, posicao: string, projetando: number, portabilidade 
 describe('descrever (o que vai para a IA)', () => {
   it('primeiro nome sem o emoji, posição de N, projetando com 2 casas, situação e esteira', () => {
     const [a, b, c, d] = descrever([
-      linha('AMANDA ALVES DA SILVA   🏆', '1º', 1.4567, 200000, 60000, 2),
+      linha('BEATRIZ COSTA LIMA   🏆', '1º', 1.4567, 200000, 60000, 2),
       linha('BRUNO', '2º', 0.75, 100000, 1000),
       linha('CARLA SOUZA', '3º', 0.2, 30000),
       linha('DIEGO', '4º', 0, 0),
     ]);
-    expect(a).toEqual({ nome: 'Amanda', posicao: '1º de 4', projetando: 1.46, situacao: 'batendo a meta', esteira: 'esteira em andamento cheia', vendeu_cartao_ou_margem: true });
+    expect(a).toEqual({ nome: 'Beatriz', posicao: '1º de 4', projetando: 1.46, situacao: 'batendo a meta', esteira: 'esteira em andamento cheia', vendeu_cartao_ou_margem: true });
     expect([b.situacao, b.esteira]).toEqual(['perto da meta', 'pouca coisa em andamento']);
     expect([c.nome, c.situacao, c.esteira]).toEqual(['Carla', 'abaixo da meta', 'esteira vazia']);
     expect(d.situacao).toBe('sem nenhum contrato pago');
@@ -44,6 +44,15 @@ describe('conferência das frases', () => {
     expect(comNumero.trocadas).toBe(1);
     expect(fraseValida(comNumero.frases[0])).toBe(true);
     expect(comNumero.frases[0].startsWith('Ana')).toBe(true);
+  });
+
+  it('frase de outra pessoa (IA trocou a ordem) é trocada por pronta (Review final #2)', () => {
+    const ds = descrever([linha('ANA', '1º', 1.2), linha('BRUNO', '2º', 0.2), linha('JOSÉ CARLOS', '3º', 0.1)]);
+    const { frases, trocadas } = conferirFrases(ds, ['Bruno, acorde e venda.', 'Ana, siga no topo.', 'jose, levante a cabeça.']);
+    expect(trocadas).toBe(2);
+    expect(frases[0].startsWith('Ana,')).toBe(true);
+    expect(frases[1].startsWith('Bruno,')).toBe(true);
+    expect(frases[2]).toBe('jose, levante a cabeça.');
   });
 
   it('lista de frases menor que a de pessoas: completa com prontas', () => {

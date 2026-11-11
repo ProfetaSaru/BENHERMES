@@ -142,7 +142,7 @@ configuração → aviso, valor não perdido na tela.
 ## 11. Testes
 
 - Cálculo (fictício): dias úteis de 11/2026 = (6, 19); margem/cartão fora da portabilidade; proposta repetida;
-  empate e posição compartilhada; só ativos; renomear supervisor (`ROBSON - URA`); emoji ≥ 133%; faixas do
+  empate e posição compartilhada; só ativos; renomear supervisor (`CAIO - URA`); emoji ≥ 133%; faixas do
   potencial; total geral.
 - **Golden** (`RANKING_GOLDEN_DIR` com as duas esteiras e o esperado): posições, nomes e valores (±0,01) iguais ao
   oficial de 11/11/2026; pulado sem a pasta.

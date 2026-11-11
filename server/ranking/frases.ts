@@ -181,7 +181,18 @@ export const frasePronta = (d: Descricao, indice: number, total: number, usadas:
   return banco[faixa][0].replace('{n}', d.nome);
 };
 
-/** Mantém as frases válidas e diferentes entre si; troca as outras (e as que faltam) por prontas */
+const semAcento = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
+
+/** A frase é desta pessoa: começa pelo primeiro nome dela (sem diferenciar maiúsculas e acentos) */
+const comecaPeloNome = (frase: string, nome: string): boolean => {
+  const primeira = frase.trim().split(/[\s,;:.!?]+/)[0] ?? '';
+  return semAcento(primeira) === semAcento(nome);
+};
+
+/**
+ * Mantém as frases válidas, diferentes entre si e que começam pelo nome da pessoa certa; troca as outras
+ * (e as que faltam) por prontas
+ */
 export const conferirFrases = (
   descricoes: Descricao[],
   frases: string[],
@@ -193,7 +204,7 @@ export const conferirFrases = (
   const saida = descricoes.map((d, i) => {
     const f = (frases[i] ?? '').replace(/\s+/g, ' ').trim();
     const chave = f.toLocaleLowerCase('pt-BR');
-    if (fraseValida(f) && !vistas.has(chave)) {
+    if (fraseValida(f) && !vistas.has(chave) && comecaPeloNome(f, d.nome)) {
       vistas.add(chave);
       return f;
     }

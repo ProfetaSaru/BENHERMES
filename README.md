@@ -227,7 +227,7 @@ preencha os campos e **Salvar**. A configuração fica no servidor e vale para q
 | **Funcionários ativos** | Só quem está aqui entra no ranking (um nome por linha, como vem na esteira) |
 | **Vendedores / Supervisores CLT** | Quem usa as metas CLT; os outros usam as de estágio |
 | **Feriados** | Dias que não contam como dia útil (`AAAA-MM-DD`) |
-| **Renomear supervisores** | `COMO VEM NA ESTEIRA = COMO APARECE` (ex.: `ROBSON - URA = ROBSON PAULINO`) |
+| **Renomear supervisores** | `COMO VEM NA ESTEIRA = COMO APARECE` (ex.: `CAIO - URA = CAIO RAMOS`) |
 | **Emoji do destaque** | Vai ao lado do nome de quem passa de 133% da meta |
 
 **Exportar** baixa o `config.json` com o que está salvo.

@@ -23,7 +23,7 @@
 ## Review Focus
 
 1. **Relatório no 1º dia útil do mês** — a macro conta o mês anterior inteiro (`dias_uteis(2026-12-01) = (19, 19)`), sem divisão por zero; teste na Task 1.
-2. **Nomes da configuração com acento ou minúsculas** ("stéphanny marlene firmo dos santos") batem com a esteira normalizada (vendedor CLT, ativo, renomear); teste na Task 1.
+2. **Nomes da configuração com acento ou minúsculas** ("débora lúcia dos anjos") batem com a esteira normalizada (vendedor CLT, ativo, renomear); teste na Task 1.
 3. **Cabeçalho da esteira com BOM e espaços** ("﻿Proposta", "Etapa " com espaço, "Pago " com espaço) é lido normalmente; teste na Task 1.
 4. **IA repete frase para empatados ou devolve frase de outra pessoa** — frases duplicadas no mesmo ranking são trocadas por prontas; teste na Task 3.
 5. **Histórico reaberto depois de mudar as metas** — a planilha baixada de novo usa os valores guardados, sem recalcular; teste na Task 2.
@@ -45,13 +45,13 @@
 
 - [ ] **Step 1: Failing tests** (`calculo.test.ts`, config fictícia com metas do `config.json` do pacote e nomes ANA, BRUNO, CARLA, DIEGO, EVA; equipes "EQUIPE A"/"EQUIPE B"):
   - `diasUteis('2026-11-11', ['2026-11-02','2026-11-20'])` → `[6, 19]`; `diasUteis('2026-12-01', idem)` → `[19, 19]` (Review Focus 1).
-  - `numeroBr('11.233,99')` → 11233.99; `''` → 0; `normalizar(' Stéphanny  ')` → `'STEPHANNY'`.
+  - `numeroBr('11.233,99')` → 11233.99; `''` → 0; `normalizar(' Débora  ')` → `'DEBORA'`.
   - `lerEsteira` com BOM e cabeçalho `"Etapa "` lê a coluna `Etapa`; sem `Valor Contrato` → `faltando: ['Valor Contrato']` (Review Focus 3).
   - `qualEsteira`: linhas com Etapa "Pago" → `'pagamento'`; só "Andamento" → `'andamento'`.
   - Proposta repetida nas duas esteiras conta uma vez (a de pagamento); "Reprovado" ignorado; `MARGEM LIVRE`/`CARTAO` pagos vão para `margemCartao` (quantidade) e não para portabilidade; quem só tem cartão não aparece.
   - Só ativos; vendedor CLT por nome com acento/minúsculas (Review Focus 2); empate: dois com portabilidade 0 → mesma posição (`"3º"`, `"3º"`), e entre empatados vem antes quem apareceu por último na esteira.
   - Projetando, potencial (faixa estágio < 1: taxa 0,001; ≥ 500/350: extra 1000), projeção = port + and/2, elegível pela meta de bônus — valores calculados à mão no teste.
-  - Emoji `"ANA   🏆"` quando projetando ≥ 1,33; renomear `" robson - ura "` → nome configurado.
+  - Emoji `"ANA   🏆"` quando projetando ≥ 1,33; renomear `" caio - ura "` → nome configurado.
   - Total: portabilidade = soma dos supervisores; elegíveis = vendedores + supervisores elegíveis.
   - Títulos e `cabecalhoProjecao` de 11/11/2026: `"RANKING GERAL DE CONTRATOS PAGOS - VENDEDOR - DE 01/11/2026 A 11/11/2026"`, `"PORT. PROJEÇÃO - 18/11/2026"`.
 - [ ] **Step 2:** `npx vitest run src/utils/ranking/calculo.test.ts` → FAIL (módulo não existe).
@@ -94,7 +94,7 @@
   - `conferirFrases(descricoes: Descricao[], frases: string[]): { frases: string[]; trocadas: number }` (troca inválidas e repetidas por prontas).
 - Produces (`config.ts`, sem imports): `validarConfig(bruto: unknown): { config: ConfigRankingServidor } | { erro: string }` (tipos de todos os campos do `config.json`; `ia` ausente → os dois ligados; ignora `_comentario`).
 
-- [ ] **Step 1: Failing tests:** `descrever` (nome "AMANDA ALVES   🏆" → "Amanda"); `fraseValida` recusa "Ana, 3º lugar", "Ana bateu 120%", "R$ 10 mil"; `conferirFrases` com duas frases iguais troca a segunda (Review Focus 4) e troca a com número; `frasePronta` começa pelo nome e não repete em 30 pessoas; `validarConfig` aceita o formato do pacote com nomes fictícios, recusa `metas.clt.meta_vendedor: "450000"` e preenche `ia`.
+- [ ] **Step 1: Failing tests:** `descrever` (nome "BEATRIZ COSTA   🏆" → "Beatriz"); `fraseValida` recusa "Ana, 3º lugar", "Ana bateu 120%", "R$ 10 mil"; `conferirFrases` com duas frases iguais troca a segunda (Review Focus 4) e troca a com número; `frasePronta` começa pelo nome e não repete em 30 pessoas; `validarConfig` aceita o formato do pacote com nomes fictícios, recusa `metas.clt.meta_vendedor: "450000"` e preenche `ia`.
 - [ ] **Step 2:** `npx vitest run server/ranking` → FAIL. **Step 3:** implementar (banco com ≥ 6 frases por faixa × tom). **Step 4:** PASS; `git commit -m "feat(ranking): frases prontas, conferência e validação da configuração"`
 
 ### Task 4: Servidor — cadeia de IAs e rotas

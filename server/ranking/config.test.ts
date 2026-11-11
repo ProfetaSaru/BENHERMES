@@ -12,7 +12,7 @@ const PACOTE = {
   feriados: ['2026-11-02', '2026-11-20'],
   vendedores_clt: ['ANA SOUZA'],
   supervisores_clt: [],
-  renomear_supervisores: { 'ROBSON - URA': 'ROBSON PAULINO' },
+  renomear_supervisores: { 'CAIO - URA': 'CAIO RAMOS' },
   funcionarios_ativos: ['ANA SOUZA', 'BRUNO LIMA'],
 };
 
