@@ -35,3 +35,22 @@ export interface RelatorioRanking {
   tituloSupervisor: string;
   cabecalhoProjecao: string;
 }
+
+export type ProvedorComentarios = 'chatgpt' | 'claude' | 'frases';
+
+/** Um ranking gerado, como fica no histórico do servidor (sem as esteiras) */
+export interface RegistroRanking {
+  id: string;
+  /** AAAA-MM-DD */
+  dia: string;
+  geradoEm: string;
+  geradoPor: string;
+  provedor: ProvedorComentarios;
+  relatorio: RelatorioRanking;
+  legenda: string;
+}
+
+export interface StatusIa {
+  chatgpt: { chave: boolean };
+  claude: { chave: boolean };
+}
