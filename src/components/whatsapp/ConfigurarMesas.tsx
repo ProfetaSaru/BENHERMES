@@ -4,8 +4,9 @@ import { AuthUser } from '../../types/auth';
 import { NotificationType } from '../../types/task';
 import { apiRequest } from '../../utils/apiClient';
 import { Centro, MapaWhatsapp, Mesa } from '../../types/whatsapp';
-import { codigoDoLugar } from '../../utils/mapaMesas';
 import {
+  avisoDeRemocao,
+  mesclarRascunhoDaMesa,
   DadosDaMesa,
   adicionarMesaNoMapa,
   adicionarSalaNoMapa,
@@ -33,6 +34,8 @@ interface Edicao {
   salaId: string;
   nova: boolean;
   rascunho: Mesa;
+  /** A mesa quando a edição começou (para salvar só o que mudou no rascunho) */
+  inicial?: Mesa;
 }
 
 const CENTROS: [Centro, string][] = [
@@ -78,7 +81,7 @@ export const ConfigurarMesas: React.FC<ConfigurarMesasProps> = ({
 
   const agora = () => new Date();
 
-  const editar = (salaId: string, mesa: Mesa) => setEdicao({ salaId, nova: false, rascunho: mesa });
+  const editar = (salaId: string, mesa: Mesa) => setEdicao({ salaId, nova: false, rascunho: mesa, inicial: mesa });
 
   const criarMesa = (salaId: string) => {
     const n = mapa.salas.reduce((total, s) => total + s.mesas.length, 0) + 1;
@@ -124,6 +127,11 @@ export const ConfigurarMesas: React.FC<ConfigurarMesasProps> = ({
       return;
     }
     if (nova) {
+      if (!mapa.salas.some((s) => s.id === salaId)) {
+        onNotify('A sala desta mesa não existe mais (o mapa foi importado ou alterado). A edição foi cancelada.', 'error');
+        setEdicao(null);
+        return;
+      }
       const mesa = { ...rascunho, sigla: rascunho.sigla.trim().toUpperCase(), nome: rascunho.nome.trim(), supervisorUserId: rascunho.supervisorUserId ?? null };
       onMapa(adicionarMesaNoMapa(mapa, salaId, mesa, agora()));
       onNotify(`Mesa ${mesa.nome} criada.`, 'success');
@@ -131,31 +139,16 @@ export const ConfigurarMesas: React.FC<ConfigurarMesasProps> = ({
       return;
     }
     const original = mapa.salas.find((s) => s.id === salaId)?.mesas.find((m) => m.id === rascunho.id);
-    if (!original) return;
-    const { mesa, removidos } = formatarMesa(
-      original,
-      {
-        nome: rascunho.nome.trim(),
-        sigla: rascunho.sigla,
-        supervisor: rascunho.supervisor,
-        supervisorUserId: rascunho.supervisorUserId ?? null,
-        esq: rascunho.esq,
-        dir: rascunho.dir,
-        centro: rascunho.centro,
-        inicio: rascunho.inicio,
-        desativadas: rascunho.desativadas,
-      },
-      agora()
-    );
-    const comGente = removidos.filter((r) => r.operador.trim());
-    if (
-      comGente.length > 0 &&
-      !window.confirm(
-        `Estas baias deixam de existir e têm operador:\n${comGente
-          .map((r) => `${codigoDoLugar(mesa.sigla, r.posicao)} — ${r.operador}`)
-          .join('\n')}\n\nSalvar mesmo assim?`
-      )
-    ) {
+    if (!original) {
+      onNotify('Esta mesa não existe mais no mapa (ele foi importado ou alterado). A edição foi cancelada.', 'error');
+      setEdicao(null);
+      return;
+    }
+    // Só o que mudou no rascunho: o que mudou no painel enquanto ele estava aberto (ex.: supervisor) continua
+    const dados = mesclarRascunhoDaMesa(edicao.inicial ?? original, rascunho, original);
+    const { mesa, removidos } = formatarMesa(original, { ...dados, nome: dados.nome.trim(), supervisorUserId: dados.supervisorUserId ?? null }, agora());
+    const linhas = avisoDeRemocao(removidos, { ...original, sigla: mesa.sigla });
+    if (linhas.length > 0 && !window.confirm(`Estas baias deixam de existir:\n${linhas.join('\n')}\n\nSalvar mesmo assim?`)) {
       return;
     }
     // Vagas de celular ligadas a baias que deixaram de existir viram backup

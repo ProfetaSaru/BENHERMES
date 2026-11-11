@@ -61,6 +61,13 @@ export const mapaInicial = (agora: Date): MapaWhatsapp => ({
   atualizadoEm: agora.toISOString(),
 });
 
+/** Mapa ainda como veio de fábrica (ninguém cadastrado): a tela sugere importar a planilha */
+export const pareceMapaInicial = (mapa: MapaWhatsapp): boolean =>
+  mapa.celulares.length === 0 &&
+  mapa.historico.length === 0 &&
+  mapa.manutencoes.length === 0 &&
+  mapa.salas.every((s) => s.mesas.every((m) => !m.supervisor.trim() && Object.values(m.lugares).every((l) => !l.operador.trim())));
+
 /** Nova situação (menos RESTRINGIDO e ANALISE: use restringir e pedirAnalise) */
 export const mudarSituacao = (atual: EstadoWhatsapp, nova: Situacao, agora: Date): EstadoWhatsapp => {
   if (nova === 'RESTRINGIDO') throw new Error('Para restringir, informe por quanto tempo.');
@@ -121,13 +128,18 @@ export const alterarMesaNoMapa = (
   mesaId: string,
   mudar: (mesa: Mesa) => Mesa,
   agora: Date
-): MapaWhatsapp => ({
-  ...mapa,
-  salas: mapa.salas.map((s) =>
-    s.id !== salaId ? s : { ...s, mesas: s.mesas.map((m) => (m.id === mesaId ? mudar(m) : m)) }
-  ),
-  atualizadoEm: agora.toISOString(),
-});
+): MapaWhatsapp => {
+  const atual = mapa.salas.find((s) => s.id === salaId)?.mesas.find((m) => m.id === mesaId);
+  if (!atual) return mapa;
+  const nova = mudar(atual);
+  // Nada mudou (ex.: sair de um campo sem editar): o mapa fica igual, sem mexer em "Atualizado em"
+  if (JSON.stringify(nova) === JSON.stringify(atual)) return mapa;
+  return {
+    ...mapa,
+    salas: mapa.salas.map((s) => (s.id !== salaId ? s : { ...s, mesas: s.mesas.map((m) => (m.id === mesaId ? nova : m)) })),
+    atualizadoEm: agora.toISOString(),
+  };
+};
 
 export const alterarLugarNoMapa = (
   mapa: MapaWhatsapp,
@@ -197,6 +209,28 @@ export const formatarMesa = (
     removidos: removidos.map((posicao) => ({ posicao, operador: mesa.lugares[posicao]?.operador ?? '' })),
   };
 };
+
+const CAMPOS_DA_MESA = ['nome', 'sigla', 'supervisor', 'supervisorUserId', 'esq', 'dir', 'centro', 'inicio', 'desativadas'] as const;
+
+/**
+ * O que salvar de um rascunho de mesa: só os campos mudados no rascunho (em relação à mesa quando a edição
+ * começou); o resto vem da mesa atual, para não desfazer o que mudou no painel enquanto o rascunho estava aberto.
+ */
+export const mesclarRascunhoDaMesa = (inicial: Mesa, rascunho: Mesa, atual: Mesa): DadosDaMesa => {
+  const igual = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  return Object.fromEntries(CAMPOS_DA_MESA.map((c) => [c, igual(rascunho[c], inicial[c]) ? atual[c] : rascunho[c]])) as unknown as DadosDaMesa;
+};
+
+/** Linhas da confirmação ao salvar uma mesa: baias que deixam de existir com operador e o lugar do supervisor */
+export const avisoDeRemocao = (removidos: { posicao: string; operador: string }[], mesa: Mesa): string[] =>
+  removidos.flatMap(({ posicao, operador }) => {
+    const codigo = `${mesa.sigla}-${posicao}`;
+    if (posicao === 'SUP') {
+      const situacao = mesa.lugares.SUP?.whatsapp.situacao;
+      return [`${codigo} — supervisor ${mesa.supervisor || '(sem nome)'}${situacao ? ` (WhatsApp: ${ROTULOS[situacao]})` : ''}`];
+    }
+    return operador.trim() ? [`${codigo} — ${operador}`] : [];
+  });
 
 export const alternarDesativada = (mesa: Mesa, posicao: string, agora: Date): Mesa => {
   if (mesa.desativadas.includes(posicao)) {

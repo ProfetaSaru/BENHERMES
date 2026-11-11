@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Clock, Send, Smartphone, UserX, X, XCircle } from 'lucide-react';
 import { EstadoWhatsapp, Situacao, WhatsappDoSupervisor } from '../../types/whatsapp';
 import {
@@ -62,6 +62,10 @@ export const PainelLugar: React.FC<PainelLugarProps> = ({
   const [unidade, setUnidade] = useState<'horas' | 'dias'>('horas');
   const [erro, setErro] = useState('');
 
+  // Cada lugar/vaga monta um painel novo (key no WhatsappHub): o foco vai para ele, para teclado e leitor de tela
+  const raiz = useRef<HTMLElement>(null);
+  useEffect(() => raiz.current?.focus(), []);
+
   // Trocou de lugar: fecha o formulário de restrição
   useEffect(() => {
     setRestringindo(false);
@@ -101,7 +105,7 @@ export const PainelLugar: React.FC<PainelLugarProps> = ({
   const atrasada = analiseAtrasada(estado, agora);
 
   return (
-    <aside className="wpp-painel" aria-label={`Editar ${titulo}`}>
+    <aside ref={raiz} tabIndex={-1} className="wpp-painel" aria-label={`Editar ${titulo}`}>
       <div className="wpp-painel-topo">
         <div>
           <h2>{titulo}</h2>

@@ -10,6 +10,9 @@ import {
   renomearSalaNoMapa,
   alterarLugarNoMapa,
   alterarMesaNoMapa,
+  avisoDeRemocao,
+  mesclarRascunhoDaMesa,
+  pareceMapaInicial,
   carregarMapa,
   estado,
   exportarMapa,
@@ -252,6 +255,12 @@ describe('alterações no mapa (sem mexer no original)', () => {
   const sala = mapa.salas[0];
   const mesa = sala.mesas[0];
 
+  it('mudança que não muda nada não mexe em "Atualizado em"', () => {
+    expect(alterarLugarNoMapa(mapa, sala.id, mesa.id, 'E1', { operador: '' }, depois(1))).toBe(mapa);
+    expect(alterarMesaNoMapa(mapa, sala.id, mesa.id, (m) => ({ ...m }), depois(1))).toBe(mapa);
+    expect(alterarMesaNoMapa(mapa, sala.id, 'nao-existe', (m) => ({ ...m, nome: 'X' }), depois(1))).toBe(mapa);
+  });
+
   it('lugar: troca só o lugar pedido e atualiza a data do mapa', () => {
     const novo = alterarLugarNoMapa(mapa, sala.id, mesa.id, 'E1', { operador: 'ANA' }, depois(1));
     expect(novo.salas[0].mesas[0].lugares.E1.operador).toBe('ANA');
@@ -354,5 +363,32 @@ describe('versão 3', () => {
     for (const r of ruins) {
       expect(() => importarMapa(exportarMapa(r as MapaWhatsapp, AGORA), AGORA)).toThrow('não é um mapa do Controle de WhatsApps válido');
     }
+  });
+});
+
+describe('edição de mesa pelas configurações', () => {
+  const base = novaMesa({ nome: '1º Equipe', sigla: 'OP1', supervisor: 'JOANA', esq: 2, dir: 2, centro: 'SUP', inicio: 'sup' }, AGORA);
+
+  it('salvar o rascunho só aplica o que foi mudado nele (o supervisor trocado no painel continua)', () => {
+    const rascunho = { ...base, esq: 3 };
+    const atual = { ...base, supervisor: 'MARCOS', supervisorUserId: 'u-2' };
+    expect(mesclarRascunhoDaMesa(base, rascunho, atual)).toMatchObject({ esq: 3, dir: 2, supervisor: 'MARCOS', supervisorUserId: 'u-2', nome: '1º Equipe' });
+  });
+
+  it('centro "Ninguém" pede confirmação para o lugar do supervisor, mesmo sem operador', () => {
+    const mesa = { ...base, lugares: { ...base.lugares, SUP: { operador: '', whatsapp: restringir(2, 'dias', AGORA) }, E2: { ...base.lugares.E2, operador: 'ANA' } } };
+    const { removidos } = formatarMesa(mesa, { ...mesa, esq: 1, centro: 'NENHUM' }, AGORA);
+    expect([...avisoDeRemocao(removidos, mesa)].sort()).toEqual(['OP1-E2 — ANA', 'OP1-SUP — supervisor JOANA (WhatsApp: RESTRINGIDO)']);
+  });
+});
+
+describe('mapa ainda vazio (sugere importar a planilha)', () => {
+  it('mapa de fábrica sim; com operador, supervisor, celular ou histórico, não', () => {
+    const m = mapaInicial(AGORA);
+    expect(pareceMapaInicial(m)).toBe(true);
+    expect(pareceMapaInicial(alterarLugarNoMapa(m, m.salas[0].id, m.salas[0].mesas[0].id, 'E1', { operador: 'ANA' }, AGORA))).toBe(false);
+    expect(pareceMapaInicial(alterarMesaNoMapa(m, m.salas[0].id, m.salas[0].mesas[0].id, (x) => ({ ...x, supervisor: 'JOANA' }), AGORA))).toBe(false);
+    expect(pareceMapaInicial({ ...m, celulares: [novoCelular({ cor: 'Azul', hex: '#1E40AF', apelido: '', marca: 'SAMSUNG', usuarios: 2, mesaId: null }, m, AGORA)] })).toBe(false);
+    expect(pareceMapaInicial({ ...m, manutencoes: [{} as any] })).toBe(false);
   });
 });

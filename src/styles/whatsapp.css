@@ -1703,3 +1703,8 @@
     align-items: stretch;
   }
 }
+
+/* O painel recebe o foco ao abrir (teclado e leitor de tela), sem contorno no quadro inteiro */
+.wpp-painel:focus {
+  outline: none;
+}
