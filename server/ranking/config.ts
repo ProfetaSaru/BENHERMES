@@ -7,6 +7,7 @@ import type { ConfigRanking, MetasGrupo } from './tipos.ts';
 
 const CAMPOS_META: (keyof MetasGrupo)[] = ['meta_vendedor', 'meta_bonus_vendedor', 'meta_supervisor', 'meta_bonus_supervisor', 'meta_cartao'];
 const LISTAS = ['vendedores_clt', 'supervisores_clt', 'funcionarios_ativos'] as const;
+const DIVISORES: (keyof MetasGrupo)[] = ['meta_vendedor', 'meta_supervisor'];
 
 const numeroValido = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0;
 const dataValida = (v: unknown): v is string =>
@@ -21,6 +22,8 @@ export const validarConfig = (bruto: unknown): { config: ConfigRanking } | { err
     if (!metas[grupo] || typeof metas[grupo] !== 'object') return { erro: `Faltam as metas de metas.${grupo}.` };
     for (const campo of CAMPOS_META) {
       if (!numeroValido(metas[grupo][campo])) return { erro: `metas.${grupo}.${campo} precisa ser um número maior ou igual a zero.` };
+      // Meta do vendedor e do supervisor dividem o resultado de cada um: zero daria ranking sem sentido
+      if (DIVISORES.includes(campo) && metas[grupo][campo] === 0) return { erro: `metas.${grupo}.${campo} precisa ser maior que zero.` };
     }
   }
   if (!numeroValido(metas.meta_geral)) return { erro: 'metas.meta_geral precisa ser um número maior ou igual a zero.' };

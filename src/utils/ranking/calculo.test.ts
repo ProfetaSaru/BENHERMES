@@ -70,6 +70,13 @@ describe('leitura das esteiras', () => {
     expect(qualEsteira(linhas)).toBe('pagamento');
   });
 
+  it('campo entre aspas com quebra de linha não quebra a linha da esteira', () => {
+    const { linhas } = lerEsteira('Proposta;Etapa;Produto;Agente;Equipe;Valor Contrato\n1;Pago;"PORT\nCOM OBS";ANA - 1;EQUIPE A;1.000,00\n2;Pago;P;BRUNO;EQUIPE A;2,00');
+    expect(linhas).toHaveLength(2);
+    expect(linhas[0]).toMatchObject({ Produto: 'PORT\nCOM OBS', Agente: 'ANA - 1', 'Valor Contrato': '1.000,00' });
+    expect(linhas[1].Agente).toBe('BRUNO');
+  });
+
   it('coluna faltando e qual é cada esteira', () => {
     expect(lerEsteira('Proposta;Etapa;Produto;Agente;Equipe\n1;Pago;P;A;E').faltando).toEqual(['Valor Contrato']);
     expect(qualEsteira(lerEsteira(ANDAMENTO).linhas)).toBe('andamento');

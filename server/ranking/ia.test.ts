@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { descrever } from './frases.ts';
-import { INSTRUCAO, gerarComentarios, provedoresDoAmbiente, type Provedor } from './ia.ts';
+import { INSTRUCAO, gerarComentarios, limparEntrada, provedoresDoAmbiente, type Provedor } from './ia.ts';
 
 const linha = (nome: string, posicao: string, projetando: number) => ({ nome, posicao, projetando, portabilidade: projetando ? 1000 : 0, andamento: 0, margemCartao: 0 });
 const ENTRADA = {
@@ -72,5 +72,14 @@ describe('provedores pelo ambiente e pela configuração', () => {
 
   it('as instruções proíbem números, posições e valores', () => {
     expect(INSTRUCAO).toMatch(/NÃO cite valores, números, porcentagens, posições/);
+  });
+});
+
+describe('pedido do navegador remontado no servidor', () => {
+  it('situação e esteira só com os textos fixos; qualquer outro texto é descartado', () => {
+    const d = (situacao: string, esteira: string) => ({ nome: 'Ana', posicao: '1º de 1', projetando: 1, situacao, esteira, vendeu_cartao_ou_margem: false });
+    const r = limparEntrada({ vendedores: [d('perto da meta', 'esteira vazia'), d('CPF 123.456.789-00', 'R$ 50.000,00')], supervisores: [] })!;
+    expect([r.vendedores[0].situacao, r.vendedores[0].esteira]).toEqual(['perto da meta', 'esteira vazia']);
+    expect([r.vendedores[1].situacao, r.vendedores[1].esteira]).toEqual(['', '']);
   });
 });

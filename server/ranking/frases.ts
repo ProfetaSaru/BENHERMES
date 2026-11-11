@@ -178,7 +178,11 @@ export const frasePronta = (d: Descricao, indice: number, total: number, usadas:
       }
     }
   }
-  return banco[faixa][0].replace('{n}', d.nome);
+  // Todas já usadas (ranking muito grande): repete em rodízio, a partir da faixa da pessoa
+  const todas = RESERVA[faixa].flatMap((f) => banco[f]);
+  const modelo = todas[(usadas.size - todas.length) % todas.length];
+  usadas.add(`${modelo}#${usadas.size}`);
+  return modelo.replace('{n}', d.nome);
 };
 
 const semAcento = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');

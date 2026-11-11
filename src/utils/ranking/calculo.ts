@@ -22,7 +22,7 @@ export const normalizar = (texto: unknown): string =>
         .trim()
         .toUpperCase()
         .normalize('NFKD')
-        .replace(/[̀-ͯ]/g, '')
+        .replace(/[\u0300-\u036f]/g, '')
         .split(/\s+/)
         .filter(Boolean)
         .join(' ');
@@ -38,39 +38,47 @@ export const numeroBr = (v: unknown): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
-/** Divide uma linha do CSV (separador ';', aspas opcionais) */
-const campos = (linha: string): string[] => {
-  const saida: string[] = [];
+/**
+ * Registros do CSV (separador ';', aspas opcionais). Lê o texto inteiro de uma vez para que um campo entre
+ * aspas com quebra de linha não quebre o registro (como o csv do Python).
+ */
+const registrosCsv = (texto: string): string[][] => {
+  const registros: string[][] = [];
+  let registro: string[] = [];
   let atual = '';
   let aspas = false;
-  for (let i = 0; i < linha.length; i++) {
-    const c = linha[i];
+  for (let i = 0; i < texto.length; i++) {
+    const c = texto[i];
     if (aspas) {
-      if (c === '"' && linha[i + 1] === '"') {
+      if (c === '"' && texto[i + 1] === '"') {
         atual += '"';
         i++;
       } else if (c === '"') aspas = false;
       else atual += c;
     } else if (c === '"') aspas = true;
     else if (c === ';') {
-      saida.push(atual);
+      registro.push(atual);
+      atual = '';
+    } else if (c === '\n' || c === '\r') {
+      if (c === '\r' && texto[i + 1] === '\n') i++;
+      registro.push(atual);
+      registros.push(registro);
+      registro = [];
       atual = '';
     } else atual += c;
   }
-  saida.push(atual);
-  return saida;
+  registro.push(atual);
+  registros.push(registro);
+  return registros.filter((r) => r.some((v) => v.trim() !== ''));
 };
 
 /** CSV exportado do sistema (separador ';', UTF-8 com BOM). Cabeçalhos sem espaços nas pontas. */
 export const lerEsteira = (texto: string): { linhas: Record<string, string>[]; faltando: string[] } => {
-  const linhas = texto.replace(/^﻿/, '').split(/\r?\n/).filter((l) => l.trim() !== '');
-  if (linhas.length === 0) return { linhas: [], faltando: [...COLUNAS] };
-  const cabecalho = campos(linhas[0]).map((c) => c.trim());
-  const registros = linhas.slice(1).map((l) => {
-    const valores = campos(l);
-    return Object.fromEntries(cabecalho.map((c, i) => [c, valores[i] ?? '']));
-  });
-  return { linhas: registros, faltando: COLUNAS.filter((c) => !cabecalho.includes(c)) };
+  const registros = registrosCsv(texto.replace(/^\uFEFF/, ''));
+  if (registros.length === 0) return { linhas: [], faltando: [...COLUNAS] };
+  const cabecalho = registros[0].map((c) => c.trim());
+  const linhas = registros.slice(1).map((valores) => Object.fromEntries(cabecalho.map((c, i) => [c, valores[i] ?? ''])));
+  return { linhas, faltando: COLUNAS.filter((c) => !cabecalho.includes(c)) };
 };
 
 /** Qual das duas esteiras é: a de pagamento tem contratos "Pago"; a de andamento, "Andamento" */
