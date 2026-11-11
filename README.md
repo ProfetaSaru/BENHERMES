@@ -224,13 +224,36 @@ preencha os campos e **Salvar**. A configuração fica no servidor e vale para q
 |---|---|
 | **Metas CLT / Estágio** | Meta e início do bônus de vendedor e supervisor, e a meta de cartão |
 | **Meta geral** | Meta da operação no mês |
-| **Funcionários ativos** | Só quem está aqui entra no ranking (um nome por linha, como vem na esteira) |
+| **Operadores ativos (Argus)** | Atualizada sozinha pela Argus a cada ranking; só é usada quando a Argus não responde |
+| **Incluir sempre** | Entram no ranking mesmo sem estar ativos na Argus (ex.: contas DIGITAL) |
+| **Ligações de nomes** | `NOME NA ESTEIRA = NOME NA ARGUS` (lado direito vazio: não ligar). Preenchidas pela conferência |
 | **Vendedores / Supervisores CLT** | Quem usa as metas CLT; os outros usam as de estágio |
 | **Feriados** | Dias que não contam como dia útil (`AAAA-MM-DD`) |
 | **Renomear supervisores** | `COMO VEM NA ESTEIRA = COMO APARECE` (ex.: `CAIO - URA = CAIO RAMOS`) |
 | **Emoji do destaque** | Vai ao lado do nome de quem passa de 133% da meta |
 
 **Exportar** baixa o `config.json` com o que está salvo.
+
+</details>
+
+<details>
+<summary><b>👥 Quem entra no ranking (operadores ativos da Argus)</b></summary>
+
+A cada **Gerar ranking**, o BenHermes baixa os **usuários operadores ativos** da Argus (com o token salvo em
+Relatório URA › Configurações) e só eles entram: quem é desativado na Argus sai do ranking sozinho. A tela avisa quem
+entrou e quem saiu desde o ranking anterior. Se a Argus não responder, vale a última lista baixada (com aviso).
+
+O nome na esteira nem sempre é escrito igual ao da Argus (muitas vezes a Argus tem menos sobrenomes, ou muda uma
+letra). A ligação segue esta ordem:
+
+1. Ligação feita à mão na conferência (ou "não é a mesma pessoa").
+2. Nome igual (sem diferenciar maiúsculas, acentos e espaços).
+3. Mesmo primeiro nome e as palavras do nome mais curto aparecem, na ordem, no mais longo.
+4. Mesmo primeiro nome e nome quase igual (uma letra de diferença).
+
+Os passos 3 e 4 só valem com um único candidato, e cada operador da Argus vale para uma pessoa só. Depois de gerar,
+a **Conferência com a Argus** mostra quem ficou fora (com **Ligar** a uma pessoa da Argus ou **Incluir sempre**) e
+quem foi ligado por nome diferente (com **Não é a mesma pessoa**).
 
 </details>
 
@@ -754,6 +777,7 @@ testes e o build. **PR vermelho não deve ir para a `main`.**
 | [`ranking/calculo.test.ts`](src/utils/ranking/calculo.test.ts) | Dias úteis, margem/cartão fora da portabilidade, proposta repetida, empate, só ativos, renomear supervisor, emoji, faixas do potencial, total geral, BOM e colunas faltando |
 | [`ranking/golden.test.ts`](src/utils/ranking/golden.test.ts) | Ranking real conferido com o oficial (posições, nomes e valores). **Pulado** sem a variável `RANKING_GOLDEN_DIR` apontando para uma pasta com `andamento.csv`, `pagamento.csv`, `config.json` e `esperado.json` (dados reais nunca vão para o repositório) |
 | [`ranking/planilha.test.ts`](src/utils/ranking/planilha.test.ts) | Modelo sem dados reais, títulos, cabeçalho de projeção, cores, SIM/NÃO e legenda de cartão |
+| [`ranking/argusAtivos.test.ts`](src/utils/ranking/argusAtivos.test.ts) | Ligação esteira × Argus: nome igual, nome mais curto, uma letra diferente, ambíguo, cada operador para uma pessoa, ligação manual, incluir sempre, quem entrou e saiu |
 | [`ranking/legenda.test.ts`](src/utils/ranking/legenda.test.ts) | Legenda de cada dia, fechamento com feriado no fim do mês, balanço no 1º dia útil, sem números, "Outra versão" |
 | [`ranking/frases.test.ts`](server/ranking/frases.test.ts) · [`ia.test.ts`](server/ranking/ia.test.ts) | O que vai para a IA, frases trocadas (com número ou repetidas), ChatGPT → Claude → frases prontas, chaves ausentes |
 | [`ranking.test.ts`](server/ranking.test.ts) | Rotas só do Admin (403 para os outros), configuração inválida, histórico de 120 e pedido sem CPF, sobrenome ou R$ |
@@ -778,7 +802,7 @@ npm run dev        # http://localhost:5173/
 |---|---|
 | `npm run dev` | Servidor de desenvolvimento Vite (com proxy para `/api` e ponte do Argus) |
 | `npm run start` | Servidor de produção Node.js com SQLite nativo (`node:sqlite`) e autenticação |
-| `npm test` | Executa todos os testes unitários (34 suites, 319 testes) |
+| `npm test` | Executa todos os testes unitários (35 suites, 336 testes) |
 | `npm run build` | Confere os tipos e compila o frontend em `dist/` |
 | `npm run preview` | Abre o site gerado (também com a ponte do Argus) |
 

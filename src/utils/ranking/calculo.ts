@@ -247,6 +247,11 @@ const linha = (
   feedback: '',
 });
 
+/** Vendedores que aparecem nas duas esteiras (nome antes do " - ", normalizado), sem repetir */
+export const agentesDasEsteiras = (andamento: Record<string, string>[], pagamento: Record<string, string>[]): string[] => [
+  ...new Set([...andamento, ...pagamento].map((l) => normalizar((l.Agente ?? '').split(' - ')[0])).filter(Boolean)),
+];
+
 export const gerarRelatorio = (
   andamento: Record<string, string>[],
   pagamento: Record<string, string>[],

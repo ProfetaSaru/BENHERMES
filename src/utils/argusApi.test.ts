@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { baixarDoArgus, diagnosticoLeads, formatarTempo, mediaPonderada } from './argusApi';
+import { baixarDoArgus, diagnosticoLeads, formatarTempo, mediaPonderada, operadoresAtivosDaArgus } from './argusApi';
 
 // API do Argus SIMULADA: nada sai para a internet. Nomes fictícios.
 const sessao = (data: string, nome: string, tma: number, tme: number, qtde: number) => ({
@@ -88,5 +88,36 @@ describe('funções auxiliares', () => {
     expect(mediaPonderada([[38, 0], [40, 0]])).toBe(39); // sem peso: média simples
     expect(formatarTempo(64)).toBe('00:01:04');
     expect(formatarTempo('00:02:00')).toBe('00:02:00');
+  });
+});
+
+describe('operadores ativos (Ranking de Contratos)', () => {
+  it('só os usuários operadores ativos, sem robôs e sem repetir', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, opcoes: RequestInit) => {
+        pedidos.push({ caminho: decodeURIComponent(url.split('caminho=')[1]), corpo: JSON.parse(String(opcoes.body)), token: '' });
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            codStatus: 1,
+            usuarios: [
+              { idUsuario: 1, nome: 'ANA ALVES', ativo: true },
+              { idUsuario: 2, nome: 'BRUNO BRITO', ativo: false },
+              { idUsuario: 3, nome: 'OPER VIRTUAL 1', ativo: true },
+              { idUsuario: 4, nome: ' Carla  Dias ', ativo: true },
+              { idUsuario: 5, nome: 'ANA ALVES', ativo: true },
+            ],
+          }),
+        };
+      })
+    );
+    expect(await operadoresAtivosDaArgus(config)).toEqual(['ANA ALVES', 'Carla Dias']);
+    expect(pedidos[0]).toMatchObject({ caminho: 'cmd/listarusuarios', corpo: { idTipoUsuario: 2 } });
+  });
+
+  it('sem token: erro que diz onde configurar', async () => {
+    await expect(operadoresAtivosDaArgus({ token: ' ', url: '' })).rejects.toThrow(/token/i);
   });
 });

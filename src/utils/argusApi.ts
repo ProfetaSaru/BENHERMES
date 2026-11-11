@@ -259,6 +259,19 @@ export const baixarDoArgus = async (dia: string, config: ConfigArgus): Promise<A
   ];
 };
 
+/**
+ * Nomes dos usuários operadores ATIVOS na Argus (sem os robôs da URA). O Ranking de Contratos usa esta lista
+ * para saber quem ainda está na empresa: quem é desativado na Argus sai do ranking sozinho.
+ */
+export const operadoresAtivosDaArgus = async (config: ConfigArgus): Promise<string[]> => {
+  if (!config.token.trim()) throw new Error('Falta o token da API do Argus (Relatório URA › Configurações).');
+  const nomes = (await buscarUsuarios(config))
+    .filter((u) => u.ativo === true)
+    .map((u) => String(u.nome ?? '').replace(/\s+/g, ' ').trim())
+    .filter((n) => n && !ehRobo(n));
+  return [...new Set(nomes)];
+};
+
 // ---------------------------------------------------------------------------
 // Diagnóstico dos leads
 // ---------------------------------------------------------------------------

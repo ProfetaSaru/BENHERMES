@@ -27,6 +27,9 @@ interface Formulario {
   vendedores_clt: string;
   supervisores_clt: string;
   funcionarios_ativos: string;
+  incluir_sempre: string;
+  vinculos: string;
+  argus_em: string | null;
   renomear: string;
   usar_chatgpt: boolean;
   usar_claude: boolean;
@@ -43,6 +46,11 @@ const paraFormulario = (c: ConfigRanking | null): Formulario => ({
   vendedores_clt: (c?.vendedores_clt ?? []).join('\n'),
   supervisores_clt: (c?.supervisores_clt ?? []).join('\n'),
   funcionarios_ativos: (c?.funcionarios_ativos ?? []).join('\n'),
+  incluir_sempre: (c?.incluir_sempre ?? []).join('\n'),
+  vinculos: Object.entries(c?.vinculos_argus ?? {})
+    .map(([de, para]) => `${de} = ${para}`)
+    .join('\n'),
+  argus_em: c?.argus_em ?? null,
   renomear: Object.entries(c?.renomear_supervisores ?? {})
     .map(([de, para]) => `${de} = ${para}`)
     .join('\n'),
@@ -74,6 +82,15 @@ const doFormulario = (f: Formulario) => ({
   vendedores_clt: linhas(f.vendedores_clt),
   supervisores_clt: linhas(f.supervisores_clt),
   funcionarios_ativos: linhas(f.funcionarios_ativos),
+  incluir_sempre: linhas(f.incluir_sempre),
+  // "ESTEIRA = ARGUS"; lado direito vazio = não é a mesma pessoa
+  vinculos_argus: Object.fromEntries(
+    linhas(f.vinculos)
+      .map((l) => l.split('='))
+      .filter((p) => p.length === 2 && p[0].trim())
+      .map(([de, para]) => [de.trim(), para.trim()])
+  ),
+  argus_em: f.argus_em,
   renomear_supervisores: Object.fromEntries(
     linhas(f.renomear)
       .map((l) => l.split('='))
@@ -133,8 +150,11 @@ export const RankingConfiguracao: React.FC<RankingConfiguracaoProps> = ({ config
     if (!arquivo) return;
     try {
       const json = JSON.parse(await arquivo.text());
-      // O config.json do pacote não tem a escolha das IAs: mantém a que já está salva
-      if (json && typeof json === 'object' && !json.ia && config) json.ia = config.ia;
+      // O config.json do pacote não tem a escolha das IAs nem as ligações com a Argus: mantém as que estão salvas.
+      // A lista de ativos importada vale até o próximo ranking, quando a Argus a substitui.
+      if (json && typeof json === 'object' && config) {
+        for (const campo of ['ia', 'incluir_sempre', 'vinculos_argus'] as const) if (json[campo] === undefined) json[campo] = config[campo];
+      }
       await salvar(json, 'arquivo');
     } catch {
       setErro('O arquivo não é um JSON válido.');
@@ -153,7 +173,7 @@ export const RankingConfiguracao: React.FC<RankingConfiguracaoProps> = ({ config
     URL.revokeObjectURL(url);
   };
 
-  const lista = ({ chave, titulo, ajuda }: { chave: 'vendedores_clt' | 'supervisores_clt' | 'funcionarios_ativos' | 'feriados'; titulo: string; ajuda: string }) => (
+  const lista = ({ chave, titulo, ajuda }: { chave: 'vendedores_clt' | 'supervisores_clt' | 'funcionarios_ativos' | 'incluir_sempre' | 'feriados'; titulo: string; ajuda: string }) => (
     <div className="formatter-mapping-field mapped">
       <label htmlFor={`ranking-${chave}`} className="formatter-field-label">
         {titulo} <span className="badge badge-muted">{linhas(form[chave]).length}</span>
@@ -237,7 +257,14 @@ export const RankingConfiguracao: React.FC<RankingConfiguracaoProps> = ({ config
       </div>
 
       <div className="ranking-listas">
-        {lista({ chave: 'funcionarios_ativos', titulo: 'Funcionários ativos', ajuda: 'Um nome por linha, como vem na esteira. Só eles entram no ranking.' })}
+        {lista({
+          chave: 'funcionarios_ativos',
+          titulo: 'Operadores ativos (Argus)',
+          ajuda: form.argus_em
+            ? `Atualizada sozinha pela Argus a cada ranking (última: ${new Date(form.argus_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}). Só é usada se a Argus não responder.`
+            : 'Vem da Argus no próximo ranking. Até lá, vale esta lista (a do config.json).',
+        })}
+        {lista({ chave: 'incluir_sempre', titulo: 'Incluir sempre', ajuda: 'Entram mesmo sem estar ativos na Argus (nome como na esteira).' })}
         {lista({ chave: 'vendedores_clt', titulo: 'Vendedores CLT', ajuda: 'Um por linha. Quem não está aqui usa as metas de estágio.' })}
         {lista({ chave: 'supervisores_clt', titulo: 'Supervisores CLT', ajuda: 'Um por linha.' })}
         {lista({ chave: 'feriados', titulo: 'Feriados', ajuda: 'Um por linha, no formato AAAA-MM-DD.' })}
@@ -253,6 +280,22 @@ export const RankingConfiguracao: React.FC<RankingConfiguracaoProps> = ({ config
             spellCheck={false}
           />
           <div className="formatter-field-sample">Um por linha: COMO VEM NA ESTEIRA = COMO APARECE NO RANKING.</div>
+        </div>
+        <div className="formatter-mapping-field mapped">
+          <label htmlFor="ranking-vinculos" className="formatter-field-label">
+            Ligações de nomes (Argus) <span className="badge badge-muted">{linhas(form.vinculos).length}</span>
+          </label>
+          <textarea
+            id="ranking-vinculos"
+            className="formatter-select escala-textarea"
+            value={form.vinculos}
+            onChange={(e) => alterar('vinculos', e.target.value)}
+            spellCheck={false}
+          />
+          <div className="formatter-field-sample">
+            Um por linha: NOME NA ESTEIRA = NOME NA ARGUS. Com o lado direito vazio, a pessoa não é ligada automaticamente.
+            Preenchidas pela conferência depois de gerar.
+          </div>
         </div>
       </div>
 
