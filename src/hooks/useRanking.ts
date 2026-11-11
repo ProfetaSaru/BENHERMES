@@ -3,6 +3,7 @@ import { ConfigRanking, ProvedorComentarios, RegistroRanking, StatusIa } from '.
 import type { Descricao } from '../../server/ranking/frases';
 import { apiRequest } from '../utils/apiClient';
 import { criarHistoricoRanking } from './rankingHistorico';
+import { ConfigArgus, URL_PADRAO_ARGUS, operadoresAtivosDaArgus } from '../utils/argusApi';
 
 /** Configuração, histórico e IAs do ranking, guardados no servidor (rotas só do Admin) */
 export function useRanking() {
@@ -64,6 +65,12 @@ export function useRanking() {
     []
   );
 
+  /** Operadores ativos na Argus, com o token salvo nas configurações do Relatório URA */
+  const operadoresDaArgus = useCallback(async (): Promise<string[]> => {
+    const r = await apiRequest<{ argus: ConfigArgus | null }>('/api/relatorio-ura');
+    return operadoresAtivosDaArgus({ token: String(r.argus?.token ?? ''), url: String(r.argus?.url ?? '') || URL_PADRAO_ARGUS });
+  }, []);
+
   const pedirComentarios = useCallback(
     (entrada: { vendedores: Descricao[]; supervisores: Descricao[] }) =>
       apiRequest<{ vendedores: string[]; supervisores: string[]; provedor: ProvedorComentarios; avisos: string[] }>(
@@ -73,5 +80,5 @@ export function useRanking() {
     []
   );
 
-  return { config, salvarConfig, historico, salvarNoHistorico, removerDoHistorico, atualizarNoHistorico, statusIa, carregando, erroDeCarga, pedirComentarios };
+  return { config, salvarConfig, historico, salvarNoHistorico, removerDoHistorico, atualizarNoHistorico, statusIa, carregando, erroDeCarga, pedirComentarios, operadoresDaArgus };
 }

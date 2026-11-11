@@ -18,9 +18,10 @@ import {
   FolderOpen,
 } from 'lucide-react';
 import { NotificationType } from '../../types/task';
-import { ProvedorComentarios, RegistroRanking, RelatorioRanking } from '../../types/ranking';
+import { ConfigRanking, ProvedorComentarios, RegistroRanking, RelatorioRanking } from '../../types/ranking';
 import { useRanking } from '../../hooks/useRanking';
-import { gerarRelatorio, lerEsteira, qualEsteira, separarEsteiras } from '../../utils/ranking/calculo';
+import { agentesDasEsteiras, gerarRelatorio, lerEsteira, normalizar, qualEsteira, separarEsteiras } from '../../utils/ranking/calculo';
+import { ResultadoAtivos, ativosDoRanking, diferencaDeListas } from '../../utils/ranking/argusAtivos';
 import { carregarTemplateRanking, gerarPlanilhaRanking, nomeDaPlanilhaRanking } from '../../utils/ranking/planilha';
 import { legendaDoDia } from '../../utils/ranking/legenda';
 import { conferirFrases, descrever } from '../../../server/ranking/frases';
@@ -28,6 +29,7 @@ import { baixarPlanilha } from '../../utils/planilhaColorida';
 import { hojeIso, isoParaBr, diaDaSemana } from '../../utils/calendario';
 import { RankingTabela } from './RankingTabela';
 import { RankingConfiguracao } from './RankingConfiguracao';
+import { RankingConferenciaArgus } from './RankingConferenciaArgus';
 
 interface RankingHubProps {
   onNotify: (message: string, type?: NotificationType) => void;
@@ -77,6 +79,7 @@ export const RankingHub: React.FC<RankingHubProps> = ({ onNotify, usuario }) => 
   const [comentando, setComentando] = useState(false);
   const [copiado, setCopiado] = useState(false);
   const [avisos, setAvisos] = useState<Aviso[]>([]);
+  const [conferencia, setConferencia] = useState<{ resultado: ResultadoAtivos; fonte: 'argus' | 'lista'; operadores: string[] } | null>(null);
   const arquivoRef = useRef<HTMLInputElement>(null);
   const proximoAviso = useRef(1);
 
@@ -151,6 +154,39 @@ export const RankingHub: React.FC<RankingHubProps> = ({ onNotify, usuario }) => 
     if (falha) avisar(`Ranking gerado, mas não foi salvo no histórico: ${falha}`, 'erro');
   };
 
+  /** Primeiros nomes de uma lista, para os avisos (até 8) */
+  const listar = (nomes: string[]) => (nomes.length > 8 ? `${nomes.slice(0, 8).join(', ')} e mais ${nomes.length - 8}` : nomes.join(', '));
+
+  /**
+   * Quem está na empresa: os operadores ATIVOS na Argus. A lista baixada fica salva na configuração e é usada
+   * quando a Argus não responde.
+   */
+  const operadoresAtivos = async (cfg: ConfigRanking): Promise<{ operadores: string[]; fonte: 'argus' | 'lista' }> => {
+    try {
+      const operadores = await ranking.operadoresDaArgus();
+      if (operadores.length === 0) throw new Error('a Argus não devolveu nenhum operador ativo');
+      const { entraram, sairam } = diferencaDeListas(cfg.funcionarios_ativos, operadores);
+      if (!cfg.argus_em) avisar(`Operadores ativos atualizados pela Argus: ${operadores.length} pessoas.`);
+      else if (entraram.length || sairam.length) {
+        avisar(
+          [entraram.length ? `entraram na Argus: ${listar(entraram)}` : '', sairam.length ? `saíram da Argus: ${listar(sairam)}` : '']
+            .filter(Boolean)
+            .join(' • ')
+            .replace(/^./, (c) => c.toUpperCase()) + '.'
+        );
+      }
+      const falha = await ranking.salvarConfig({ ...cfg, funcionarios_ativos: operadores, argus_em: new Date().toISOString() });
+      if (falha) avisar(`A lista da Argus não foi salva para a próxima vez: ${falha}`, 'erro');
+      return { operadores, fonte: 'argus' };
+    } catch (err: any) {
+      avisar(
+        `Não consegui buscar os operadores na Argus: ${String(err?.message || 'erro desconhecido').replace(/\.$/, '')}. Usei a lista salva${cfg.argus_em ? ` em ${dataHora(cfg.argus_em)}` : ' (do config.json)'}.`,
+        'erro'
+      );
+      return { operadores: cfg.funcionarios_ativos, fonte: 'lista' };
+    }
+  };
+
   const handleGerar = async () => {
     if (!config || faltando.length > 0 || !dia) return;
     setAvisos([]);
@@ -158,10 +194,27 @@ export const RankingHub: React.FC<RankingHubProps> = ({ onNotify, usuario }) => 
     try {
       const andamento = esteiras.find((e) => e.tipo === 'andamento')!.linhas;
       const pagamento = esteiras.find((e) => e.tipo === 'pagamento')!.linhas;
-      const calculado = gerarRelatorio(andamento, pagamento, config, dia);
-      if (calculado.vendedores.length === 0) {
-        avisar('Nenhum funcionário ativo encontrado nas esteiras. Confira a lista de funcionários ativos na configuração.', 'erro');
+
+      const { operadores, fonte } = await operadoresAtivos(config);
+      let ativos: string[] = [];
+      if (operadores.length === 0) {
+        setConferencia(null);
+        avisar('Sem lista de operadores ativos: entraram todos os vendedores das esteiras.', 'erro');
+      } else {
+        const r = ativosDoRanking(agentesDasEsteiras(andamento, pagamento), operadores, {
+          vinculos: config.vinculos_argus,
+          incluirSempre: config.incluir_sempre,
+        });
+        setConferencia({ resultado: r, fonte, operadores: [...new Set(operadores.map(normalizar))].sort() });
+        if (r.ativos.length === 0) {
+          avisar('Nenhum vendedor das esteiras está entre os operadores ativos da Argus. Confira a conferência abaixo.', 'erro');
+          return;
+        }
+        ativos = r.ativos;
       }
+
+      const calculado = gerarRelatorio(andamento, pagamento, { ...config, funcionarios_ativos: ativos }, dia);
+      if (calculado.vendedores.length === 0) avisar('Nenhum vendedor com contrato pago entre os ativos.', 'erro');
       const { relatorio: comentado, provedor: origem } = await comentar(calculado);
       const texto = legendaDoDia(dia, config.feriados, 0);
       setRelatorio(comentado);
@@ -184,6 +237,14 @@ export const RankingHub: React.FC<RankingHubProps> = ({ onNotify, usuario }) => 
     } finally {
       setGerando(false);
     }
+  };
+
+  /** Mudanças vindas da conferência com a Argus (ligações e exceções) */
+  const mudarConfig = async (mudancas: Partial<ConfigRanking>, ok: string) => {
+    if (!config) return;
+    const falha = await ranking.salvarConfig({ ...config, ...mudancas });
+    if (falha) avisar(`Não foi possível salvar: ${falha}`, 'erro');
+    else avisar(`${ok} Clique em Gerar ranking de novo para atualizar.`);
   };
 
   /** Atualiza o registro aberto no histórico (frases refeitas ou legenda final) */
@@ -433,6 +494,23 @@ export const RankingHub: React.FC<RankingHubProps> = ({ onNotify, usuario }) => 
         </div>
       </div>
 
+      {conferencia && config && (
+        <RankingConferenciaArgus
+          resultado={conferencia.resultado}
+          fonte={conferencia.fonte}
+          operadores={conferencia.operadores}
+          onLigar={(esteira, argus) =>
+            mudarConfig({ vinculos_argus: { ...config.vinculos_argus, [esteira]: argus } }, `${esteira} ligado a ${argus} (Argus).`)
+          }
+          onNaoEMesma={(esteira) =>
+            mudarConfig({ vinculos_argus: { ...config.vinculos_argus, [esteira]: '' } }, `${esteira} não será mais ligado automaticamente.`)
+          }
+          onIncluirSempre={(esteira) =>
+            mudarConfig({ incluir_sempre: [...config.incluir_sempre, esteira] }, `${esteira} entra sempre no ranking.`)
+          }
+        />
+      )}
+
       {relatorio && (
         <>
           <div className="formatter-actions-card">
@@ -519,7 +597,8 @@ export const RankingHub: React.FC<RankingHubProps> = ({ onNotify, usuario }) => 
                     <td>{dataHora(h.geradoEm)}</td>
                     <td>{h.geradoPor}</td>
                     <td>{NOME_DO_PROVEDOR[h.provedor]?.replace('Comentários: ', '')}</td>
-                    <td className="ranking-historico-acoes">
+                    <td>
+                      <div className="ranking-historico-acoes">
                       <button type="button" className="btn btn-secondary" onClick={() => handleAbrir(h)} title="Abrir">
                         <FolderOpen size={14} />
                         Abrir
@@ -540,6 +619,7 @@ export const RankingHub: React.FC<RankingHubProps> = ({ onNotify, usuario }) => 
                       <button type="button" className="btn btn-secondary" onClick={() => handleRemover(h)} title="Apagar">
                         <Trash2 size={14} />
                       </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

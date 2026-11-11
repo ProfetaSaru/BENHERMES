@@ -32,6 +32,25 @@ describe('validar a configuração do ranking', () => {
     expect('config' in r && r.config.emoji_destaque).toBe('🏆');
   });
 
+  it('campos da Argus: padrão vazio, guarda os informados e recusa formato errado', () => {
+    const vazio = validarConfig(PACOTE);
+    expect('config' in vazio && [vazio.config.incluir_sempre, vazio.config.vinculos_argus, vazio.config.argus_em]).toEqual([[], {}, null]);
+    const cheio = validarConfig({
+      ...PACOTE,
+      incluir_sempre: [' DIGITAL 1 ', ''],
+      vinculos_argus: { 'BRUNO LIMA SANTOS': 'BRUNO LIMA', 'CARLA DIAS': '' },
+      argus_em: '2026-11-11T12:00:00.000Z',
+    });
+    expect('config' in cheio && [cheio.config.incluir_sempre, cheio.config.vinculos_argus, cheio.config.argus_em]).toEqual([
+      ['DIGITAL 1'],
+      { 'BRUNO LIMA SANTOS': 'BRUNO LIMA', 'CARLA DIAS': '' },
+      '2026-11-11T12:00:00.000Z',
+    ]);
+    expect('erro' in validarConfig({ ...PACOTE, incluir_sempre: 'X' }) && validarConfig({ ...PACOTE, incluir_sempre: 'X' })).toMatchObject({ erro: expect.stringMatching(/incluir_sempre/) });
+    expect(validarConfig({ ...PACOTE, vinculos_argus: { A: 1 } })).toMatchObject({ erro: expect.stringMatching(/vinculos_argus/) });
+    expect(validarConfig({ ...PACOTE, argus_em: 'ontem' })).toMatchObject({ erro: expect.stringMatching(/argus_em/) });
+  });
+
   it('recusa com mensagem que diz o campo', () => {
     const casos: [unknown, RegExp][] = [
       [{ ...PACOTE, metas: { ...PACOTE.metas, clt: { ...PACOTE.metas.clt, meta_vendedor: '450000' } } }, /metas\.clt\.meta_vendedor/],

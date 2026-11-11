@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ConfigRanking } from '../../types/ranking';
-import { diasUteis, gerarRelatorio, lerEsteira, normalizar, numeroBr, qualEsteira, separarEsteiras } from './calculo';
+import { agentesDasEsteiras, diasUteis, gerarRelatorio, lerEsteira, normalizar, numeroBr, qualEsteira, separarEsteiras } from './calculo';
 
 const FERIADOS = ['2026-11-02', '2026-11-20'];
 const DIA = '2026-11-11';
@@ -18,6 +18,9 @@ const CONFIG: ConfigRanking = {
   renomear_supervisores: { 'CAIO - URA': 'CAIO RAMOS' },
   funcionarios_ativos: ['Ana', 'BRUNO', 'carla', 'DIEGO', 'EVA'],
   ia: { usar_chatgpt: true, usar_claude: true },
+  incluir_sempre: [],
+  vinculos_argus: {},
+  argus_em: null,
 };
 
 const CAB = 'Proposta;Etapa;Produto;Agente;Equipe;Valor Contrato';
@@ -90,6 +93,13 @@ describe('qual é cada esteira (Review final #1)', () => {
       ['a.csv', 'andamento'],
     ]);
     expect(separarEsteiras([andamento]).map((e) => e.tipo)).toEqual(['pagamento']);
+  });
+});
+
+describe('vendedores das esteiras (para conferir com a Argus)', () => {
+  it('nomes das duas esteiras, sem o " - número", normalizados e sem repetir', () => {
+    const lista = (agentes: string[]) => agentes.map((Agente) => ({ Agente }));
+    expect(agentesDasEsteiras(lista(['Ana Souza - 12', 'BRUNO']), lista(['ANA SOUZA', '', 'Débora Lúcia - 3']))).toEqual(['ANA SOUZA', 'BRUNO', 'DEBORA LUCIA']);
   });
 });
 

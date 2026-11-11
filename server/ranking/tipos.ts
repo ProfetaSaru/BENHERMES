@@ -20,6 +20,13 @@ export interface ConfigRanking {
   vendedores_clt: string[];
   supervisores_clt: string[];
   renomear_supervisores: Record<string, string>;
+  /** Operadores ativos da Argus no último ranking (atualizada sozinha); usada quando a Argus não responde */
   funcionarios_ativos: string[];
   ia: { usar_chatgpt: boolean; usar_claude: boolean };
+  /** Entram no ranking mesmo sem estar ativos na Argus (nome como na esteira) */
+  incluir_sempre: string[];
+  /** Nome na esteira → nome na Argus ("" = não é a mesma pessoa) */
+  vinculos_argus: Record<string, string>;
+  /** Quando a lista de ativos veio da Argus pela última vez (ISO) */
+  argus_em: string | null;
 }
