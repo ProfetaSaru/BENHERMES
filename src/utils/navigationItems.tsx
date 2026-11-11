@@ -9,6 +9,7 @@ import {
   Users,
   StickyNote,
   FolderOpen,
+  Trophy,
 } from 'lucide-react';
 import { NavigationItem } from '../types/navigation';
 import { canSeeTool, UserRole } from '../types/auth';
@@ -55,6 +56,18 @@ export const getNavigationItems = (
       badgeVariant: 'success',
       isReady: true,
       icon: <PhoneCall size={20} />,
+    },
+    {
+      id: 'ranking',
+      name: 'Ranking de Contratos',
+      fullName: 'Ranking de Contratos Pagos',
+      shortName: 'Ranking',
+      description: 'Ranking diário de contratos pagos com comentários, planilha e legenda do dia.',
+      category: 'automacoes',
+      badge: 'Novo',
+      badgeVariant: 'success',
+      isReady: true,
+      icon: <Trophy size={20} />,
     },
     {
       id: 'whatsapp',

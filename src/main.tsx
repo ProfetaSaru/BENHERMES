@@ -9,6 +9,7 @@ import './styles/templates.css';
 import './styles/history.css';
 import './styles/formatter.css';
 import './styles/escala.css';
+import './styles/ranking.css';
 import './styles/relatorioUra.css';
 import './styles/whatsapp.css';
 import './styles/files.css';

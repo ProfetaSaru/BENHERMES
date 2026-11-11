@@ -1,0 +1,264 @@
+/* ==========================================================================
+   RANKING DE CONTRATOS PAGOS
+   Reaproveita os cards e botões do formatador (formatter.css), os avisos da
+   escala (escala.css) e a área de arquivos da URA (relatorioUra.css).
+   ========================================================================== */
+
+/* Prévia com o visual da aba RELATORIO: cores da planilha, iguais nos dois temas */
+.ranking-moldura {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #0b2a5b;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.ranking-moldura .formatter-table-scroll {
+  background: #ffffff;
+  max-height: none;
+}
+
+.ranking-tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: Calibri, Carlito, Arial, sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #000000;
+  background: #ffffff;
+}
+
+.ranking-titulo {
+  caption-side: top;
+  background: #ffff00;
+  color: #000000;
+  font-size: 1.05rem;
+  font-weight: 800;
+  padding: 8px 10px;
+  text-align: center;
+}
+
+.ranking-tabela th {
+  background: #000000;
+  color: #ffffff;
+  padding: 6px 8px;
+  font-size: 0.72rem;
+  text-align: center;
+  white-space: normal;
+  line-height: 1.2;
+}
+
+.ranking-tabela td {
+  padding: 5px 6px;
+  border: 1px solid #d9d9d9;
+  white-space: nowrap;
+}
+
+.ranking-centro {
+  text-align: center;
+}
+
+.ranking-valor {
+  text-align: right;
+}
+
+.ranking-feedback {
+  white-space: normal !important;
+  min-width: 260px;
+  font-weight: 600;
+}
+
+/* Mesma regra da planilha: azul ≥ 100%, verde ≥ 70%, preto abaixo */
+.ranking-azul td {
+  color: #0000ff;
+}
+
+.ranking-verde td {
+  color: #00b050;
+}
+
+.ranking-preto td {
+  color: #000000;
+}
+
+.ranking-tabela td.ranking-elegivel {
+  color: #ffffff;
+}
+
+.ranking-elegivel.sim {
+  background: #008000;
+}
+
+.ranking-elegivel.nao {
+  background: #ff0000;
+}
+
+.ranking-total td {
+  border-top: 2px solid #000000;
+  font-size: 0.95rem;
+  color: #000000;
+}
+
+/* Resultado: título e etiqueta de quem escreveu os comentários */
+.ranking-resultado-info {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.ranking-provedor {
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.ranking-provedor.chatgpt,
+.ranking-provedor.claude {
+  color: var(--blue);
+  background: var(--blue-soft);
+  border-color: var(--blue);
+}
+
+.ranking-provedor.frases {
+  color: var(--amber);
+  background: var(--amber-soft);
+  border-color: var(--amber);
+}
+
+/* Avisos da própria ferramenta */
+.ranking-aviso-erro {
+  background: var(--red-soft);
+  border-color: var(--red);
+}
+
+.ranking-aviso-erro svg {
+  color: var(--red);
+}
+
+.escala-aviso > span {
+  flex: 1;
+}
+
+.ranking-aviso-fechar {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+}
+
+/* Legenda */
+.ranking-legenda {
+  width: 100%;
+  min-height: 300px;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.55;
+  margin-bottom: 8px;
+}
+
+/* Histórico */
+.ranking-historico-acoes {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.ranking-historico-acoes .btn {
+  width: auto;
+  padding: 6px 10px;
+}
+
+/* Configuração */
+.ranking-metas {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.ranking-listas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.ranking-grupo {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ranking-grupo legend {
+  font-weight: 700;
+  padding: 0 6px;
+  color: var(--ink);
+}
+
+.ranking-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.ranking-campo > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ranking-ia {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+
+.ranking-chave {
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--line);
+}
+
+.ranking-chave.ok {
+  color: var(--green);
+  border-color: var(--green);
+  background: var(--green-soft);
+}
+
+.ranking-chave.falta {
+  color: var(--muted);
+}
+
+.ranking-salvar {
+  margin-bottom: 8px;
+}
+
+.ranking-sem-config p {
+  margin: 8px 0 0;
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+  .ranking-metas {
+    grid-template-columns: 1fr;
+  }
+}

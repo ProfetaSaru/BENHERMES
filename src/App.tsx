@@ -33,6 +33,9 @@ const EscalaBasesHub = lazy(() =>
 const RelatorioUraHub = lazy(() =>
   import('./components/relatorioUra/RelatorioUraHub').then((m) => ({ default: m.RelatorioUraHub }))
 );
+const RankingHub = lazy(() =>
+  import('./components/ranking/RankingHub').then((m) => ({ default: m.RankingHub }))
+);
 const ConfiguracoesHub = lazy(() =>
   import('./components/configuracoes/ConfiguracoesHub').then((m) => ({ default: m.ConfiguracoesHub }))
 );
@@ -742,6 +745,10 @@ export const App: React.FC = () => {
               ) : activeToolId === 'relatorio-ura' && currentUser.role === 'admin' ? (
                 <main className="container" style={{ maxWidth: '1480px', padding: '0 16px' }}>
                   <RelatorioUraHub onNotify={notify} />
+                </main>
+              ) : activeToolId === 'ranking' && currentUser.role === 'admin' ? (
+                <main className="container" style={{ maxWidth: '1480px', padding: '0 16px' }}>
+                  <RankingHub onNotify={notify} usuario={currentUser.displayName || currentUser.username} />
                 </main>
               ) : (
                 <ToolPlaceholder

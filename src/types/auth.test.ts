@@ -27,6 +27,7 @@ describe('RBAC e Visibilidade de Abas por Perfil', () => {
       'relatorios',
       'escala',
       'relatorio-ura',
+      'ranking',
       'whatsapp',
       'metricas',
       'anotacoes',

@@ -19,6 +19,11 @@ services:
       # Integração com o BenCalls (README › Integração com o BenCalls). Vazio = desligada.
       - BENCALLS_URL=${BENCALLS_URL:-}
       - BENCALLS_SEGREDO=${BENCALLS_SEGREDO:-}
+      # Ranking de contratos pagos: IAs dos comentários (README › Ranking de contratos pagos). Vazio = sem essa IA.
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - RANKING_MODELO_OPENAI=${RANKING_MODELO_OPENAI:-gpt-4o-mini}
+      - RANKING_MODELO_CLAUDE=${RANKING_MODELO_CLAUDE:-claude-haiku-5-5}
       - ALLOWED_IPS=${ALLOWED_IPS:-2804:431:80f7:7700::/48,2804:1b3:a5e7:c3c7::/48,201.93.163.133,2804:1b3:a5e7:2c83::/48,201.93.159.169,2804:1b3:a5e7:8e38::/48,127.0.0.1,::1}
     volumes:
       - ./data:/app/data
