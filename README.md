@@ -37,6 +37,7 @@ tudo no navegador, sem instalar nada.
 | 💬 [Controle de WhatsApps](#-controle-de-whatsapps) | 🛠️ [Tecnologias](#️-tecnologias) |
 | ⚙️ [Configurações (feriados)](#️-configurações-do-hub) | 🔌 [Integração com o BenCalls](#-integração-com-o-bencalls) |
 | 📋 [Central de Relatórios](#-central-de-relatórios) | 📊 [Formatador de Planilhas](#-formatador-de-planilhas) |
+| 🏆 [Ranking de Contratos](#-ranking-de-contratos) | |
 
 ---
 
@@ -46,6 +47,7 @@ tudo no navegador, sem instalar nada.
 |:-:|---|---|---|
 | 🎲 | **Escala de Bases** | Rodízio diário das bases do INSS entre os grupos dos supervisores do Ativo | Todo dia útil, de manhã |
 | 📞 | **Relatório URA** | TMA, TMO, leads, custo, vendas e clientes por operador e equipe, com setas e cores | Todo dia útil (relatório do dia anterior) |
+| 🏆 | **Ranking de Contratos** | Ranking diário de contratos pagos (vendedores e supervisores), com os comentários do FEEDBACK, a planilha de sempre e a legenda do dia. Só o Admin vê | Todo dia útil, para mandar no grupo |
 | 💬 | **Controle de WhatsApps** | Mapa das mesas com a situação do WhatsApp de cada baia, os celulares, o ciclo do banimento, a manutenção com o texto do grupo, as estatísticas e a planilha | Na manutenção (manhã e almoço) e sempre que um número cair ou voltar |
 | 📊 | **Formatador de Planilhas** | Converte qualquer planilha no CSV de mailing `CPF;BENEFICIO;NOME;TELEFONE1..5` | Quando chega uma base nova |
 | 📋 | **Central de Relatórios** | Relatórios de atividades e formulários a partir de modelos Markdown | No fim do expediente |
@@ -67,12 +69,16 @@ flowchart LR
     F --> G
     G --> H[📋 Copiar tabela<br/>ou ⬇️ Baixar planilha]
     A --> I[💬 Controle de WhatsApps<br/>🔧 manutenção 9h e 13h]
+    A --> K[🏆 Ranking de Contratos<br/>2 esteiras → Gerar ranking]
+    K --> L[⬇️ Baixar planilha<br/>📋 Copiar legenda]
     I --> J[📋 Copiar texto<br/>e mandar com os vídeos]
 ```
 
 - [ ] **Escala:** abrir **Escala de Bases**, clicar nos nomes de quem faltou e em **Gerar escala do dia**. Depois, **Copiar texto** para o chat.
 - [ ] **Relatório:** abrir **Relatório URA** (a data já vem como o dia útil anterior), clicar em **Baixar do Argus**, arrastar a tarifação e a esteira, digitar o **valor real da fatura** de cada tarifação (se já tiver) e clicar em **Gerar relatório**.
 - [ ] **Entregar:** **Copiar tabela** (cola com as cores no Excel e no Outlook) ou **Baixar planilha**.
+- [ ] **Ranking:** **Ranking de Contratos** → arrastar as duas esteiras (Andamento e Pagamento) → **Gerar ranking** →
+  **Baixar planilha** e **📋 Copiar** a legenda para o grupo.
 - [ ] **Manutenção dos WhatsApps (manhã e almoço da operação):** **Controle de WhatsApps** → **🔧 Iniciar manutenção** →
   conferir celular por celular → **Concluir** → **📋 Copiar** o texto e mandar no grupo com os vídeos.
 
@@ -186,6 +192,95 @@ sequenceDiagram
 - Repassa só `report/desempenhoresumido`, `cmd/listargrupos` e `cmd/listarusuarios`, e **não grava nem registra nada**.
 - **Leads:** desempenho geral do dia, sem os robôs (`OPER VIRTUAL`). O filtro pelo grupo RECEPTIVO - URA trazia só quem **está** no grupo (346 de 2.985 leads em 20/10/2026).
 - **Diagnóstico dos leads** (Configurações do relatório): CSV com os leads de cada operador por filtro, sessões e datas. Serve para comparar com a exportação manual. Sem dados de clientes.
+
+</details>
+
+---
+
+## 🏆 Ranking de Contratos
+
+Ranking diário de **contratos pagos** de vendedores e supervisores, no mesmo formato da aba RELATORIO da planilha
+`Ranking_relatorio_com_comentarios_OFICIAL.xlsm`: as mesmas contas da macro, a mesma planilha, os comentários da coluna
+**FEEDBACK** e a **legenda do dia** pronta para colar no grupo. **Só o Admin** vê a ferramenta.
+
+1. Exporte as duas esteiras do dia (**Andamento** e **Pagamento**, em `.csv`) e arraste as duas na área de arquivos.
+   Cada uma é reconhecida pela coluna *Etapa*; o nome do arquivo não importa.
+2. Confira o **dia do ranking** (vem hoje) e clique em **Gerar ranking**.
+3. Confira a prévia (azul ≥ 100% da meta, verde ≥ 70%, preto abaixo; ELEGÍVEL em verde/vermelho) e a etiqueta de
+   quem escreveu os comentários. **Refazer comentários** pede frases novas.
+4. **Baixar planilha** (`ranking_AAAA-MM-DD.xlsx`) e **📋 Copiar** a legenda.
+
+> [!NOTE]
+> As esteiras (que têm **CPF de clientes**) são lidas **só no navegador** e não vão para o servidor. O histórico guarda
+> apenas o ranking pronto (nomes, valores, frases e legenda) — até 120 dias, e gerar de novo a mesma data pede confirmação.
+
+<details>
+<summary><b>⚙️ Configuração (metas, feriados e pessoas)</b></summary>
+
+Em **Configuração do ranking**, no fim da página: **Importar config.json** (o mesmo arquivo do pacote em Python) ou
+preencha os campos e **Salvar**. A configuração fica no servidor e vale para quem for Admin.
+
+| Campo | O que é |
+|---|---|
+| **Metas CLT / Estágio** | Meta e início do bônus de vendedor e supervisor, e a meta de cartão |
+| **Meta geral** | Meta da operação no mês |
+| **Funcionários ativos** | Só quem está aqui entra no ranking (um nome por linha, como vem na esteira) |
+| **Vendedores / Supervisores CLT** | Quem usa as metas CLT; os outros usam as de estágio |
+| **Feriados** | Dias que não contam como dia útil (`AAAA-MM-DD`) |
+| **Renomear supervisores** | `COMO VEM NA ESTEIRA = COMO APARECE` (ex.: `ROBSON - URA = ROBSON PAULINO`) |
+| **Emoji do destaque** | Vai ao lado do nome de quem passa de 133% da meta |
+
+**Exportar** baixa o `config.json` com o que está salvo.
+
+</details>
+
+<details>
+<summary><b>🤖 Comentários do FEEDBACK (ChatGPT → Claude → frases prontas)</b></summary>
+
+Uma frase por pessoa: motivação para quem está no topo e cobrança cada vez mais dura para quem está atrás, **sem
+números, posições nem valores**. A ordem é:
+
+1. **ChatGPT** — a chave que a empresa já usa.
+2. **Claude** — entra sozinho quando o ChatGPT está sem limite, fora do ar ou demora mais de 30 segundos (aparece o aviso
+   *"ChatGPT sem limite ou fora do ar; comentários feitos pelo Claude"*).
+3. **Frases prontas** — quando nenhuma IA responde, ou não há chave. Toda frase da IA que citar número, posição ou
+   valor, ou repetir a de outra pessoa, também é trocada por uma pronta.
+
+Para a IA vão só o **primeiro nome**, a posição em texto (*"3º de 12"*), o percentual da meta e frases como *"perto da
+meta"* e *"esteira vazia"*. **Nunca** vão CPF, sobrenome ou valores em R$ — o servidor remonta o pedido e descarta
+qualquer outro campo.
+
+As chaves ficam **só no servidor**, no `.env` (ou no `docker-compose.yml`), nunca no site:
+
+```bash
+OPENAI_API_KEY=...            # ChatGPT
+ANTHROPIC_API_KEY=...         # Claude (reserva)
+RANKING_MODELO_OPENAI=gpt-4o-mini        # opcional
+RANKING_MODELO_CLAUDE=claude-haiku-5-5   # opcional
+```
+
+Na configuração, **Usar o ChatGPT** e **Usar o Claude** ligam e desligam cada IA e mostram se a chave está instalada.
+**Para tirar o Claude de vez** (por exemplo, se a conta for de alguém que saiu da empresa): desmarque **Usar o Claude**
+ou apague a `ANTHROPIC_API_KEY` do servidor e reinicie. Sem nenhuma chave, o ranking continua saindo com as frases
+prontas.
+
+</details>
+
+<details>
+<summary><b>📣 Legenda do dia</b></summary>
+
+O texto do modelo que a equipe usava no BenHub, sem IA, montado pela data:
+
+| Dia | Tom |
+|---|---|
+| Segunda | Início da semana, "uma excelente semana" |
+| Terça / Quarta / Quinta | Acelerar, meio da semana, sprint antes da sexta |
+| Sexta | Fechar a semana, "um excelente final de semana" |
+| **Último dia útil do mês** | Fechamento do mês (com o nome do mês) |
+| **Primeiro dia útil do mês** | Balanço do mês anterior, no passado ("Novembro passou...") |
+
+Os feriados da configuração contam (ex.: com feriado no dia 30, o fechamento vai para o dia útil anterior). O quadro é
+editável; **Outra versão** troca as frases e o **📋 Copiar** leva o que estiver no quadro (essa versão fica no histórico).
 
 </details>
 
@@ -618,6 +713,9 @@ repetir coluna), completa o CPF que perdeu o zero à esquerda e gera UTF-8 com B
 | `benhermes_whatsapp` | Mapa do Controle de WhatsApps (salas, mesas, operadores, situações, celulares, histórico de 12 meses e manutenções) |
 | `benhermes_template_tasks` e outras | Central de Relatórios (tarefas, rascunhos e histórico) |
 
+O **Ranking de Contratos** é diferente: a configuração e o histórico ficam **no servidor** (só o Admin acessa) e as
+esteiras nunca saem do navegador.
+
 > [!WARNING]
 > Como tudo fica no navegador, **outro computador ou outro navegador começa vazio**, e limpar os dados do navegador
 > apaga o histórico. Use sempre o mesmo computador e **exporte os históricos** (escala e relatório) de vez em quando.
@@ -653,6 +751,12 @@ testes e o build. **PR vermelho não deve ir para a `main`.**
 | [`whatsappHistorico.test.ts`](src/utils/whatsappHistorico.test.ts) | O que gera evento (painel, celular, operador, entrou/saiu) e o que não gera (trocar celular de baia), relógio que voltou, poda de 12 meses |
 | [`whatsappManutencao.test.ts`](src/utils/whatsappManutencao.test.ts) | Janela pela hora, botões por situação, ações em sequência, texto do grupo exato, celular apagado no meio |
 | [`whatsappEstatisticas.test.ts`](src/utils/whatsappEstatisticas.test.ts) | Linha do tempo, quedas, tempo OK, até voltar, troca de operador, período que corta, calendário com feriados |
+| [`ranking/calculo.test.ts`](src/utils/ranking/calculo.test.ts) | Dias úteis, margem/cartão fora da portabilidade, proposta repetida, empate, só ativos, renomear supervisor, emoji, faixas do potencial, total geral, BOM e colunas faltando |
+| [`ranking/golden.test.ts`](src/utils/ranking/golden.test.ts) | Ranking real conferido com o oficial (posições, nomes e valores). **Pulado** sem a variável `RANKING_GOLDEN_DIR` apontando para uma pasta com `andamento.csv`, `pagamento.csv`, `config.json` e `esperado.json` (dados reais nunca vão para o repositório) |
+| [`ranking/planilha.test.ts`](src/utils/ranking/planilha.test.ts) | Modelo sem dados reais, títulos, cabeçalho de projeção, cores, SIM/NÃO e legenda de cartão |
+| [`ranking/legenda.test.ts`](src/utils/ranking/legenda.test.ts) | Legenda de cada dia, fechamento com feriado no fim do mês, balanço no 1º dia útil, sem números, "Outra versão" |
+| [`ranking/frases.test.ts`](server/ranking/frases.test.ts) · [`ia.test.ts`](server/ranking/ia.test.ts) | O que vai para a IA, frases trocadas (com número ou repetidas), ChatGPT → Claude → frases prontas, chaves ausentes |
+| [`ranking.test.ts`](server/ranking.test.ts) | Rotas só do Admin (403 para os outros), configuração inválida, histórico de 120 e pedido sem CPF, sobrenome ou R$ |
 | [`argusProxy.test.ts`](server/argusProxy.test.ts) | A ponte descarta CPF/e-mail, só aceita os 3 endereços e exige https e token |
 
 </details>
@@ -674,7 +778,7 @@ npm run dev        # http://localhost:5173/
 |---|---|
 | `npm run dev` | Servidor de desenvolvimento Vite (com proxy para `/api` e ponte do Argus) |
 | `npm run start` | Servidor de produção Node.js com SQLite nativo (`node:sqlite`) e autenticação |
-| `npm test` | Executa todos os testes unitários (19 suites, 209 testes) |
+| `npm test` | Executa todos os testes unitários (34 suites, 319 testes) |
 | `npm run build` | Confere os tipos e compila o frontend em `dist/` |
 | `npm run preview` | Abre o site gerado (também com a ponte do Argus) |
 
@@ -719,11 +823,13 @@ O projeto adota o princípio **Nevernester** para manter o código limpo, legív
 BENHERMES/
 ├── api/argus.ts                  # função da Vercel: ponte com o Argus no site
 ├── server/argusProxy.ts          # ponte com o Argus (mesmo código no Vite e na Vercel)
+├── server/ranking/               # Ranking: comentários por IA, frases prontas e validação da configuração
 ├── .github/workflows/ci.yml      # testes e build em cada PR
 ├── src/
 │   ├── components/
 │   │   ├── escala/               # Escala de Bases
 │   │   ├── relatorioUra/         # Relatório URA (tabela, conferência, configurações)
+│   │   ├── ranking/              # Ranking de Contratos (prévia, legenda, histórico, configuração)
 │   │   ├── configuracoes/        # Configurações do Hub (feriados)
 │   │   ├── formatter/            # Formatador de Planilhas
 │   │   ├── reports/ templates/   # Central de Relatórios
