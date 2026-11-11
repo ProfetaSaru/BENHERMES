@@ -206,7 +206,7 @@ export const EscalaBasesHub: React.FC<EscalaBasesHubProps> = ({ onNotify }) => {
           <p className="eyebrow">AUTOMAÇÕES & DADOS</p>
           <h1>
             <Shuffle size={32} />
-            Escala de Bases — Ativo 2
+            Escala de Bases — Ativo
           </h1>
           <p>
             Rodízio diário das bases entre os grupos dos supervisores: a cada dia, cada pessoa anda uma base para

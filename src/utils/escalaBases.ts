@@ -12,7 +12,7 @@ import { bordaFina, novaPlanilha, pintar } from './planilhaColorida';
 import type { Workbook } from 'exceljs';
 
 /**
- * Escala diária de bases do Ativo 2, em RODÍZIO.
+ * Escala diária de bases do Ativo, em RODÍZIO.
  *
  * Mesmas regras do escala_bases.py do BENZAITEN e da macro da Escala_Bases_Ativo2.xlsm:
  *  - a cada sorteio, cada pessoa anda UMA base para frente, na ordem do cadastro
@@ -246,7 +246,7 @@ export const ultimosSorteios = (
 /** Texto pronto para colar no chat ou no e-mail */
 export const textoDaEscala = (resultado: ResultadoSorteio): string => {
   const linhas = [
-    `ESCALA DE BASES — ATIVO 2`,
+    `ESCALA DE BASES — ATIVO`,
     `${isoParaBr(resultado.data)} (${diaDaSemana(resultado.data)})`,
     '',
     ...resultado.atribuicoes.map((a) => `• ${a.base}: ${a.responsavel}`),
@@ -283,7 +283,7 @@ export const gerarPlanilhaEscala = async (
   // --- Aba 1: escala do dia ---
   const ws = livro.addWorksheet('Escala');
   ws.mergeCells('A1:B1');
-  ws.getCell('A1').value = 'ESCALA DE BASES — ATIVO 2';
+  ws.getCell('A1').value = 'ESCALA DE BASES — ATIVO';
   pintar(ws.getCell('A1'), azul, branco, true, 14);
   ws.getCell('A1').alignment = { horizontal: 'center' };
   ws.mergeCells('A2:B2');

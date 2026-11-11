@@ -3,12 +3,14 @@ import { describe, expect, it } from 'vitest';
 import { EscalaRegistro } from '../types/escala';
 import {
   csvParaHistorico,
+  gerarPlanilhaEscala,
   historicoParaCsv,
   importarPlanilhaEscala,
   mesclarHistorico,
   realizarSorteio,
   registrarSorteio,
   rodizio,
+  textoDaEscala,
 } from './escalaBases';
 
 // Mesmos casos do tests/test_escala_bases.py do BENZAITEN (nomes fictícios)
@@ -140,5 +142,18 @@ describe('histórico e importação da escala', () => {
     const { cadastro, registros } = importarPlanilhaEscala(lido);
     expect(cadastro).toEqual({ bases: ['BASE A', 'BASE B'], pessoas: ['ANA', 'BRUNO'] });
     expect(registros.map((r) => r.data)).toEqual(['2026-10-20', '2026-10-20', '2026-10-19', '2026-10-19']);
+  });
+});
+
+describe('título da escala', () => {
+  const resultado = realizarSorteio({ bases: NOTAS, pessoas: PESSOAS }, [], '2026-11-11', []);
+
+  it('o texto para o chat começa com "ESCALA DE BASES — ATIVO", sem o 2', () => {
+    expect(textoDaEscala(resultado).split('\n')[0]).toBe('ESCALA DE BASES — ATIVO');
+  });
+
+  it('a planilha tem o mesmo título', async () => {
+    const livro = await gerarPlanilhaEscala(resultado, [], NOTAS);
+    expect(livro.getWorksheet('Escala')!.getCell('A1').value).toBe('ESCALA DE BASES — ATIVO');
   });
 });
