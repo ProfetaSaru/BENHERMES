@@ -81,6 +81,16 @@ describe('frases prontas', () => {
     }
   });
 
+  it('ranking grande (45 zerados): as frases prontas se repetem no máximo duas vezes', () => {
+    const nomes = Array.from({ length: 45 }, (_, i) => `PESSOA${String.fromCharCode(65 + (i % 26))}${String.fromCharCode(65 + Math.floor(i / 26))}`);
+    const ds = descrever(nomes.map((n, i) => linha(n, `${i + 1}º`, 0, 0)));
+    const usadas = new Set<string>();
+    const frases = ds.map((d, i) => frasePronta(d, i, ds.length, usadas).replace(d.nome, '{n}'));
+    const vezes = new Map<string, number>();
+    for (const f of frases) vezes.set(f, (vezes.get(f) ?? 0) + 1);
+    expect(Math.max(...vezes.values())).toBeLessThanOrEqual(2);
+  });
+
   it('todos zerados: ninguém repete', () => {
     const ds = descrever(nomes.map((n) => linha(n, '5º', 0, 0)));
     const usadas = new Set<string>();

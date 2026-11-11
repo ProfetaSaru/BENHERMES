@@ -51,6 +51,14 @@ describe('validar a configuração do ranking', () => {
     expect(validarConfig({ ...PACOTE, argus_em: 'ontem' })).toMatchObject({ erro: expect.stringMatching(/argus_em/) });
   });
 
+  it('meta do vendedor e do supervisor precisam ser maiores que zero (são divisores)', () => {
+    for (const campo of ['meta_vendedor', 'meta_supervisor'] as const) {
+      const r = validarConfig({ ...PACOTE, metas: { ...PACOTE.metas, estagio: { ...PACOTE.metas.estagio, [campo]: 0 } } });
+      expect('erro' in r && r.erro, campo).toMatch(new RegExp(`metas\\.estagio\\.${campo}.*maior que zero`));
+    }
+    expect('config' in validarConfig({ ...PACOTE, metas: { ...PACOTE.metas, clt: { ...PACOTE.metas.clt, meta_cartao: 0 } } })).toBe(true);
+  });
+
   it('recusa com mensagem que diz o campo', () => {
     const casos: [unknown, RegExp][] = [
       [{ ...PACOTE, metas: { ...PACOTE.metas, clt: { ...PACOTE.metas.clt, meta_vendedor: '450000' } } }, /metas\.clt\.meta_vendedor/],

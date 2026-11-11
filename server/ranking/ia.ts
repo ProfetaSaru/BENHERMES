@@ -192,6 +192,10 @@ export const chavesDoAmbiente = (env: Ambiente = process.env) => ({
  * Remonta o pedido do navegador só com os campos permitidos: primeiro nome (uma palavra, sem dígitos),
  * posição "Xº de N", projetando arredondado e os textos qualitativos. Qualquer outro campo é descartado.
  */
+// Os únicos textos que o navegador manda (frases.ts › descrever); qualquer outro é descartado
+const SITUACOES = new Set(['batendo a meta', 'perto da meta', 'sem nenhum contrato pago', 'abaixo da meta']);
+const ESTEIRAS = new Set(['esteira em andamento cheia', 'pouca coisa em andamento', 'esteira vazia']);
+
 export const limparEntrada = (bruto: any): EntradaComentarios | null => {
   const lista = (v: unknown): Descricao[] | null => {
     if (!Array.isArray(v) || v.length > 500) return null;
@@ -205,8 +209,8 @@ export const limparEntrada = (bruto: any): EntradaComentarios | null => {
         nome,
         posicao,
         projetando,
-        situacao: String(d.situacao ?? '').slice(0, 40),
-        esteira: String(d.esteira ?? '').slice(0, 40),
+        situacao: SITUACOES.has(d.situacao) ? d.situacao : '',
+        esteira: ESTEIRAS.has(d.esteira) ? d.esteira : '',
         vendeu_cartao_ou_margem: d.vendeu_cartao_ou_margem === true,
       });
     }

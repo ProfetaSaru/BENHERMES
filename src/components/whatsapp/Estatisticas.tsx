@@ -5,7 +5,7 @@ import { EventoWhatsapp, MapaWhatsapp, Situacao } from '../../types/whatsapp';
 import { FeriadoLocal } from '../../utils/calendario';
 import { AlvoAlerta } from '../../utils/whatsappAlertas';
 import { ROTULOS } from '../../utils/whatsappBaias';
-import { Grupo, Periodo, calcularEstatisticas, formatarDuracao } from '../../utils/whatsappEstatisticas';
+import { Grupo, Periodo, calcularEstatisticas, formatarDuracao, larguraDaBarra } from '../../utils/whatsappEstatisticas';
 import { ROTULO_JANELA } from '../../utils/whatsappManutencao';
 
 interface EstatisticasProps {
@@ -113,9 +113,9 @@ const QuedasPorDia: React.FC<{ dados: { dia: string; quedas: number }[] }> = ({ 
 };
 
 /** Barra horizontal fina com o valor em texto ao lado */
-const Barra: React.FC<{ valor: number; max: number; classe: string; rotulo: string }> = ({ valor, max, classe, rotulo }) => (
+const Barra: React.FC<{ valor: number | null; max: number; classe: string; rotulo: string }> = ({ valor, max, classe, rotulo }) => (
   <span className="wpp-barra" title={rotulo}>
-    <span className={`wpp-barra-cheia ${classe}`} style={{ width: `${max > 0 ? Math.max(2, (valor / max) * 100) : 0}%` }} />
+    <span className={`wpp-barra-cheia ${classe}`} style={{ width: `${larguraDaBarra(valor, max)}%` }} />
   </span>
 );
 
@@ -190,7 +190,7 @@ export const Estatisticas: React.FC<EstatisticasProps> = ({ mapa, agora, feriado
                 {g.hex && <span className="wpp-celular-amostra" style={{ background: g.hex }} aria-hidden="true" />}
                 {g.nome}
               </span>
-              <Barra valor={g.tempoOk ?? 0} max={1} classe="ok" rotulo={`Tempo OK: ${pct(g.tempoOk)}`} />
+              <Barra valor={g.tempoOk} max={1} classe="ok" rotulo={`Tempo OK: ${pct(g.tempoOk)}`} />
               <span className="wpp-est-valor">{pct(g.tempoOk)}</span>
               <span className={`wpp-est-quedas ${g.quedas ? 'tem' : ''}`}>{g.quedas} queda(s)</span>
             </li>

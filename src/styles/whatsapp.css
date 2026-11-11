@@ -971,25 +971,6 @@
 }
 
 /* Aviso flutuante (ligar uma baia já usada, erros de importação…) */
-.wpp-aviso {
-  position: fixed;
-  left: 50%;
-  bottom: 24px;
-  z-index: 60;
-  transform: translateX(-50%);
-  max-width: calc(100vw - 32px);
-  padding: 10px 16px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--paper);
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
-}
-
-.wpp-aviso .form-message {
-  margin: 0;
-  min-height: 0;
-}
-
 /* Manutenção */
 .wpp-manutencao-chamada {
   display: flex;
@@ -1721,4 +1702,29 @@
     flex-direction: column;
     align-items: stretch;
   }
+}
+
+/* O painel recebe o foco ao abrir (teclado e leitor de tela), sem contorno no quadro inteiro */
+.wpp-painel:focus {
+  outline: none;
+}
+
+/* Caixa de marcar no formulário do celular novo */
+.wpp-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+
+/* Formulário do celular novo: caixa de marcar na linha do campo e botões numa linha própria */
+.wpp-config-celular-form label.wpp-check {
+  flex-direction: row;
+  align-items: center;
+  min-height: 40px;
+}
+
+.wpp-config-celular-form .formatter-actions-buttons {
+  grid-column: 1 / -1;
 }

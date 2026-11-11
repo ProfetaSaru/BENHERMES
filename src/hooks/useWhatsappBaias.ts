@@ -64,7 +64,9 @@ export function useWhatsappBaias() {
   const gravar = useCallback(
     (mudar: (m: MapaWhatsapp) => MapaWhatsapp) =>
       setMapa((antes) => {
-        const proximo = gravarAlteracao(antes, mudar(antes), new Date());
+        const mudado = mudar(antes);
+        if (mudado === antes) return antes; // nada mudou: não grava nem sincroniza
+        const proximo = gravarAlteracao(antes, mudado, new Date());
         sincronizarComServidor(proximo);
         return proximo;
       }),

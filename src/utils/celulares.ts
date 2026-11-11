@@ -114,17 +114,22 @@ export const ligarAutomaticamente = (celular: Celular, mapa: MapaWhatsapp): Celu
   return { ...celular, vagas: vagas.map((v) => ({ ...v, baia: fila[v.app].shift() ?? null })) };
 };
 
+/** Compartilhado e nome do backup que um celular novo ganha nesta equipe (o formulário mostra para editar) */
+export const perfilPadraoDoCelular = (mapa: MapaWhatsapp, mesaId: string | null) => perfilDaMesa(acharMesa(mapa, mesaId)?.mesa);
+
 export const novoCelular = (
-  dados: Pick<Celular, 'cor' | 'hex' | 'apelido' | 'marca' | 'usuarios' | 'mesaId'>,
+  dados: Pick<Celular, 'cor' | 'hex' | 'apelido' | 'marca' | 'usuarios' | 'mesaId'> & Partial<Pick<Celular, 'compartilhado' | 'nomeBackup'>>,
   mapa: MapaWhatsapp,
   agora: Date
 ): Celular => {
   const quantos = temUsuarios(dados.marca) ? dados.usuarios : 1;
+  const padrao = perfilPadraoDoCelular(mapa, dados.mesaId);
   const celular: Celular = {
     id: crypto.randomUUID(),
     ...dados,
     usuarios: quantos,
-    ...perfilDaMesa(acharMesa(mapa, dados.mesaId)?.mesa),
+    compartilhado: dados.compartilhado ?? padrao.compartilhado,
+    nomeBackup: dados.nomeBackup?.trim() || padrao.nomeBackup,
     vagas: vagasDaMarca(dados.marca, quantos).map((m) => novaVaga(m, agora)),
   };
   return ligarAutomaticamente(celular, mapa);
@@ -218,13 +223,17 @@ export const mudarMarcaOuUsuarios = (
   if (marca === 'OUTRO' && celular.marca === 'OUTRO') return { celular, removidas: [] };
   const quantos = temUsuarios(marca) ? quantidade : 1;
   const chave = (v: ModeloDeVaga) => `${v.grupo}|${v.rotulo}`;
-  const atuais = new Map(celular.vagas.map((v) => [chave(v), v]));
-  const modelos = vagasDaMarca(marca, quantos);
-  const vagas = modelos.map((m) => atuais.get(chave(m)) ?? novaVaga(m, agora));
-  const mantidas = new Set(modelos.map(chave));
+  // Cada modelo usa uma vaga atual diferente (um "Outro" pode ter duas vagas com o mesmo grupo e rótulo)
+  const usadas = new Set<string>();
+  const vagas = vagasDaMarca(marca, quantos).map((m) => {
+    const atual = celular.vagas.find((v) => !usadas.has(v.id) && chave(v) === chave(m));
+    if (!atual) return novaVaga(m, agora);
+    usadas.add(atual.id);
+    return atual;
+  });
   return {
     celular: { ...celular, marca, usuarios: quantos, vagas },
-    removidas: celular.vagas.filter((v) => !mantidas.has(chave(v))),
+    removidas: celular.vagas.filter((v) => !usadas.has(v.id)),
   };
 };
 
@@ -248,6 +257,16 @@ export const limparLigacoes = (mapa: MapaWhatsapp): MapaWhatsapp => ({
     return { ...c, vagas: c.vagas.map((v) => (v.baia && !ativas.has(v.baia) ? { ...v, baia: null } : v)) };
   }),
 });
+
+/** Vagas ligadas a uma baia antes e que ficam como backup depois (para avisar antes de salvar ou remover) */
+export const vagasQueViramBackup = (antes: MapaWhatsapp, depois: MapaWhatsapp): string[] =>
+  antes.celulares.flatMap((cel) => {
+    const sigla = acharMesa(antes, cel.mesaId)?.mesa.sigla ?? '';
+    const novo = depois.celulares.find((c) => c.id === cel.id);
+    return cel.vagas
+      .filter((v) => v.baia && !novo?.vagas.find((n) => n.id === v.id)?.baia)
+      .map((v) => `${textoDoLocal(cel, v)} (era ${sigla}-${v.baia})`);
+  });
 
 export const removerMesaComCelulares = (mapa: MapaWhatsapp, salaId: string, mesaId: string, agora: Date): MapaWhatsapp =>
   transferirSituacoes(mapa, limparLigacoes(removerMesaNoMapa(mapa, salaId, mesaId, agora)), agora);

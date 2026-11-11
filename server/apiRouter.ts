@@ -22,6 +22,8 @@ import { chavesDoAmbiente, gerarComentarios, limparEntrada, provedoresDoAmbiente
 import type { ConfigRanking } from './ranking/tipos.ts';
 
 const MAX_BODY_BYTES = 5 * 1024 * 1024; // 5 MB (para mapas/relatórios grandes)
+// O mapa do WhatsApp guarda 12 meses de histórico: com ~50 eventos por dia passa de 5 MB
+const MAX_WHATSAPP_BODY_BYTES = 30 * 1024 * 1024;
 const MAX_UPLOAD_FILE_BYTES = 50 * 1024 * 1024; // 50 MB (para arquivos compartilhados)
 
 const BLOCKED_FILE_EXTENSIONS = new Set([
@@ -95,7 +97,7 @@ function sendJson(res: ServerResponse, status: number, data: unknown): void {
   res.end(JSON.stringify(data));
 }
 
-function readJsonBody(req: IncomingMessage & { body?: unknown }): Promise<any> {
+function readJsonBody(req: IncomingMessage & { body?: unknown }, limite = MAX_BODY_BYTES): Promise<any> {
   if (req.body !== undefined) {
     if (typeof req.body === 'string') {
       try {
@@ -120,7 +122,7 @@ function readJsonBody(req: IncomingMessage & { body?: unknown }): Promise<any> {
     let total = 0;
     req.on('data', (chunk: Buffer) => {
       total += chunk.length;
-      if (total > MAX_BODY_BYTES) {
+      if (total > limite) {
         reject(new Error('Payload excede o limite permitido.'));
         req.destroy();
         return;
@@ -480,7 +482,7 @@ export function createApiHandler(
           sendJson(res, 403, { erro: 'Operadores não têm acesso à aba Controle de WhatsApps.' });
           return true;
         }
-        const body = await readJsonBody(req);
+        const body = await readJsonBody(req, MAX_WHATSAPP_BODY_BYTES);
         if (!body || !body.mapa) {
           sendJson(res, 400, { erro: 'Mapa inválido.' });
           return true;

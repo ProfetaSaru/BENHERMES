@@ -312,4 +312,18 @@ export const concluirManutencao = (mapa: MapaWhatsapp, observacao: string, agora
 };
 
 /** Descarta o registro; as mudanças de situação já feitas continuam */
-export const cancelarManutencao = (mapa: MapaWhatsapp): MapaWhatsapp => ({ ...mapa, manutencaoAtual: null });
+/** Cancelar: a manutenção some, e os eventos feitos durante ela deixam de apontar para ela */
+export const cancelarManutencao = (mapa: MapaWhatsapp): MapaWhatsapp => {
+  const id = mapa.manutencaoAtual?.id;
+  return {
+    ...mapa,
+    manutencaoAtual: null,
+    historico: id
+      ? mapa.historico.map((e) => {
+          if (e.manutencaoId !== id) return e;
+          const { manutencaoId: _cancelada, ...resto } = e;
+          return resto;
+        })
+      : mapa.historico,
+  };
+};

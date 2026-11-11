@@ -10,6 +10,9 @@ import {
   renomearSalaNoMapa,
   alterarLugarNoMapa,
   alterarMesaNoMapa,
+  avisoDeRemocao,
+  mesclarRascunhoDaMesa,
+  pareceMapaInicial,
   carregarMapa,
   estado,
   exportarMapa,
@@ -27,6 +30,7 @@ import {
   siglaValida,
   tempoRestante,
 } from './whatsappBaias';
+import { novoCelular } from './celulares';
 
 const AGORA = new Date('2026-10-27T10:00:00');
 const depois = (minutos: number) => new Date(AGORA.getTime() + minutos * 60_000);
@@ -143,6 +147,13 @@ describe('situação do WhatsApp', () => {
     }
   });
 
+  it('prazo enorme é recusado com mensagem (não quebra com "Invalid time value")', () => {
+    expect(() => restringir(1e12, 'dias', AGORA)).toThrow('O prazo máximo da restrição é de 365 dias.');
+    expect(() => restringir(366, 'dias', AGORA)).toThrow('O prazo máximo da restrição é de 365 dias.');
+    expect(() => restringir(8761, 'horas', AGORA)).toThrow('O prazo máximo da restrição é de 365 dias.');
+    expect(restringir(365, 'dias', AGORA).restritoAte).toBe(new Date(AGORA.getTime() + 365 * 24 * 3600_000).toISOString());
+  });
+
   it('tempo restante e restrição vencida', () => {
     expect(tempoRestante(restringir(27, 'horas', AGORA), AGORA)).toBe('1d 3h');
     expect(tempoRestante(restringir(2, 'dias', AGORA), AGORA)).toBe('2d');
@@ -196,6 +207,46 @@ describe('arquivo do mapa (.json)', () => {
     expect(() => importarMapa(JSON.stringify(errado), AGORA)).toThrow();
   });
 
+  it('recusa datas que não são datas, cor fora do formato e eventos com situação inválida', () => {
+    const base = () => {
+      const m: MapaWhatsapp = structuredClone(mapa);
+      m.celulares = [novoCelular({ cor: 'Azul', hex: '#1E40AF', apelido: '', marca: 'SAMSUNG', usuarios: 2, mesaId: null }, m, AGORA)];
+      m.historico = [
+        { em: AGORA.toISOString(), chave: 'k', tipo: 'SITUACAO', de: 'OK', para: 'BANIDO', codigo: 'OP1-E1', operador: '', equipe: '', celular: '', vaga: '' },
+      ];
+      return m;
+    };
+    expect(importarMapa(exportarMapa(base(), AGORA), AGORA).celulares).toHaveLength(1);
+    const estragos: ((m: any) => void)[] = [
+      (m) => (m.salas[0].mesas[0].lugares.E1.whatsapp.mudouEm = 'ontem'),
+      (m) => (m.atualizadoEm = 'agora'),
+      (m) => (m.celulares[0].hex = 'azul'),
+      (m) => (m.historico[0].para = 'TALVEZ'),
+      (m) => (m.historico[0].em = 'ontem'),
+      (m) => (m.salas[0].mesas[0].desativadas = [1]),
+    ];
+    for (const [i, estragar] of estragos.entries()) {
+      const m = base();
+      estragar(m);
+      expect(() => importarMapa(exportarMapa(m, AGORA), AGORA), `estrago ${i}`).toThrow('O arquivo não é um mapa do Controle de WhatsApps válido.');
+    }
+  });
+
+  it('importar limpa ligações de vaga para baia ou mesa que não existem', () => {
+    const m: MapaWhatsapp = structuredClone(mapa);
+    const op1 = m.salas[0].mesas[0];
+    const cel = novoCelular({ cor: 'Azul', hex: '#1E40AF', apelido: '', marca: 'SAMSUNG', usuarios: 1, mesaId: op1.id }, m, AGORA);
+    cel.vagas[0].baia = 'E99';
+    const orfao = { ...novoCelular({ cor: 'Preto', hex: '#000000', apelido: '', marca: 'IPHONE', usuarios: 1, mesaId: null }, m, AGORA), mesaId: 'mesa-apagada' };
+    orfao.vagas[0].baia = 'E1';
+    m.celulares = [cel, orfao];
+    const lido = importarMapa(exportarMapa(m, AGORA), AGORA);
+    expect(lido.celulares[0].vagas[0].baia).toBeNull();
+    expect(lido.celulares[0].mesaId).toBe(op1.id);
+    expect(lido.celulares[1]).toMatchObject({ mesaId: null });
+    expect(lido.celulares[1].vagas[0].baia).toBeNull();
+  });
+
   it('dados salvos ilegíveis são sinalizados para guardar uma cópia antes de sobrescrever', () => {
     expect(lerMapaSalvo('lixo', AGORA).ilegivel).toBe(true);
     expect(lerMapaSalvo('{"versao":2}', AGORA).ilegivel).toBe(true);
@@ -218,6 +269,12 @@ describe('alterações no mapa (sem mexer no original)', () => {
   const mapa = mapaInicial(AGORA);
   const sala = mapa.salas[0];
   const mesa = sala.mesas[0];
+
+  it('mudança que não muda nada não mexe em "Atualizado em"', () => {
+    expect(alterarLugarNoMapa(mapa, sala.id, mesa.id, 'E1', { operador: '' }, depois(1))).toBe(mapa);
+    expect(alterarMesaNoMapa(mapa, sala.id, mesa.id, (m) => ({ ...m }), depois(1))).toBe(mapa);
+    expect(alterarMesaNoMapa(mapa, sala.id, 'nao-existe', (m) => ({ ...m, nome: 'X' }), depois(1))).toBe(mapa);
+  });
 
   it('lugar: troca só o lugar pedido e atualiza a data do mapa', () => {
     const novo = alterarLugarNoMapa(mapa, sala.id, mesa.id, 'E1', { operador: 'ANA' }, depois(1));
@@ -321,5 +378,32 @@ describe('versão 3', () => {
     for (const r of ruins) {
       expect(() => importarMapa(exportarMapa(r as MapaWhatsapp, AGORA), AGORA)).toThrow('não é um mapa do Controle de WhatsApps válido');
     }
+  });
+});
+
+describe('edição de mesa pelas configurações', () => {
+  const base = novaMesa({ nome: '1º Equipe', sigla: 'OP1', supervisor: 'JOANA', esq: 2, dir: 2, centro: 'SUP', inicio: 'sup' }, AGORA);
+
+  it('salvar o rascunho só aplica o que foi mudado nele (o supervisor trocado no painel continua)', () => {
+    const rascunho = { ...base, esq: 3 };
+    const atual = { ...base, supervisor: 'MARCOS', supervisorUserId: 'u-2' };
+    expect(mesclarRascunhoDaMesa(base, rascunho, atual)).toMatchObject({ esq: 3, dir: 2, supervisor: 'MARCOS', supervisorUserId: 'u-2', nome: '1º Equipe' });
+  });
+
+  it('centro "Ninguém" pede confirmação para o lugar do supervisor, mesmo sem operador', () => {
+    const mesa = { ...base, lugares: { ...base.lugares, SUP: { operador: '', whatsapp: restringir(2, 'dias', AGORA) }, E2: { ...base.lugares.E2, operador: 'ANA' } } };
+    const { removidos } = formatarMesa(mesa, { ...mesa, esq: 1, centro: 'NENHUM' }, AGORA);
+    expect([...avisoDeRemocao(removidos, mesa)].sort()).toEqual(['OP1-E2 — ANA', 'OP1-SUP — supervisor JOANA (WhatsApp: RESTRINGIDO)']);
+  });
+});
+
+describe('mapa ainda vazio (sugere importar a planilha)', () => {
+  it('mapa de fábrica sim; com operador, supervisor, celular ou histórico, não', () => {
+    const m = mapaInicial(AGORA);
+    expect(pareceMapaInicial(m)).toBe(true);
+    expect(pareceMapaInicial(alterarLugarNoMapa(m, m.salas[0].id, m.salas[0].mesas[0].id, 'E1', { operador: 'ANA' }, AGORA))).toBe(false);
+    expect(pareceMapaInicial(alterarMesaNoMapa(m, m.salas[0].id, m.salas[0].mesas[0].id, (x) => ({ ...x, supervisor: 'JOANA' }), AGORA))).toBe(false);
+    expect(pareceMapaInicial({ ...m, celulares: [novoCelular({ cor: 'Azul', hex: '#1E40AF', apelido: '', marca: 'SAMSUNG', usuarios: 2, mesaId: null }, m, AGORA)] })).toBe(false);
+    expect(pareceMapaInicial({ ...m, manutencoes: [{} as any] })).toBe(false);
   });
 });

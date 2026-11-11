@@ -61,6 +61,13 @@ export const mapaInicial = (agora: Date): MapaWhatsapp => ({
   atualizadoEm: agora.toISOString(),
 });
 
+/** Mapa ainda como veio de fábrica (ninguém cadastrado): a tela sugere importar a planilha */
+export const pareceMapaInicial = (mapa: MapaWhatsapp): boolean =>
+  mapa.celulares.length === 0 &&
+  mapa.historico.length === 0 &&
+  mapa.manutencoes.length === 0 &&
+  mapa.salas.every((s) => s.mesas.every((m) => !m.supervisor.trim() && Object.values(m.lugares).every((l) => !l.operador.trim())));
+
 /** Nova situação (menos RESTRINGIDO e ANALISE: use restringir e pedirAnalise) */
 export const mudarSituacao = (atual: EstadoWhatsapp, nova: Situacao, agora: Date): EstadoWhatsapp => {
   if (nova === 'RESTRINGIDO') throw new Error('Para restringir, informe por quanto tempo.');
@@ -92,6 +99,7 @@ export const tempoDesde = (iso: string, agora: Date): string => {
 export const restringir = (quantidade: number, unidade: 'horas' | 'dias', agora: Date): EstadoWhatsapp => {
   if (!Number.isFinite(quantidade) || quantidade <= 0) throw new Error('Informe um tempo maior que zero.');
   const horas = unidade === 'dias' ? quantidade * 24 : quantidade;
+  if (horas > 365 * 24) throw new Error('O prazo máximo da restrição é de 365 dias.');
   return estado('RESTRINGIDO', agora, new Date(agora.getTime() + horas * HORA));
 };
 
@@ -120,13 +128,18 @@ export const alterarMesaNoMapa = (
   mesaId: string,
   mudar: (mesa: Mesa) => Mesa,
   agora: Date
-): MapaWhatsapp => ({
-  ...mapa,
-  salas: mapa.salas.map((s) =>
-    s.id !== salaId ? s : { ...s, mesas: s.mesas.map((m) => (m.id === mesaId ? mudar(m) : m)) }
-  ),
-  atualizadoEm: agora.toISOString(),
-});
+): MapaWhatsapp => {
+  const atual = mapa.salas.find((s) => s.id === salaId)?.mesas.find((m) => m.id === mesaId);
+  if (!atual) return mapa;
+  const nova = mudar(atual);
+  // Nada mudou (ex.: sair de um campo sem editar): o mapa fica igual, sem mexer em "Atualizado em"
+  if (JSON.stringify(nova) === JSON.stringify(atual)) return mapa;
+  return {
+    ...mapa,
+    salas: mapa.salas.map((s) => (s.id !== salaId ? s : { ...s, mesas: s.mesas.map((m) => (m.id === mesaId ? nova : m)) })),
+    atualizadoEm: agora.toISOString(),
+  };
+};
 
 export const alterarLugarNoMapa = (
   mapa: MapaWhatsapp,
@@ -197,6 +210,28 @@ export const formatarMesa = (
   };
 };
 
+const CAMPOS_DA_MESA = ['nome', 'sigla', 'supervisor', 'supervisorUserId', 'esq', 'dir', 'centro', 'inicio', 'desativadas'] as const;
+
+/**
+ * O que salvar de um rascunho de mesa: só os campos mudados no rascunho (em relação à mesa quando a edição
+ * começou); o resto vem da mesa atual, para não desfazer o que mudou no painel enquanto o rascunho estava aberto.
+ */
+export const mesclarRascunhoDaMesa = (inicial: Mesa, rascunho: Mesa, atual: Mesa): DadosDaMesa => {
+  const igual = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  return Object.fromEntries(CAMPOS_DA_MESA.map((c) => [c, igual(rascunho[c], inicial[c]) ? atual[c] : rascunho[c]])) as unknown as DadosDaMesa;
+};
+
+/** Linhas da confirmação ao salvar uma mesa: baias que deixam de existir com operador e o lugar do supervisor */
+export const avisoDeRemocao = (removidos: { posicao: string; operador: string }[], mesa: Mesa): string[] =>
+  removidos.flatMap(({ posicao, operador }) => {
+    const codigo = `${mesa.sigla}-${posicao}`;
+    if (posicao === 'SUP') {
+      const situacao = mesa.lugares.SUP?.whatsapp.situacao;
+      return [`${codigo} — supervisor ${mesa.supervisor || '(sem nome)'}${situacao ? ` (WhatsApp: ${ROTULOS[situacao]})` : ''}`];
+    }
+    return operador.trim() ? [`${codigo} — ${operador}`] : [];
+  });
+
 export const alternarDesativada = (mesa: Mesa, posicao: string, agora: Date): Mesa => {
   if (mesa.desativadas.includes(posicao)) {
     const lugares = posicao in mesa.lugares ? mesa.lugares : { ...mesa.lugares, [posicao]: { operador: '', whatsapp: estado('OK', agora) } };
@@ -225,13 +260,16 @@ export const exportarMapa = (mapa: MapaWhatsapp, agora: Date): string =>
 
 const ehTexto = (v: unknown): v is string => typeof v === 'string';
 const ehNumero = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+/** Texto que é uma data de verdade (o mapa guarda datas em ISO) */
+const ehData = (v: unknown): v is string => ehTexto(v) && !Number.isNaN(new Date(v).getTime());
+const ehHex = (v: unknown): v is string => ehTexto(v) && /^#[0-9A-Fa-f]{6}$/.test(v);
 
 const estadoValido = (e: any): boolean =>
   !!e &&
   SITUACOES.includes(e.situacao) &&
-  ehTexto(e.mudouEm) &&
-  (e.restritoAte === undefined || ehTexto(e.restritoAte)) &&
-  (e.analisePedidaEm === undefined || ehTexto(e.analisePedidaEm));
+  ehData(e.mudouEm) &&
+  (e.restritoAte === undefined || ehData(e.restritoAte)) &&
+  (e.analisePedidaEm === undefined || ehData(e.analisePedidaEm));
 
 const mesaValida = (m: any): boolean =>
   !!m &&
@@ -245,6 +283,7 @@ const mesaValida = (m: any): boolean =>
   ['SUP', 'SUPSUB', 'NENHUM'].includes(m.centro) &&
   ['sup', 'porta'].includes(m.inicio) &&
   Array.isArray(m.desativadas) &&
+  m.desativadas.every(ehTexto) &&
   !!m.lugares &&
   typeof m.lugares === 'object' &&
   Object.values(m.lugares).every((l: any) => !!l && ehTexto(l.operador) && estadoValido(l.whatsapp));
@@ -263,7 +302,7 @@ const celularValido = (c: any): boolean =>
   !!c &&
   ehTexto(c.id) &&
   ehTexto(c.cor) &&
-  ehTexto(c.hex) &&
+  ehHex(c.hex) &&
   ehTexto(c.apelido) &&
   ['SAMSUNG', 'MOTOROLA', 'XIAOMI', 'IPHONE', 'OUTRO'].includes(c.marca) &&
   ehNumero(c.usuarios) &&
@@ -304,24 +343,36 @@ export const migrarMapa = (dados: any): MapaV2 => ({
 const TIPOS_EVENTO = ['SITUACAO', 'OPERADOR', 'ENTROU', 'SAIU'];
 const ACOES = ['BANIDO', 'RESTRINGIDO', 'PEDIU_ANALISE', 'LIBERADO', 'PERDIDO', 'TROCOU_CHIP', 'VOLTOU'];
 
+/** Situação no evento: ENTROU vem do vazio, SAIU vai para o vazio; OPERADOR guarda nomes */
+const situacoesDoEvento = (e: any): boolean => {
+  const sit = (v: string) => (SITUACOES as string[]).includes(v);
+  if (e.tipo === 'SITUACAO') return sit(e.de) && sit(e.para);
+  if (e.tipo === 'ENTROU') return e.de === '' && sit(e.para);
+  if (e.tipo === 'SAIU') return sit(e.de) && e.para === '';
+  return true;
+};
+
 const eventoValido = (e: any): boolean =>
   !!e &&
   ['em', 'chave', 'de', 'para', 'codigo', 'operador', 'equipe', 'celular', 'vaga'].every((k) => ehTexto(e[k])) &&
+  ehData(e.em) &&
   TIPOS_EVENTO.includes(e.tipo) &&
+  situacoesDoEvento(e) &&
   (e.manutencaoId === undefined || ehTexto(e.manutencaoId));
 
 const acaoValida = (a: any): boolean =>
   !!a &&
   ['em', 'chave', 'codigo', 'operador', 'celular', 'vaga'].every((k) => ehTexto(a[k])) &&
+  ehData(a.em) &&
   ACOES.includes(a.acao) &&
   (a.numeroNovo === undefined || ehTexto(a.numeroNovo)) &&
-  (a.ate === undefined || ehTexto(a.ate));
+  (a.ate === undefined || ehData(a.ate));
 
 const manutencaoValida = (m: any): boolean =>
   !!m &&
   ehTexto(m.id) &&
-  ehTexto(m.inicio) &&
-  (m.fim === null || ehTexto(m.fim)) &&
+  ehData(m.inicio) &&
+  (m.fim === null || ehData(m.fim)) &&
   ['MANHA', 'ALMOCO', 'FORA'].includes(m.janela) &&
   Array.isArray(m.conferidos) &&
   m.conferidos.every(ehTexto) &&
@@ -329,6 +380,15 @@ const manutencaoValida = (m: any): boolean =>
   m.acoes.every(acaoValida) &&
   ehTexto(m.observacao) &&
   ehTexto(m.texto);
+
+/** Celular de mesa que não existe fica guardado; vaga ligada a baia que não existe vira backup */
+const ligacoesValidas = (salas: Sala[], celulares: MapaWhatsapp['celulares']): MapaWhatsapp['celulares'] =>
+  celulares.map((c) => {
+    const mesa = salas.flatMap((s) => s.mesas).find((m) => m.id === c.mesaId);
+    if (!mesa) return c.mesaId === null && c.vagas.every((v) => v.baia === null) ? c : { ...c, mesaId: null, vagas: c.vagas.map((v) => ({ ...v, baia: null })) };
+    const ativas = new Set(posicoesAtivas(mesa));
+    return c.vagas.every((v) => !v.baia || ativas.has(v.baia)) ? c : { ...c, vagas: c.vagas.map((v) => (v.baia && !ativas.has(v.baia) ? { ...v, baia: null } : v)) };
+  });
 
 /**
  * Valida a estrutura e devolve só os campos do mapa. Versão 1 → 2 → 3; da 2 para a 3 o histórico
@@ -352,13 +412,13 @@ const lerMapa = (bruto: any, agora: Date): MapaWhatsapp => {
     Array.isArray(dados.manutencoes) &&
     dados.manutencoes.every(manutencaoValida) &&
     (dados.manutencaoAtual === null || manutencaoValida(dados.manutencaoAtual)) &&
-    ehTexto(dados.inicioDoHistorico) &&
-    ehTexto(dados.atualizadoEm);
+    ehData(dados.inicioDoHistorico) &&
+    ehData(dados.atualizadoEm);
   if (!valido) throw new Error('O arquivo não é um mapa do Controle de WhatsApps válido.');
   return {
     versao: 3,
     salas: dados.salas,
-    celulares: dados.celulares,
+    celulares: ligacoesValidas(dados.salas, dados.celulares),
     historico: dados.historico,
     manutencoes: dados.manutencoes,
     manutencaoAtual: dados.manutencaoAtual,

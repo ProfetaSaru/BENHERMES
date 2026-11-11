@@ -959,13 +959,8 @@ export class AppDatabase {
         now
       );
 
-    this.db
-      .prepare(
-        `INSERT INTO note_reads (note_id, user_id, last_read_at)
-         VALUES (?, ?, ?)
-         ON CONFLICT(note_id, user_id) DO UPDATE SET last_read_at = excluded.last_read_at`
-      )
-      .run(id, user.id, now);
+    // Sem marca de "lido" na criação: ainda não há comentários, e uma marca com o horário de agora fazia um
+    // comentário feito no mesmo milissegundo não contar como não lido (a comparação é estritamente depois).
 
     return this.getNoteById(id, user)!;
   }

@@ -131,15 +131,25 @@ describe('poda de 12 meses', () => {
     const mapa: MapaWhatsapp = {
       ...semCelular(),
       inicioDoHistorico: '2025-01-01T00:00:00.000Z',
-      historico: [evento('2025-09-01T10:00:00.000Z'), evento('2025-12-01T10:00:00.000Z')],
+      historico: [evento('2025-09-01T10:00:00.000Z'), evento('2025-12-01T10:00:00.000Z'), evento(AGORA.toISOString())],
       manutencoes: [manutencao('2025-09-01T10:00:00.000Z'), manutencao('2025-12-01T10:00:00.000Z')],
     };
     const podado = podarHistorico(mapa, AGORA);
-    expect(podado.historico.map((e) => e.em)).toEqual(['2025-12-01T10:00:00.000Z']);
+    expect(podado.historico.map((e) => e.em)).toEqual(['2025-12-01T10:00:00.000Z', AGORA.toISOString()]);
     expect(podado.manutencoes.map((m) => m.inicio)).toEqual(['2025-12-01T10:00:00.000Z']);
     const limite = new Date(AGORA);
     limite.setMonth(limite.getMonth() - 12);
     expect(podado.inicioDoHistorico).toBe(limite.toISOString());
+  });
+
+  it('relógio adiantado (um ano à frente) não apaga o histórico: conta a partir do evento mais recente', () => {
+    const mapa: MapaWhatsapp = {
+      ...semCelular(),
+      historico: [evento('2026-01-15T10:00:00.000Z'), evento('2026-10-27T10:00:00.000Z')],
+      manutencoes: [manutencao('2026-10-27T10:00:00.000Z')],
+    };
+    const adiantado = new Date('2027-12-01T10:00:00');
+    expect(podarHistorico(mapa, adiantado)).toBe(mapa);
   });
 
   it('sem nada velho, o mapa volta igual', () => {

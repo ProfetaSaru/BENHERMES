@@ -247,6 +247,26 @@ h3 {
   color: var(--blue);
 }
 
+/* Aviso flutuante do app (avisos de todas as ferramentas, menos a Central de Relatórios) */
+.aviso-flutuante {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 60;
+  transform: translateX(-50%);
+  max-width: calc(100vw - 32px);
+  padding: 10px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+}
+
+.aviso-flutuante .form-message {
+  margin: 0;
+  min-height: 0;
+}
+
 /* Task List */
 .task-list {
   display: grid;

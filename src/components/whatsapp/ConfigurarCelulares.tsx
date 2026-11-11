@@ -14,6 +14,7 @@ import {
   mudarMarcaOuUsuarios,
   nomeDoCelular,
   novoCelular,
+  perfilPadraoDoCelular,
   removerCelularNoMapa,
   removerVaga,
   transferirSituacoes,
@@ -38,9 +39,21 @@ interface Rascunho {
   marca: Marca;
   usuarios: number;
   mesaId: string;
+  /** Começam com o padrão da equipe escolhida e podem ser mudados */
+  compartilhado: boolean;
+  nomeBackup: string;
 }
 
-const RASCUNHO_VAZIO: Rascunho = { cor: '', hex: '#808080', apelido: '', marca: 'SAMSUNG', usuarios: 4, mesaId: '' };
+const RASCUNHO_VAZIO: Rascunho = {
+  cor: '',
+  hex: '#808080',
+  apelido: '',
+  marca: 'SAMSUNG',
+  usuarios: 4,
+  mesaId: '',
+  compartilhado: false,
+  nomeBackup: 'Benconsig Comercial',
+};
 
 /** Cadastro dos celulares corporativos: equipe, marca, usuários, vagas e números dos chips */
 export const ConfigurarCelulares: React.FC<ConfigurarCelularesProps> = ({
@@ -163,7 +176,11 @@ export const ConfigurarCelulares: React.FC<ConfigurarCelularesProps> = ({
       )}
       <label>
         <span className="formatter-field-label">Equipe</span>
-        <select className="formatter-select" value={r.mesaId} onChange={(e) => setNovo({ ...r, mesaId: e.target.value })}>
+        <select
+          className="formatter-select"
+          value={r.mesaId}
+          onChange={(e) => setNovo({ ...r, mesaId: e.target.value, ...perfilPadraoDoCelular(mapa, e.target.value || null) })}
+        >
           <option value="">Guardado (sem equipe)</option>
           {mesas.map(({ mesa, sala }) => (
             <option key={mesa.id} value={mesa.id}>
@@ -171,6 +188,14 @@ export const ConfigurarCelulares: React.FC<ConfigurarCelularesProps> = ({
             </option>
           ))}
         </select>
+      </label>
+      <label>
+        <span className="formatter-field-label">Nome do backup</span>
+        <input className="formatter-select" value={r.nomeBackup} onChange={(e) => setNovo({ ...r, nomeBackup: e.target.value })} />
+      </label>
+      <label className="wpp-check">
+        <input type="checkbox" checked={r.compartilhado} onChange={(e) => setNovo({ ...r, compartilhado: e.target.checked })} />
+        Compartilhado (as vagas não são ligadas às baias)
       </label>
       <div className="formatter-actions-buttons escala-acoes">
         <button type="submit" className="btn btn-primary">

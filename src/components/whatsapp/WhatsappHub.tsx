@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { BarChart3, Download, FileJson, FileUp, Map as MapIcon, MessageCircle, Upload, Users } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { NotificationState, NotificationType } from '../../types/task';
+import { NotificationType } from '../../types/task';
 import {
   AuthUser,
   UserRole,
@@ -13,7 +13,6 @@ import {
   canImportOverwriteWhatsappMap,
   canManageWhatsappMaintenance,
 } from '../../types/auth';
-import { NotificationToast } from '../common/NotificationToast';
 import { MapaWhatsapp } from '../../types/whatsapp';
 import { useWhatsappBaias } from '../../hooks/useWhatsappBaias';
 import { useFeriados } from '../../hooks/useFeriados';
@@ -21,7 +20,7 @@ import { nomeDoCelular, ondeEstaABaia, textoDoLocal } from '../../utils/celulare
 import { codigoDoLugar } from '../../utils/mapaMesas';
 import { baixarPlanilha } from '../../utils/planilhaColorida';
 import { AlvoAlerta, ResumoWhatsapp, alertas, resumoDaSala, resumoGeral } from '../../utils/whatsappAlertas';
-import { estado, exportarMapa, filtrarMapaParaSupervisor, importarMapa } from '../../utils/whatsappBaias';
+import { estado, exportarMapa, filtrarMapaParaSupervisor, importarMapa, pareceMapaInicial } from '../../utils/whatsappBaias';
 import { lerArquivoDoMapa } from '../../utils/whatsappPlanilha';
 import { gerarResumoWhatsapp, nomeDoResumoWhatsapp } from '../../utils/whatsappResumo';
 import { Alertas } from './Alertas';
@@ -37,7 +36,6 @@ import { useChamadosBenCalls } from '../../hooks/useChamadosBenCalls';
 
 interface WhatsappHubProps {
   /** Aviso atual do app: aparece flutuando, porque as ações acontecem em qualquer ponto da página */
-  notification: NotificationState;
   onNotify: (message: string, type?: NotificationType) => void;
   userRole?: UserRole;
   currentUser?: AuthUser | null;
@@ -93,7 +91,6 @@ const Contagens: React.FC<{ resumo: ResumoWhatsapp; celulares?: boolean }> = ({ 
 );
 
 export const WhatsappHub: React.FC<WhatsappHubProps> = ({
-  notification,
   onNotify,
   userRole = 'admin',
   currentUser = null,
@@ -225,6 +222,7 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({
       if (!cel || !vaga) return null;
       return (
         <PainelLugar
+          key={`vaga-${cel.id}-${vaga.id}`}
           titulo={`${nomeDoCelular(cel)} · ${vaga.rotulo}`}
           subtitulo={`${vaga.grupo} · backup "${cel.nomeBackup}"${vaga.numero ? ` · ${vaga.numero}` : ''}`}
           estado={vaga.whatsapp}
@@ -261,6 +259,7 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({
     const onde = ondeEstaABaia(mapa, mesa.id, posicao);
     return (
       <PainelLugar
+        key={`lugar-${mesa.id}-${posicao}`}
         titulo={codigoDoLugar(mesa.sigla, posicao)}
         subtitulo={`${mesa.nome} · ${sala.nome}`}
         nome={nome}
@@ -285,7 +284,7 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({
           </h1>
           <p>
             Mapa das mesas com a situação do WhatsApp de cada lugar e os celulares corporativos. Clique numa baia
-            para trocar o operador ou a situação, ou num alerta para agir; tudo fica salvo neste navegador.
+            para trocar o operador ou a situação, ou num alerta para agir; tudo fica salvo no servidor do BenHermes.
             Atualizado em {dataHora(mapa.atualizadoEm)}.
           </p>
         </div>
@@ -297,8 +296,8 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({
 
       {wpp.erroAoSalvar && (
         <div className="escala-aviso wpp-armazenamento" role="alert">
-          Armazenamento cheio: exporte o mapa e baixe a planilha. As mudanças continuam na tela, mas não estão sendo salvas
-          neste navegador.
+          Não consegui salvar no servidor: as mudanças continuam na tela, mas ainda não foram salvas. Confira a conexão e,
+          por segurança, exporte o mapa ou baixe a planilha.
         </div>
       )}
 
@@ -341,6 +340,29 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({
               <input type="file" ref={planilhaRef} accept=".xlsx,.xls" onChange={handleImportarPlanilha} style={{ display: 'none' }} />
               <input type="file" ref={jsonRef} accept=".json,application/json" onChange={handleImportarMapa} style={{ display: 'none' }} />
             </>
+          )}
+
+          {canImportOverwrite && !previa && pareceMapaInicial(mapa) && (
+            <div className="formatter-card wpp-primeira-vez">
+              <h2 className="formatter-card-title">
+                <FileUp size={20} />
+                Primeira vez? Importe o mapa
+              </h2>
+              <p className="ura-ajuda">
+                O mapa ainda está vazio. Importe a planilha de status dos WhatsApps (a RELATORIO-WHATSAPP-INTUITIVO ou a
+                baixada pelo BenHermes) ou um mapa .json exportado daqui. Se preferir, cadastre salas e mesas mais abaixo.
+              </p>
+              <div className="formatter-actions-buttons escala-acoes">
+                <button type="button" className="btn btn-primary" onClick={() => planilhaRef.current?.click()}>
+                  <FileUp size={16} />
+                  Importar planilha
+                </button>
+                <button type="button" className="btn btn-secondary" onClick={() => jsonRef.current?.click()}>
+                  <FileJson size={16} />
+                  Importar mapa (.json)
+                </button>
+              </div>
+            </div>
           )}
 
           <div className="formatter-card">
@@ -527,11 +549,6 @@ export const WhatsappHub: React.FC<WhatsappHubProps> = ({
 
       {painel}
 
-      {notification.message && (
-        <div className="wpp-aviso">
-          <NotificationToast message={notification.message} type={notification.type} />
-        </div>
-      )}
     </div>
   );
 };

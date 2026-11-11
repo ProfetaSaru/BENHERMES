@@ -5,7 +5,7 @@
 ### Hub de automações e relatórios da operação
 
 Escala de bases, relatório de produtividade da URA, formatador de planilhas e relatórios de atividades,<br>
-tudo no navegador, sem instalar nada.
+tudo pelo navegador, sem instalar nada no computador de quem usa.
 
 [![Testes e build](https://github.com/ProfetaSaru/BENHERMES/actions/workflows/ci.yml/badge.svg)](https://github.com/ProfetaSaru/BENHERMES/actions/workflows/ci.yml)
 ![React 18](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)
@@ -318,7 +318,7 @@ desenho do mapa do **Sistema de Chamados**: supervisor no topo, baias do lado es
 1. **Primeira vez:** **Importar planilha** → escolha a planilha atual → confira a prévia → **Substituir mapa**. Depois
    cadastre os celulares em **Configurar celulares** (a planilha antiga não traz os celulares).
 2. **No dia a dia:** clique numa baia para trocar o **operador** e a **situação**; clique no nome da equipe para trocar o
-   **supervisor** e dizer onde ele usa o WhatsApp (PC, celular ou não tem). Tudo salva na hora, neste navegador.
+   **supervisor** e dizer onde ele usa o WhatsApp (PC, celular ou não tem). Tudo salva na hora, no servidor do BenHermes.
 3. **Atenção:** o bloco do resumo lista o que precisa de ação, do mais urgente ao menos. Clique para abrir a baia.
 4. **Manutenção (manhã e almoço da operação):** **🔧 Iniciar manutenção** → celular por celular, os botões do que
    aconteceu → **Concluir** → **📋 Copiar** o texto do grupo e mandar antes dos vídeos.
@@ -414,7 +414,7 @@ fica numa **equipe** ou **guardado**. As **vagas** (cada WhatsApp do aparelho) n
 - A aba **📊 Estatísticas** (7 / 30 / 90 dias / 12 meses) mostra os números grandes, quedas por dia, os que mais caíram,
   os mais estáveis, por operador (ordenável), por celular e por equipe, o calendário das manutenções (manhã e almoço
   de cada dia útil, com os feriados das Configurações) e o histórico com filtros. Clicar num número abre a baia.
-- O histórico começa a contar no dia em que esta versão entra no navegador: quedas antigas não existem.
+- O histórico começa a contar no dia em que o mapa passou para a versão 3: quedas anteriores não existem.
 
 </details>
 
@@ -724,24 +724,30 @@ repetir coluna), completa o CPF que perdeu o zero à esquerda e gera UTF-8 com B
 ## 🔒 Onde ficam os dados
 
 > [!NOTE]
-> As exportações do dia (que têm **CPFs de clientes**) ficam **só na memória da página** e somem ao fechá-la.
-> O navegador guarda apenas o necessário, **no computador de quem usa**.
+> As exportações e esteiras do dia (que têm **CPFs de clientes**) ficam **só na memória da página** e somem ao
+> fechá-la: nunca vão para o servidor.
 
-| Chave no navegador (`localStorage`) | O que guarda |
+O resto fica **no servidor do BenHermes**, no banco SQLite `data/benhermes.db` (no Docker, a pasta `./data`). Assim,
+qualquer computador que entrar com a mesma conta vê os mesmos dados.
+
+| No servidor | O que guarda |
 |---|---|
-| `benhermes_escala_bases` | Cadastro de bases e pessoas, histórico e últimas escalas |
-| `benhermes_relatorio_ura` | Cadastro de operadores (sem CPF/e-mail), apelidos, metas e **totais** de cada dia |
-| `benhermes_argus` | Token e endereço da API do Argus |
-| `benhermes_feriados` | Feriados locais |
-| `benhermes_whatsapp` | Mapa do Controle de WhatsApps (salas, mesas, operadores, situações, celulares, histórico de 12 meses e manutenções) |
-| `benhermes_template_tasks` e outras | Central de Relatórios (tarefas, rascunhos e histórico) |
+| Contas (`users`) | Usuários, perfis e senhas (com hash) |
+| Relatórios (`reports`, `drafts`) | Central de Relatórios: relatórios salvos e rascunhos |
+| Anotações (`notes`, `note_comments`, `note_reads`) | Anotações, comentários e o que cada um já leu |
+| Arquivos (`shared_folders`, `shared_files`) | Pastas e arquivos compartilhados |
+| `escala_bases` | Escala: cadastro de bases e pessoas, histórico e últimas escalas |
+| `relatorio_ura` | Relatório URA: operadores (sem CPF/e-mail), apelidos, metas e **totais** de cada dia |
+| `argus_config` | Token e endereço da API do Argus |
+| `feriados_locais` | Feriados locais |
+| `whatsapp_mapa` | Controle de WhatsApps: salas, mesas, operadores, situações, celulares, histórico de 12 meses e manutenções |
+| `ranking_config`, `ranking_historico` | Ranking de Contratos: configuração e os últimos 120 rankings (sem as esteiras) |
 
-O **Ranking de Contratos** é diferente: a configuração e o histórico ficam **no servidor** (só o Admin acessa) e as
-esteiras nunca saem do navegador.
+O navegador guarda só preferências de tela (por exemplo, o modo de exibição das Anotações).
 
 > [!WARNING]
-> Como tudo fica no navegador, **outro computador ou outro navegador começa vazio**, e limpar os dados do navegador
-> apaga o histórico. Use sempre o mesmo computador e **exporte os históricos** (escala e relatório) de vez em quando.
+> Faça **cópia do arquivo `data/benhermes.db`** de vez em quando: se ele for apagado, tudo isso se perde. O site da
+> Vercel não tem servidor, então as ferramentas que salvam dados só funcionam pelo servidor (Docker ou `npm run start`).
 
 ---
 
@@ -802,7 +808,7 @@ npm run dev        # http://localhost:5173/
 |---|---|
 | `npm run dev` | Servidor de desenvolvimento Vite (com proxy para `/api` e ponte do Argus) |
 | `npm run start` | Servidor de produção Node.js com SQLite nativo (`node:sqlite`) e autenticação |
-| `npm test` | Executa todos os testes unitários (35 suites, 336 testes) |
+| `npm test` | Executa todos os testes unitários (37 suites, 361 testes) |
 | `npm run build` | Confere os tipos e compila o frontend em `dist/` |
 | `npm run preview` | Abre o site gerado (também com a ponte do Argus) |
 

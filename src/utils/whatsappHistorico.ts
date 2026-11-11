@@ -110,7 +110,15 @@ export const registrarMudancas = (antes: MapaWhatsapp, depois: MapaWhatsapp, ago
 
 /** Histórico e manutenções guardam 12 meses */
 export const podarHistorico = (mapa: MapaWhatsapp, agora: Date): MapaWhatsapp => {
-  const limite = new Date(agora);
+  // Os 12 meses contam do que vier antes: o relógio ou o registro mais recente. Um relógio adiantado
+  // (data errada no computador) não apaga o histórico.
+  const maisRecente = Math.max(
+    ...mapa.historico.map((e) => new Date(e.em).getTime()),
+    ...mapa.manutencoes.map((m) => new Date(m.inicio).getTime()),
+    -Infinity
+  );
+  const referencia = Number.isFinite(maisRecente) ? Math.min(agora.getTime(), maisRecente) : agora.getTime();
+  const limite = new Date(referencia);
   limite.setMonth(limite.getMonth() - 12);
   const dentro = (iso: string) => new Date(iso) >= limite;
   const historico = mapa.historico.filter((e) => dentro(e.em));

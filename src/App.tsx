@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, Suspense, lazy } from 
 import { useTasks } from './hooks/useTasks';
 import { useTaskForm } from './hooks/useTaskForm';
 import { useNotification } from './hooks/useNotification';
+import { AvisoFlutuante, avisoFlutuanteNaTela } from './components/common/AvisoFlutuante';
 import { useTheme } from './hooks/useTheme';
 import {
   useSavedReports,
@@ -736,7 +737,6 @@ export const App: React.FC = () => {
               ) : activeToolId === 'whatsapp' && currentUser.role !== 'operador' ? (
                 <main className="container" style={{ maxWidth: '1480px', padding: '0 16px' }}>
                   <WhatsappHub
-                    notification={notification}
                     onNotify={notify}
                     userRole={currentUser.role}
                     currentUser={currentUser}
@@ -760,6 +760,8 @@ export const App: React.FC = () => {
           )}
         </div>
       </div>
+
+      {avisoFlutuanteNaTela(activeToolId) && <AvisoFlutuante notification={notification} />}
 
       <Modal
         isOpen={isClearModalOpen}

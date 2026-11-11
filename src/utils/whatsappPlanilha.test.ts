@@ -216,6 +216,21 @@ describe('importar a planilha de status dos WhatsApps', () => {
     expect(b).toMatchObject({ nome: '3º Equipe', sigla: 'OP3', supervisor: 'Joana Sousa' });
   });
 
+  it('nome da sala mantém os acentos e sala sem equipes continua no mapa', () => {
+    const { mapa: m } = importarPlanilhaWhatsapp(
+      montarGrade({
+        E2: 'Status dos WhatsApp do Comercial Ótica — 27/10/2026',
+        ...bloco('E', 3, '1º EQUIPE - Joana Sousa', [['ANA ALVES', 'OK', 'BRUNO BRITO', 'OK']], ['SUPERVISOR', 'OK', '', '']),
+        E20: 'STATUS DOS WHATSAPP DO ATENÇÃO AO CLIENTE',
+      }),
+      AGORA
+    );
+    expect(m.salas.map((s) => [s.nome, s.mesas.length])).toEqual([
+      ['Comercial Ótica', 1],
+      ['Atenção Ao Cliente', 0],
+    ]);
+  });
+
   it('planilha sem equipes é recusada', () => {
     expect(() => importarPlanilhaWhatsapp(montarGrade({ A1: 'qualquer coisa' }), AGORA)).toThrow(
       'Não encontrei nenhuma equipe ("Nº EQUIPE - ...") na planilha.'
