@@ -17,6 +17,9 @@ import {
 import { atenderArgus } from './argusProxy.ts';
 import { enforceIpWhitelist } from './ipFilter.ts';
 import { criarIntegracaoBenCalls } from './integracaoBenCalls.ts';
+import { validarConfig } from './ranking/config.ts';
+import { chavesDoAmbiente, gerarComentarios, limparEntrada, provedoresDoAmbiente, type Provedor } from './ranking/ia.ts';
+import type { ConfigRanking } from './ranking/tipos.ts';
 
 const MAX_BODY_BYTES = 5 * 1024 * 1024; // 5 MB (para mapas/relatórios grandes)
 const MAX_UPLOAD_FILE_BYTES = 50 * 1024 * 1024; // 50 MB (para arquivos compartilhados)
@@ -159,11 +162,17 @@ function getAuthenticatedUser(req: IncomingMessage, appDb: AppDatabase, urlObj?:
 
 export function createApiHandler(
   appDb: AppDatabase,
-  options?: { enforceIp?: boolean; integracao?: ReturnType<typeof criarIntegracaoBenCalls> }
+  options?: {
+    enforceIp?: boolean;
+    integracao?: ReturnType<typeof criarIntegracaoBenCalls>;
+    /** Testes trocam as IAs reais por provedores falsos */
+    rankingIa?: { provedores?: (ia: ConfigRanking['ia']) => Provedor[] };
+  }
 ) {
   const shouldEnforceIp = options?.enforceIp ?? true;
   // Integração com o BenCalls (server/integracaoBenCalls.ts): desligada sem BENCALLS_SEGREDO
   const integracao = options?.integracao ?? criarIntegracaoBenCalls(appDb);
+  const provedoresDoRanking = options?.rankingIa?.provedores ?? ((ia: ConfigRanking['ia']) => provedoresDoAmbiente(ia));
 
   return async (req: IncomingMessage, res: ServerResponse): Promise<boolean> => {
     const urlObj = new URL(req.url || '/', 'http://localhost');
@@ -566,6 +575,61 @@ export function createApiHandler(
         const body = await readJsonBody(req);
         appDb.setAppState('escala_bases', body.dados ?? null);
         sendJson(res, 200, { dados: body.dados ?? null });
+        return true;
+      }
+
+      // 11b. Ranking de contratos pagos (/api/ranking/*): só o Admin
+      if (pathname.startsWith('/api/ranking/')) {
+        if (currentUser.role !== 'admin') {
+          sendJson(res, 403, { erro: 'Apenas o Admin tem acesso ao Ranking de contratos pagos.' });
+          return true;
+        }
+        if (pathname === '/api/ranking/ia' && method === 'GET') {
+          sendJson(res, 200, chavesDoAmbiente());
+          return true;
+        }
+        if (pathname === '/api/ranking/config' && method === 'GET') {
+          sendJson(res, 200, { config: appDb.getAppState<ConfigRanking | null>('ranking_config', null) });
+          return true;
+        }
+        if (pathname === '/api/ranking/config' && method === 'PUT') {
+          const body = await readJsonBody(req);
+          const r = validarConfig(body?.config);
+          if ('erro' in r) {
+            sendJson(res, 400, { erro: r.erro });
+            return true;
+          }
+          appDb.setAppState('ranking_config', r.config);
+          sendJson(res, 200, { config: r.config });
+          return true;
+        }
+        if (pathname === '/api/ranking/historico' && method === 'GET') {
+          sendJson(res, 200, { historico: appDb.getAppState<any[]>('ranking_historico', []) });
+          return true;
+        }
+        if (pathname === '/api/ranking/historico' && method === 'PUT') {
+          const body = await readJsonBody(req);
+          const lista = body?.historico;
+          if (!Array.isArray(lista) || !lista.every((h: any) => h && typeof h === 'object' && typeof h.id === 'string' && typeof h.geradoEm === 'string')) {
+            sendJson(res, 400, { erro: 'O histórico precisa ser uma lista de relatórios.' });
+            return true;
+          }
+          const historico = [...lista].sort((a: any, b: any) => b.geradoEm.localeCompare(a.geradoEm)).slice(0, 120);
+          appDb.setAppState('ranking_historico', historico);
+          sendJson(res, 200, { historico });
+          return true;
+        }
+        if (pathname === '/api/ranking/comentarios' && method === 'POST') {
+          const entrada = limparEntrada(await readJsonBody(req));
+          if (!entrada) {
+            sendJson(res, 400, { erro: 'Pedido de comentários inválido.' });
+            return true;
+          }
+          const ia = appDb.getAppState<ConfigRanking | null>('ranking_config', null)?.ia ?? { usar_chatgpt: true, usar_claude: true };
+          sendJson(res, 200, await gerarComentarios(entrada, provedoresDoRanking(ia)));
+          return true;
+        }
+        sendJson(res, 404, { erro: 'Rota do ranking não encontrada.' });
         return true;
       }
 
