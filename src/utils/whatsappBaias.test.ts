@@ -27,6 +27,7 @@ import {
   siglaValida,
   tempoRestante,
 } from './whatsappBaias';
+import { novoCelular } from './celulares';
 
 const AGORA = new Date('2026-10-27T10:00:00');
 const depois = (minutos: number) => new Date(AGORA.getTime() + minutos * 60_000);
@@ -143,6 +144,13 @@ describe('situação do WhatsApp', () => {
     }
   });
 
+  it('prazo enorme é recusado com mensagem (não quebra com "Invalid time value")', () => {
+    expect(() => restringir(1e12, 'dias', AGORA)).toThrow('O prazo máximo da restrição é de 365 dias.');
+    expect(() => restringir(366, 'dias', AGORA)).toThrow('O prazo máximo da restrição é de 365 dias.');
+    expect(() => restringir(8761, 'horas', AGORA)).toThrow('O prazo máximo da restrição é de 365 dias.');
+    expect(restringir(365, 'dias', AGORA).restritoAte).toBe(new Date(AGORA.getTime() + 365 * 24 * 3600_000).toISOString());
+  });
+
   it('tempo restante e restrição vencida', () => {
     expect(tempoRestante(restringir(27, 'horas', AGORA), AGORA)).toBe('1d 3h');
     expect(tempoRestante(restringir(2, 'dias', AGORA), AGORA)).toBe('2d');
@@ -194,6 +202,31 @@ describe('arquivo do mapa (.json)', () => {
     expect(() => importarMapa(JSON.stringify({ ...errado, tipo: 'outra-coisa' }), AGORA)).toThrow();
     errado.salas[0].mesas[0].lugares.E1.whatsapp.situacao = 'TALVEZ';
     expect(() => importarMapa(JSON.stringify(errado), AGORA)).toThrow();
+  });
+
+  it('recusa datas que não são datas, cor fora do formato e eventos com situação inválida', () => {
+    const base = () => {
+      const m: MapaWhatsapp = structuredClone(mapa);
+      m.celulares = [novoCelular({ cor: 'Azul', hex: '#1E40AF', apelido: '', marca: 'SAMSUNG', usuarios: 2, mesaId: null }, m, AGORA)];
+      m.historico = [
+        { em: AGORA.toISOString(), chave: 'k', tipo: 'SITUACAO', de: 'OK', para: 'BANIDO', codigo: 'OP1-E1', operador: '', equipe: '', celular: '', vaga: '' },
+      ];
+      return m;
+    };
+    expect(importarMapa(exportarMapa(base(), AGORA), AGORA).celulares).toHaveLength(1);
+    const estragos: ((m: any) => void)[] = [
+      (m) => (m.salas[0].mesas[0].lugares.E1.whatsapp.mudouEm = 'ontem'),
+      (m) => (m.atualizadoEm = 'agora'),
+      (m) => (m.celulares[0].hex = 'azul'),
+      (m) => (m.historico[0].para = 'TALVEZ'),
+      (m) => (m.historico[0].em = 'ontem'),
+      (m) => (m.salas[0].mesas[0].desativadas = [1]),
+    ];
+    for (const [i, estragar] of estragos.entries()) {
+      const m = base();
+      estragar(m);
+      expect(() => importarMapa(exportarMapa(m, AGORA), AGORA), `estrago ${i}`).toThrow('O arquivo não é um mapa do Controle de WhatsApps válido.');
+    }
   });
 
   it('dados salvos ilegíveis são sinalizados para guardar uma cópia antes de sobrescrever', () => {

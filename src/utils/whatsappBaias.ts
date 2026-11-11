@@ -92,6 +92,7 @@ export const tempoDesde = (iso: string, agora: Date): string => {
 export const restringir = (quantidade: number, unidade: 'horas' | 'dias', agora: Date): EstadoWhatsapp => {
   if (!Number.isFinite(quantidade) || quantidade <= 0) throw new Error('Informe um tempo maior que zero.');
   const horas = unidade === 'dias' ? quantidade * 24 : quantidade;
+  if (horas > 365 * 24) throw new Error('O prazo máximo da restrição é de 365 dias.');
   return estado('RESTRINGIDO', agora, new Date(agora.getTime() + horas * HORA));
 };
 
@@ -225,13 +226,16 @@ export const exportarMapa = (mapa: MapaWhatsapp, agora: Date): string =>
 
 const ehTexto = (v: unknown): v is string => typeof v === 'string';
 const ehNumero = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+/** Texto que é uma data de verdade (o mapa guarda datas em ISO) */
+const ehData = (v: unknown): v is string => ehTexto(v) && !Number.isNaN(new Date(v).getTime());
+const ehHex = (v: unknown): v is string => ehTexto(v) && /^#[0-9A-Fa-f]{6}$/.test(v);
 
 const estadoValido = (e: any): boolean =>
   !!e &&
   SITUACOES.includes(e.situacao) &&
-  ehTexto(e.mudouEm) &&
-  (e.restritoAte === undefined || ehTexto(e.restritoAte)) &&
-  (e.analisePedidaEm === undefined || ehTexto(e.analisePedidaEm));
+  ehData(e.mudouEm) &&
+  (e.restritoAte === undefined || ehData(e.restritoAte)) &&
+  (e.analisePedidaEm === undefined || ehData(e.analisePedidaEm));
 
 const mesaValida = (m: any): boolean =>
   !!m &&
@@ -245,6 +249,7 @@ const mesaValida = (m: any): boolean =>
   ['SUP', 'SUPSUB', 'NENHUM'].includes(m.centro) &&
   ['sup', 'porta'].includes(m.inicio) &&
   Array.isArray(m.desativadas) &&
+  m.desativadas.every(ehTexto) &&
   !!m.lugares &&
   typeof m.lugares === 'object' &&
   Object.values(m.lugares).every((l: any) => !!l && ehTexto(l.operador) && estadoValido(l.whatsapp));
@@ -263,7 +268,7 @@ const celularValido = (c: any): boolean =>
   !!c &&
   ehTexto(c.id) &&
   ehTexto(c.cor) &&
-  ehTexto(c.hex) &&
+  ehHex(c.hex) &&
   ehTexto(c.apelido) &&
   ['SAMSUNG', 'MOTOROLA', 'XIAOMI', 'IPHONE', 'OUTRO'].includes(c.marca) &&
   ehNumero(c.usuarios) &&
@@ -304,24 +309,36 @@ export const migrarMapa = (dados: any): MapaV2 => ({
 const TIPOS_EVENTO = ['SITUACAO', 'OPERADOR', 'ENTROU', 'SAIU'];
 const ACOES = ['BANIDO', 'RESTRINGIDO', 'PEDIU_ANALISE', 'LIBERADO', 'PERDIDO', 'TROCOU_CHIP', 'VOLTOU'];
 
+/** Situação no evento: ENTROU vem do vazio, SAIU vai para o vazio; OPERADOR guarda nomes */
+const situacoesDoEvento = (e: any): boolean => {
+  const sit = (v: string) => (SITUACOES as string[]).includes(v);
+  if (e.tipo === 'SITUACAO') return sit(e.de) && sit(e.para);
+  if (e.tipo === 'ENTROU') return e.de === '' && sit(e.para);
+  if (e.tipo === 'SAIU') return sit(e.de) && e.para === '';
+  return true;
+};
+
 const eventoValido = (e: any): boolean =>
   !!e &&
   ['em', 'chave', 'de', 'para', 'codigo', 'operador', 'equipe', 'celular', 'vaga'].every((k) => ehTexto(e[k])) &&
+  ehData(e.em) &&
   TIPOS_EVENTO.includes(e.tipo) &&
+  situacoesDoEvento(e) &&
   (e.manutencaoId === undefined || ehTexto(e.manutencaoId));
 
 const acaoValida = (a: any): boolean =>
   !!a &&
   ['em', 'chave', 'codigo', 'operador', 'celular', 'vaga'].every((k) => ehTexto(a[k])) &&
+  ehData(a.em) &&
   ACOES.includes(a.acao) &&
   (a.numeroNovo === undefined || ehTexto(a.numeroNovo)) &&
-  (a.ate === undefined || ehTexto(a.ate));
+  (a.ate === undefined || ehData(a.ate));
 
 const manutencaoValida = (m: any): boolean =>
   !!m &&
   ehTexto(m.id) &&
-  ehTexto(m.inicio) &&
-  (m.fim === null || ehTexto(m.fim)) &&
+  ehData(m.inicio) &&
+  (m.fim === null || ehData(m.fim)) &&
   ['MANHA', 'ALMOCO', 'FORA'].includes(m.janela) &&
   Array.isArray(m.conferidos) &&
   m.conferidos.every(ehTexto) &&
@@ -352,8 +369,8 @@ const lerMapa = (bruto: any, agora: Date): MapaWhatsapp => {
     Array.isArray(dados.manutencoes) &&
     dados.manutencoes.every(manutencaoValida) &&
     (dados.manutencaoAtual === null || manutencaoValida(dados.manutencaoAtual)) &&
-    ehTexto(dados.inicioDoHistorico) &&
-    ehTexto(dados.atualizadoEm);
+    ehData(dados.inicioDoHistorico) &&
+    ehData(dados.atualizadoEm);
   if (!valido) throw new Error('O arquivo não é um mapa do Controle de WhatsApps válido.');
   return {
     versao: 3,
