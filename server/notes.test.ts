@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { AppDatabase } from './db';
 import { createApiHandler } from './apiRouter';
 import { signAuthToken } from './auth';
@@ -211,6 +211,21 @@ describe('Módulo de Anotações: RBAC, Filtros, Comentários em Thread e Notifi
     });
     expect(adminFilterOpB.data.notes).toHaveLength(1);
     expect(adminFilterOpB.data.notes[0].id).toBe(n2.data.note.id);
+  });
+
+  it('comentário no mesmo milissegundo da criação da anotação conta como não lido', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-11T12:00:00.000Z'));
+    try {
+      const nota = await callApi(handler, { method: 'POST', url: '/api/notes', token: operadorAToken, body: { title: 'Mesmo instante', content: 'x' } });
+      await callApi(handler, { method: 'POST', url: `/api/notes/${nota.data.note.id}/comments`, token: supervisorAToken, body: { content: 'Visto.' } });
+      const naoLidos = await callApi(handler, { method: 'GET', url: '/api/notes/unread-count', token: operadorAToken });
+      expect(naoLidos.data.unreadCount).toBe(1);
+      const comentarios = await callApi(handler, { method: 'GET', url: `/api/notes/${nota.data.note.id}/comments`, token: operadorAToken });
+      expect(comentarios.data.comments[0].isUnread).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('permite comentários de supervisores e notifica o originador da anotação', async () => {
