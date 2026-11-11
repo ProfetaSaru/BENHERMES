@@ -37,7 +37,7 @@ export const getNavigationItems = (
       name: 'Escala',
       fullName: 'Escala de Bases',
       shortName: 'Escala',
-      description: 'Sorteio diário das bases do Ativo 2 entre os grupos dos supervisores.',
+      description: 'Sorteio diário das bases do Ativo entre os grupos dos supervisores.',
       category: 'automacoes',
       badge: 'Novo',
       badgeVariant: 'success',

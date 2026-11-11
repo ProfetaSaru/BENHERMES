@@ -31,7 +31,7 @@ tudo no navegador, sem instalar nada.
 |---|---|
 | 🧭 [Ferramentas](#-ferramentas) | 🔒 [Onde ficam os dados](#-onde-ficam-os-dados) |
 | ☀️ [Rotina diária](#️-rotina-diária) | 🧪 [Testes e checagem automática](#-testes-e-checagem-automática) |
-| 🎲 [Escala de Bases](#-escala-de-bases-ativo-2) | 🚀 [Como executar localmente](#-como-executar-localmente) |
+| 🎲 [Escala de Bases](#-escala-de-bases-ativo) | 🚀 [Como executar localmente](#-como-executar-localmente) |
 | 📞 [Relatório URA](#-relatório-de-produtividade-ura) | 🏗️ [Arquitetura](#️-arquitetura) |
 | 🔌 [API do Argus](#-api-do-argus) | 🐉 [BenHermes × BENZAITEN](#-benhermes--benzaiten) |
 | 💬 [Controle de WhatsApps](#-controle-de-whatsapps) | 🛠️ [Tecnologias](#️-tecnologias) |
@@ -44,7 +44,7 @@ tudo no navegador, sem instalar nada.
 
 | | Ferramenta | Para que serve | Quando usar |
 |:-:|---|---|---|
-| 🎲 | **Escala de Bases** | Rodízio diário das bases do INSS entre os grupos dos supervisores do Ativo 2 | Todo dia útil, de manhã |
+| 🎲 | **Escala de Bases** | Rodízio diário das bases do INSS entre os grupos dos supervisores do Ativo | Todo dia útil, de manhã |
 | 📞 | **Relatório URA** | TMA, TMO, leads, custo, vendas e clientes por operador e equipe, com setas e cores | Todo dia útil (relatório do dia anterior) |
 | 💬 | **Controle de WhatsApps** | Mapa das mesas com a situação do WhatsApp de cada baia, os celulares, o ciclo do banimento, a manutenção com o texto do grupo, as estatísticas e a planilha | Na manutenção (manhã e almoço) e sempre que um número cair ou voltar |
 | 📊 | **Formatador de Planilhas** | Converte qualquer planilha no CSV de mailing `CPF;BENEFICIO;NOME;TELEFONE1..5` | Quando chega uma base nova |
@@ -81,7 +81,7 @@ flowchart LR
 
 ---
 
-## 🎲 Escala de Bases (Ativo 2)
+## 🎲 Escala de Bases (Ativo)
 
 A escala é um **rodízio**: a cada dia, cada pessoa anda **uma base para frente** e volta para a primeira depois da
 última. Assim **ninguém repete uma base antes de passar por todas**.

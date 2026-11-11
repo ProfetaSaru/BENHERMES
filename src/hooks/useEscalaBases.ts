@@ -21,7 +21,7 @@ const podarResultados = (resultados: Record<string, ResultadoSorteio>): Record<s
 };
 
 /**
- * Cadastro (bases e pessoas) e histórico de sorteios da escala do Ativo 2,
+ * Cadastro (bases e pessoas) e histórico de sorteios da escala do Ativo,
  * sincronizados no servidor (/api/escala).
  */
 export function useEscalaBases() {
