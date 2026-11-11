@@ -5,7 +5,7 @@
 ### Hub de automações e relatórios da operação
 
 Escala de bases, relatório de produtividade da URA, formatador de planilhas e relatórios de atividades,<br>
-tudo no navegador, sem instalar nada.
+tudo pelo navegador, sem instalar nada no computador de quem usa.
 
 [![Testes e build](https://github.com/ProfetaSaru/BENHERMES/actions/workflows/ci.yml/badge.svg)](https://github.com/ProfetaSaru/BENHERMES/actions/workflows/ci.yml)
 ![React 18](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)
@@ -318,7 +318,7 @@ desenho do mapa do **Sistema de Chamados**: supervisor no topo, baias do lado es
 1. **Primeira vez:** **Importar planilha** → escolha a planilha atual → confira a prévia → **Substituir mapa**. Depois
    cadastre os celulares em **Configurar celulares** (a planilha antiga não traz os celulares).
 2. **No dia a dia:** clique numa baia para trocar o **operador** e a **situação**; clique no nome da equipe para trocar o
-   **supervisor** e dizer onde ele usa o WhatsApp (PC, celular ou não tem). Tudo salva na hora, neste navegador.
+   **supervisor** e dizer onde ele usa o WhatsApp (PC, celular ou não tem). Tudo salva na hora, no servidor do BenHermes.
 3. **Atenção:** o bloco do resumo lista o que precisa de ação, do mais urgente ao menos. Clique para abrir a baia.
 4. **Manutenção (manhã e almoço da operação):** **🔧 Iniciar manutenção** → celular por celular, os botões do que
    aconteceu → **Concluir** → **📋 Copiar** o texto do grupo e mandar antes dos vídeos.
@@ -414,7 +414,7 @@ fica numa **equipe** ou **guardado**. As **vagas** (cada WhatsApp do aparelho) n
 - A aba **📊 Estatísticas** (7 / 30 / 90 dias / 12 meses) mostra os números grandes, quedas por dia, os que mais caíram,
   os mais estáveis, por operador (ordenável), por celular e por equipe, o calendário das manutenções (manhã e almoço
   de cada dia útil, com os feriados das Configurações) e o histórico com filtros. Clicar num número abre a baia.
-- O histórico começa a contar no dia em que esta versão entra no navegador: quedas antigas não existem.
+- O histórico começa a contar no dia em que o mapa passou para a versão 3: quedas anteriores não existem.
 
 </details>
 
