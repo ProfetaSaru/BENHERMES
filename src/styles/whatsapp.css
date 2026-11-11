@@ -1717,3 +1717,14 @@
   font-size: 0.9rem;
   color: var(--ink);
 }
+
+/* Formulário do celular novo: caixa de marcar na linha do campo e botões numa linha própria */
+.wpp-config-celular-form label.wpp-check {
+  flex-direction: row;
+  align-items: center;
+  min-height: 40px;
+}
+
+.wpp-config-celular-form .formatter-actions-buttons {
+  grid-column: 1 / -1;
+}
