@@ -808,7 +808,7 @@ npm run dev        # http://localhost:5173/
 |---|---|
 | `npm run dev` | Servidor de desenvolvimento Vite (com proxy para `/api` e ponte do Argus) |
 | `npm run start` | Servidor de produção Node.js com SQLite nativo (`node:sqlite`) e autenticação |
-| `npm test` | Executa todos os testes unitários (35 suites, 336 testes) |
+| `npm test` | Executa todos os testes unitários (37 suites, 361 testes) |
 | `npm run build` | Confere os tipos e compila o frontend em `dist/` |
 | `npm run preview` | Abre o site gerado (também com a ponte do Argus) |
 
