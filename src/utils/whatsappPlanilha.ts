@@ -105,7 +105,11 @@ export const importarPlanilhaWhatsapp = (grade: string[][], agora: Date): Result
     linha.forEach((valor, c) => {
       const normal = normalizarNome(valor);
       const sala = normal.match(TITULO_SALA);
-      if (sala) salas.push({ id: crypto.randomUUID(), nome: nomeDaSala(sala[1]), mesas: [], linha: r });
+      if (sala) {
+        // O título é reconhecido sem acentos, mas o nome da sala vem do texto original (com os acentos)
+        const original = valor.replace(/\s+/g, ' ').trim().match(new RegExp(TITULO_SALA.source, 'i'));
+        salas.push({ id: crypto.randomUUID(), nome: nomeDaSala(original?.[1] ?? sala[1]), mesas: [], linha: r });
+      }
       const cabecalho = normalizarNome(cel(r + 1, c)) === 'OPERADOR' && normalizarNome(cel(r + 1, c + 1)) === 'WHATSAPP';
       const numerada = valor.trim().match(TITULO_EQUIPE);
       if (valor.trim() && (numerada || cabecalho)) {
@@ -189,7 +193,8 @@ export const importarPlanilhaWhatsapp = (grade: string[][], agora: Date): Result
   return {
     mapa: {
       versao: 3,
-      salas: salas.filter((s) => s.mesas.length > 0).map(({ linha: _linha, ...sala }) => sala),
+      // Sala com título fica no mapa mesmo sem equipes (mesas são cadastradas depois)
+      salas: salas.map(({ linha: _linha, ...sala }) => sala),
       celulares: [],
       historico: [],
       manutencoes: [],
