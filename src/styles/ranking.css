@@ -65,6 +65,7 @@
 }
 
 .ranking-feedback {
+  text-align: center;
   white-space: normal !important;
   min-width: 260px;
   font-weight: 600;

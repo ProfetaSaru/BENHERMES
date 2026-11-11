@@ -88,6 +88,9 @@ const escreverLinha = (ws: Worksheet, modelos: Record<TipoDeLinha, Modelo>, tipo
     if (i + 2 !== 10) c.font = { ...c.font, color: { argb: cor } };
   });
   ws.getCell(r, 10).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: l.elegivel ? FUNDO_SIM : FUNDO_NAO } };
+  // FEEDBACK centralizado (no modelo original ficava à esquerda)
+  const feedback = ws.getCell(r, 11);
+  feedback.alignment = { ...feedback.alignment, horizontal: 'center', vertical: 'middle' };
 };
 
 export const nomeDaPlanilhaRanking = (dia: string): string => `ranking_${dia}.xlsx`;

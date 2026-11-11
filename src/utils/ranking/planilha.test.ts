@@ -94,6 +94,13 @@ describe('planilha do ranking', () => {
     expect(ws.getCell('E4').numFmt).toBe('0%');
   });
 
+  it('FEEDBACK centralizado nas linhas de vendedores e supervisores', async () => {
+    const ws = await carregar(await gerarPlanilhaRanking(REL, buffer()));
+    for (const ref of ['K4', 'K5', 'K6', 'K10', 'K11']) {
+      expect(ws.getCell(ref).alignment, ref).toMatchObject({ horizontal: 'center', vertical: 'middle' });
+    }
+  });
+
   it('usa só os valores recebidos, sem recalcular (histórico reaberto — Review Focus 5)', async () => {
     const estranho = { ...REL, vendedores: [{ ...linha('7º', 'ZECA', 9.99), portabilidade: 1.23 }] };
     const ws = await carregar(await gerarPlanilhaRanking(estranho, buffer()));
