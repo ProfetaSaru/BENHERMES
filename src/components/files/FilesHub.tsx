@@ -227,10 +227,7 @@ export const FilesHub: React.FC<FilesHubProps> = ({ currentUser: _currentUser, o
     for (let i = 0; i < items.length; i++) {
       const file = items[i];
       setUploadProgress({ current: i + 1, total: items.length });
-      if (file.size > 50 * 1024 * 1024) {
-        onNotify(`"${file.name}" excede o limite máximo permitido de 50 MB.`, 'error');
-        continue;
-      }
+      
       try {
         const headers: Record<string, string> = {
           'x-file-name': encodeURIComponent(file.name),

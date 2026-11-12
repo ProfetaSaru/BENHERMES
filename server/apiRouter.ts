@@ -24,7 +24,6 @@ import type { ConfigRanking } from './ranking/tipos.ts';
 const MAX_BODY_BYTES = 5 * 1024 * 1024; // 5 MB (para mapas/relatórios grandes)
 // O mapa do WhatsApp guarda 12 meses de histórico: com ~50 eventos por dia passa de 5 MB
 const MAX_WHATSAPP_BODY_BYTES = 30 * 1024 * 1024;
-const MAX_UPLOAD_FILE_BYTES = 50 * 1024 * 1024; // 50 MB (para arquivos compartilhados)
 
 const BLOCKED_FILE_EXTENSIONS = new Set([
   '.exe',
@@ -47,7 +46,7 @@ const BLOCKED_FILE_EXTENSIONS = new Set([
 function streamUploadToFile(
   req: IncomingMessage,
   targetFilePath: string,
-  maxBytes: number
+  maxBytes?: number
 ): Promise<{ size: number }> {
   return new Promise((resolve, reject) => {
     let bytesWritten = 0;
@@ -55,13 +54,13 @@ function streamUploadToFile(
 
     req.on('data', (chunk: Buffer) => {
       bytesWritten += chunk.length;
-      if (bytesWritten > maxBytes) {
+      if (maxBytes !== undefined && bytesWritten > maxBytes) {
         req.destroy();
         writeStream.destroy();
         try {
           if (fs.existsSync(targetFilePath)) fs.unlinkSync(targetFilePath);
         } catch {}
-        reject(new Error('Tamanho do arquivo excede o limite permitido de 50 MB.'));
+        reject(new Error('Tamanho do arquivo excede o limite permitido.'));
         return;
       }
       writeStream.write(chunk);
@@ -853,6 +852,7 @@ export function createApiHandler(
 
         // Upload de arquivo: POST /api/files/upload
         if (pathname === '/api/files/upload' && method === 'POST') {
+          req.setTimeout(0);
           const rawHeaderName = req.headers['x-file-name'];
           let originalName = 'arquivo';
           if (typeof rawHeaderName === 'string') {
@@ -882,7 +882,7 @@ export function createApiHandler(
           const targetFilePath = path.join(appDb.uploadsDir, storageFilename);
 
           try {
-            const { size } = await streamUploadToFile(req, targetFilePath, MAX_UPLOAD_FILE_BYTES);
+            const { size } = await streamUploadToFile(req, targetFilePath);
             if (size === 0) {
               try {
                 if (fs.existsSync(targetFilePath)) fs.unlinkSync(targetFilePath);
@@ -915,6 +915,7 @@ export function createApiHandler(
         const rest = pathname.slice('/api/files/'.length);
 
         if (rest.endsWith('/download') && method === 'GET') {
+          req.setTimeout(0);
           const fileId = decodeURIComponent(rest.slice(0, -'/download'.length));
           const file = appDb.getSharedFileById(fileId, currentUser);
           if (!file) {
@@ -942,6 +943,7 @@ export function createApiHandler(
         }
 
         if (rest.endsWith('/view') && method === 'GET') {
+          req.setTimeout(0);
           const fileId = decodeURIComponent(rest.slice(0, -'/view'.length));
           const file = appDb.getSharedFileById(fileId, currentUser);
           if (!file) {

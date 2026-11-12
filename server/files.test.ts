@@ -11,12 +11,15 @@ function callApi(
     method: string;
     url: string;
     body?: any;
+    bodyBuffer?: Buffer;
     token?: string;
     headers?: Record<string, string>;
   }
 ): Promise<{ status: number; data: any; headers: Record<string, string> }> {
   return new Promise((resolve) => {
     const customHeaders = options.headers || {};
+    const listeners: Record<string, Function[]> = {};
+
     const req: any = {
       method: options.method,
       url: options.url,
@@ -27,7 +30,26 @@ function callApi(
       socket: {
         remoteAddress: '127.0.0.1',
       },
+      setTimeout() {
+        return req;
+      },
       body: options.body,
+      on(evt: string, fn: Function) {
+        listeners[evt] = listeners[evt] || [];
+        listeners[evt].push(fn);
+        if (evt === 'data' && options.bodyBuffer) {
+          queueMicrotask(() => {
+            fn(options.bodyBuffer);
+            for (const endFn of listeners['end'] || []) {
+              endFn();
+            }
+          });
+        }
+        return req;
+      },
+      destroy() {
+        return req;
+      },
     };
 
     const resHeaders: Record<string, string> = {};
@@ -258,6 +280,28 @@ describe('Módulo de Compartilhamento de Arquivos: Pastas Dinâmicas, RBAC, Uplo
     });
     expect(resUpload.status).toBe(400);
     expect(resUpload.data?.erro).toContain('não são permitidos');
+  });
+
+  it('permite upload de arquivos sem restrição de 50 MB via streaming contínuo', async () => {
+    const chunk = Buffer.from('conteudo de arquivo valido em streaming');
+    const resUpload = await callApi(handler, {
+      method: 'POST',
+      url: '/api/files/upload',
+      token: supervisorAToken,
+      headers: {
+        'x-file-name': encodeURIComponent('video_procedimento.mp4'),
+        'content-type': 'video/mp4',
+      },
+      bodyBuffer: chunk,
+    });
+
+    expect(resUpload.status).toBe(201);
+    expect(resUpload.data.file.name).toBe('video_procedimento.mp4');
+    expect(resUpload.data.file.sizeBytes).toBe(chunk.length);
+
+    // Confirma que o arquivo existe em disco
+    const savedPath = path.join(db.uploadsDir, resUpload.data.file.storagePath);
+    expect(fs.existsSync(savedPath)).toBe(true);
   });
 
   it('calcula estatísticas de exclusão e realiza exclusão em cascata removendo arquivos físicos do disco', async () => {
