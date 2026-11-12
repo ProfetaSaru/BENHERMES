@@ -59,7 +59,7 @@ export const getNavigationItems = (
     },
     {
       id: 'ranking',
-      name: 'Ranking de Contratos',
+      name: 'Ranking',
       fullName: 'Ranking de Contratos Pagos',
       shortName: 'Ranking',
       description: 'Ranking diário de contratos pagos com comentários, planilha e legenda do dia.',
@@ -71,7 +71,7 @@ export const getNavigationItems = (
     },
     {
       id: 'whatsapp',
-      name: 'Controle de WhatsApps',
+      name: 'WhatsApps',
       fullName: 'Controle de WhatsApps',
       shortName: 'WhatsApp',
       description: 'Mapa das baias com a situação do WhatsApp de cada lugar.',
