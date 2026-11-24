@@ -88,3 +88,40 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+
+/* Reserva do dia e base sem lote */
+.escala-etiqueta {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.8rem;
+  font-weight: 700;
+  border: 1px solid var(--line);
+}
+
+.escala-etiqueta.reserva {
+  color: var(--blue);
+  background: var(--blue-soft);
+  border-color: var(--blue);
+}
+
+.escala-etiqueta.sem-lote {
+  color: var(--red);
+  background: var(--red-soft);
+  border-color: var(--red);
+}
+
+.escala-linha-sem-lote td:first-child {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.escala-botao-lote {
+  width: auto;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+}
+
+.escala-botao-lote.acabou {
+  color: var(--red);
+}

@@ -99,6 +99,15 @@ A escala é um **rodízio**: a cada dia, cada pessoa anda **uma base para frente
   23/10       CARLA      DIEGO      ANA        BRUNO
 ```
 
+**Quinta base e reserva do dia.** Com mais bases que equipes (por exemplo, 5 lotes para 4 equipes), a base que sobra
+fica como **Reserva do dia**, e ela muda todo dia. Com 5 bases, em 5 dias úteis seguidos ninguém repete base: a semana
+inteira sem trabalhar duas vezes o mesmo lote.
+
+**Lote acabou.** Na escala do dia, cada base tem o botão **Lote acabou**: a base fica **Sem lote** e a equipe dela vai
+na hora para a reserva do dia (o texto do chat sai com "Sem lote: ..."). A base continua sem lote nos dias seguintes,
+e quem cair nela no rodízio vai para a reserva, até alguém clicar em **Lote novo**. Sem reserva com lote, aparece o
+aviso para pedir lote novo.
+
 <details>
 <summary><b>📐 Regras completas do rodízio</b></summary>
 

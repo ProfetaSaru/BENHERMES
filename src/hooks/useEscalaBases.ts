@@ -38,6 +38,7 @@ export function useEscalaBases() {
           cadastro: {
             bases: Array.isArray(d.cadastro?.bases) ? d.cadastro.bases : [],
             pessoas: Array.isArray(d.cadastro?.pessoas) ? d.cadastro.pessoas : [],
+            semLote: Array.isArray(d.cadastro?.semLote) ? d.cadastro.semLote : [],
           },
           historico: Array.isArray(d.historico) ? d.historico : [],
           resultados: d.resultados && typeof d.resultados === 'object' ? d.resultados : {},
