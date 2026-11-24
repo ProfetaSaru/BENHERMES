@@ -27,6 +27,8 @@ import {
   gerarPlanilhaEscala,
   importarPlanilhaEscala,
   csvParaHistorico,
+  RESERVA,
+  SEM_LOTE,
 } from '../../utils/escalaBases';
 import { hojeIso, isoParaBr, diaDaSemana, ehFimDeSemana, feriado as feriadoDoDia, normalizarNome } from '../../utils/calendario';
 import { useFeriados } from '../../hooks/useFeriados';
@@ -116,6 +118,23 @@ export const EscalaBasesHub: React.FC<EscalaBasesHubProps> = ({ onNotify }) => {
     } catch (err: any) {
       onNotify(err.message || 'Não foi possível fazer o sorteio.', 'error');
     }
+  };
+
+  // Lote acabou / lote novo: marca a base e, se a escala do dia já existe, refaz na hora
+  const semLote = cadastro.semLote ?? [];
+  const handleLote = (base: string, acabou: boolean) => {
+    const chave = normalizarNome(base);
+    const lista = acabou ? [...semLote.filter((b) => normalizarNome(b) !== chave), base] : semLote.filter((b) => normalizarNome(b) !== chave);
+    atualizarCadastro({ semLote: lista });
+    if (resultado && jaSorteado) {
+      try {
+        salvarSorteio(realizarSorteio({ ...cadastro, semLote: lista }, historico, data, resultado.ausentes, feriados));
+      } catch (err: any) {
+        onNotify(err.message || 'Não foi possível refazer a escala.', 'error');
+        return;
+      }
+    }
+    onNotify(acabou ? `${base}: lote acabou. A equipe foi para a reserva do dia.` : `${base}: lote novo, volta para o rodízio.`, 'success');
   };
 
   const handleCopiar = async () => {
@@ -345,17 +364,36 @@ export const EscalaBasesHub: React.FC<EscalaBasesHubProps> = ({ onNotify }) => {
                 <tr>
                   <th>Base</th>
                   <th>Responsável</th>
+                  <th>Lote</th>
                 </tr>
               </thead>
               <tbody>
-                {resultado.atribuicoes.map((a) => (
-                  <tr key={a.base}>
-                    <td>{a.base}</td>
-                    <td>
-                      <strong>{a.responsavel}</strong>
-                    </td>
-                  </tr>
-                ))}
+                {resultado.atribuicoes.map((a) => {
+                  const acabou = semLote.some((b) => normalizarNome(b) === normalizarNome(a.base));
+                  return (
+                    <tr key={a.base} className={a.responsavel === RESERVA ? 'escala-linha-reserva' : acabou ? 'escala-linha-sem-lote' : ''}>
+                      <td>{a.base}</td>
+                      <td>
+                        {a.responsavel === RESERVA ? (
+                          <span className="escala-etiqueta reserva">Reserva do dia</span>
+                        ) : a.responsavel === SEM_LOTE ? (
+                          <span className="escala-etiqueta sem-lote">Sem lote</span>
+                        ) : (
+                          <strong>{a.responsavel}</strong>
+                        )}
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className={`btn btn-secondary escala-botao-lote ${acabou ? '' : 'acabou'}`}
+                          onClick={() => handleLote(a.base, !acabou)}
+                        >
+                          {acabou ? 'Lote novo' : 'Lote acabou'}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

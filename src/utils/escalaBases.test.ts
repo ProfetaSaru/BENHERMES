@@ -11,6 +11,8 @@ import {
   registrarSorteio,
   rodizio,
   textoDaEscala,
+  RESERVA,
+  SEM_LOTE,
 } from './escalaBases';
 
 // Mesmos casos do tests/test_escala_bases.py do BENZAITEN (nomes fictícios)
@@ -86,12 +88,11 @@ describe('rodízio da escala', () => {
     ]);
   });
 
-  it('menos pessoas que bases: diferença máxima de uma base', () => {
-    const contagem: Record<string, number> = {};
-    rodizio(NOTAS, ['ANA', 'BRUNO', 'CARLA'], [], '2026-10-20').atribuicoes.forEach(
-      (a) => (contagem[a.responsavel] = (contagem[a.responsavel] ?? 0) + 1)
-    );
-    expect(Math.max(...Object.values(contagem)) - Math.min(...Object.values(contagem))).toBeLessThanOrEqual(1);
+  it('menos pessoas que bases: ninguém fica com duas, a que sobra é RESERVA', () => {
+    const { atribuicoes } = rodizio(NOTAS, ['ANA', 'BRUNO', 'CARLA'], [], '2026-10-20');
+    const pessoas = nomesDe(atribuicoes).filter((n) => n !== RESERVA);
+    expect(new Set(pessoas).size).toBe(3);
+    expect(nomesDe(atribuicoes).filter((n) => n === RESERVA)).toHaveLength(1);
   });
 
   it('sem bases ou com todos ausentes dá erro', () => {
@@ -155,5 +156,92 @@ describe('título da escala', () => {
   it('a planilha tem o mesmo título', async () => {
     const livro = await gerarPlanilhaEscala(resultado, [], NOTAS);
     expect(livro.getWorksheet('Escala')!.getCell('A1').value).toBe('ESCALA DE BASES — ATIVO');
+  });
+});
+
+describe('quinta base, reserva do dia e lote acabou', () => {
+  const CINCO = [...NOTAS, 'INSS - LOTE - 5 - C6'];
+  const SEMANA = ['2026-11-23', '2026-11-24', '2026-11-25', '2026-11-26', '2026-11-27'];
+  const cadastro = (semLote: string[] = []) => ({ bases: CINCO, pessoas: PESSOAS, semLote });
+
+  const semana = (inicio: EscalaRegistro[] = []) => {
+    let historico = inicio;
+    return SEMANA.map((data) => {
+      const r = realizarSorteio(cadastro(), historico, data, []);
+      historico = registrarSorteio(historico, r);
+      return r;
+    });
+  };
+
+  it('5 bases e 4 equipes: na semana ninguém repete base e a reserva muda todo dia', () => {
+    const dias = semana(dia('2026-11-20', ['ANA', 'BRUNO', 'CARLA', 'DIEGO', RESERVA], CINCO));
+    for (const p of PESSOAS) {
+      const bases = dias.map((r) => r.atribuicoes.find((a) => a.responsavel === p)?.base);
+      expect(bases.every(Boolean), p).toBe(true);
+      expect(new Set(bases).size, p).toBe(5);
+    }
+    const reservas = dias.map((r) => r.atribuicoes.find((a) => a.responsavel === RESERVA)!.base);
+    expect(new Set(reservas).size).toBe(5);
+    expect(dias[0].avisos.join(' ')).not.toMatch(/mais de uma base/);
+  });
+
+  it('sem histórico também: a roda tem 5 posições', () => {
+    const dias = semana();
+    for (const p of PESSOAS) expect(new Set(dias.map((r) => r.atribuicoes.find((a) => a.responsavel === p)!.base)).size).toBe(5);
+  });
+
+  it('lote acabou: a equipe da base vai para a reserva do dia e a base fica SEM LOTE', () => {
+    const antes = realizarSorteio(cadastro(), [], SEMANA[0], []);
+    const daEquipe = antes.atribuicoes.find((a) => a.responsavel === 'ANA')!.base;
+    const reserva = antes.atribuicoes.find((a) => a.responsavel === RESERVA)!.base;
+    const depois = realizarSorteio(cadastro([daEquipe]), [], SEMANA[0], []);
+    expect(depois.atribuicoes.find((a) => a.base === daEquipe)!.responsavel).toBe(SEM_LOTE);
+    expect(depois.atribuicoes.find((a) => a.base === reserva)!.responsavel).toBe('ANA');
+    expect(depois.avisos.join(' ')).toMatch(/ANA.*reserva/i);
+  });
+
+  it('lote acabou sem reserva livre: aviso e a equipe fica sem base', () => {
+    const r0 = realizarSorteio(cadastro(), [], SEMANA[0], []);
+    const daAna = r0.atribuicoes.find((a) => a.responsavel === 'ANA')!.base;
+    const reserva = r0.atribuicoes.find((a) => a.responsavel === RESERVA)!.base;
+    const r = realizarSorteio(cadastro([daAna, reserva]), [], SEMANA[0], []);
+    expect(r.semBase).toContain('ANA');
+    expect(r.avisos.join(' ')).toMatch(/sem reserva.*lote novo/i);
+  });
+
+  it('base sem lote nos dias seguintes: a roda continua contando os dias certos', () => {
+    let historico = dia('2026-11-20', ['ANA', 'BRUNO', 'CARLA', 'DIEGO', RESERVA], CINCO);
+    const semLote = [CINCO[1]];
+    const comSemLote = SEMANA.map((data) => {
+      const r = realizarSorteio(cadastro(semLote), historico, data, []);
+      historico = registrarSorteio(historico, r);
+      return r;
+    });
+    const normal = semana(dia('2026-11-20', ['ANA', 'BRUNO', 'CARLA', 'DIEGO', RESERVA], CINCO));
+    // Quem não caiu na base sem lote fica exatamente onde ficaria
+    comSemLote.forEach((r, i) => {
+      for (const a of normal[i].atribuicoes) {
+        if (a.base === CINCO[1] || a.responsavel === RESERVA) continue;
+        expect(r.atribuicoes.find((x) => x.base === a.base)!.responsavel, `${SEMANA[i]} ${a.base}`).toBe(a.responsavel);
+      }
+    });
+  });
+
+  it('ao cadastrar a 5ª base, a roda continua de onde parou (dia antigo sem a base nova conta como reserva)', () => {
+    const historico = [...dia('2026-11-20', ['CARLA', 'DIEGO', 'ANA', 'BRUNO']), ...dia('2026-11-23', ['BRUNO', 'CARLA', 'DIEGO', 'ANA'])];
+    const r = realizarSorteio(cadastro(), historico, '2026-11-24', []);
+    // 23/11 = [BRUNO, CARLA, DIEGO, ANA, (reserva)]; cada um anda uma posição
+    expect(nomesDe(r.atribuicoes)).toEqual([RESERVA, 'BRUNO', 'CARLA', 'DIEGO', 'ANA']);
+  });
+
+  it('texto do chat: reserva e sem lote em linhas próprias', () => {
+    const r0 = realizarSorteio(cadastro(), [], SEMANA[0], []);
+    const daAna = r0.atribuicoes.find((a) => a.responsavel === 'ANA')!.base;
+    const texto = textoDaEscala(realizarSorteio(cadastro([daAna]), [], SEMANA[0], []));
+    expect(texto).toContain(`Sem lote: ${daAna}`);
+    expect(texto).not.toContain(`: ${RESERVA}`);
+    expect(texto).not.toContain(`: ${SEM_LOTE}`);
+    const semNada = textoDaEscala(r0);
+    expect(semNada).toMatch(/\nReserva: INSS/);
   });
 });

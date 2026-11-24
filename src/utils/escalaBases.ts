@@ -27,6 +27,12 @@ import type { Workbook } from 'exceljs';
  *  - pessoa nova no cadastro entra no fim da roda.
  */
 
+/** Responsável das bases que sobram no dia (mais bases que equipes): para onde vai quem ficou sem lote */
+export const RESERVA = 'RESERVA';
+/** Responsável de uma base cujo lote acabou */
+export const SEM_LOTE = 'SEM LOTE';
+const ehMarcador = (nome: string) => nome === RESERVA || nome === SEM_LOTE;
+
 /** Cabeçalho do histórico em CSV, igual ao historico/historico_escalas.csv do BENZAITEN */
 const CABECALHO_HISTORICO = 'Data;Base;Responsavel';
 
@@ -85,16 +91,37 @@ export const pontoDePartida = (
         .filter((r) => r.data === datas[i])
         .map((r) => [normalizarNome(r.base), normalizarNome(r.responsavel)] as [string, string])
     );
-    const nomes = bases.map((b) => doDia.get(normalizarNome(b)) ?? '');
-    const completo = nomes.every(Boolean) && (new Set(nomes).size === nomes.length || pessoas.length < bases.length);
+    // Base que não aparece no dia (foi cadastrada depois, como a 5ª base) conta como reserva naquele dia,
+    // para a roda continuar de onde parou
+    const nomes = bases.map((b) => doDia.get(normalizarNome(b)) ?? RESERVA);
+    const gente = nomes.filter((n) => n !== RESERVA);
+    // Dia com base sem lote (ou ausência) não serve: alguém saiu da sua posição na roda
+    const completo =
+      nomes.every(Boolean) && !nomes.includes(SEM_LOTE) && (new Set(gente).size === gente.length || pessoas.length < bases.length);
     if (!completo) continue;
 
-    // Quem saiu do cadastro sai da roda; quem entrou vai para o fim dela
-    const roda = [...new Set(nomes.filter((n) => oficiais.has(n)).map((n) => oficiais.get(n)!))];
+    // A reserva é uma posição da roda; quem saiu do cadastro sai; quem entrou vai para o fim
+    const vistos = new Set<string>();
+    const roda: string[] = [];
+    for (const n of nomes) {
+      if (n === RESERVA) roda.push(RESERVA);
+      else if (oficiais.has(n) && !vistos.has(n)) {
+        vistos.add(n);
+        roda.push(oficiais.get(n)!);
+      }
+    }
     roda.push(...pessoas.filter((p) => !roda.includes(p)));
-    return { roda, passos: i + 1 };
+    return { roda: ajustarReservas(roda, bases.length), passos: i + 1 };
   }
-  return { roda: [...pessoas], passos: 0 };
+  return { roda: ajustarReservas([...pessoas], bases.length), passos: 0 };
+};
+
+/** Roda com tantas posições quanto bases: completa com RESERVA (ou tira as que sobraram) */
+const ajustarReservas = (roda: string[], quantasBases: number): string[] => {
+  const ajustada = [...roda];
+  while (ajustada.length > quantasBases && ajustada.includes(RESERVA)) ajustada.splice(ajustada.lastIndexOf(RESERVA), 1);
+  while (ajustada.length < quantasBases) ajustada.push(RESERVA);
+  return ajustada;
 };
 
 /**
@@ -105,7 +132,8 @@ export const rodizio = (
   pessoas: string[],
   historico: EscalaRegistro[],
   data: string,
-  ausentes: string[] = []
+  ausentes: string[] = [],
+  semLote: string[] = []
 ): { atribuicoes: EscalaAtribuicao[]; avisos: string[] } => {
   if (bases.length === 0) throw new Error('Nenhuma base cadastrada.');
   const fora = new Set(ausentes.map(normalizarNome));
@@ -126,7 +154,7 @@ export const rodizio = (
       .map((r) => [normalizarNome(r.base), normalizarNome(r.responsavel)] as [string, string])
   );
 
-  const escolha: (string | null)[] = plano.map((p) => (presentes.includes(p) ? p : null));
+  const escolha: (string | null)[] = plano.map((p) => (p === RESERVA || presentes.includes(p) ? p : null));
   const contagem = new Map(presentes.map((p) => [p, escolha.filter((e) => e === p).length]));
   const avisos: string[] = [];
 
@@ -149,9 +177,25 @@ export const rodizio = (
     avisos.push(`${plano[j]} está ausente: ${base} ficou com ${substituto}.`);
   });
 
+  // Lote acabou: quem estava na base vai para a primeira reserva com lote; sem reserva, fica sem base
+  const esgotada = new Set(semLote.map(normalizarNome));
+  bases.forEach((base, j) => {
+    if (!esgotada.has(normalizarNome(base))) return;
+    const quem = escolha[j]!;
+    escolha[j] = SEM_LOTE;
+    if (ehMarcador(quem)) return;
+    const k = bases.findIndex((b, i) => escolha[i] === RESERVA && !esgotada.has(normalizarNome(b)));
+    if (k >= 0) {
+      escolha[k] = quem;
+      avisos.push(`${base} está sem lote: ${quem} foi para a reserva (${bases[k]}).`);
+    } else {
+      avisos.push(`${base} está sem lote e não sobrou reserva: ${quem} fica sem base hoje (sem reserva com lote — peça lote novo).`);
+    }
+  });
+
   const atribuicoes = bases.map((base, j) => ({ base, responsavel: escolha[j]! }));
   const repetidos = atribuicoes
-    .filter((a) => ontem.get(normalizarNome(a.base)) === normalizarNome(a.responsavel))
+    .filter((a) => !ehMarcador(a.responsavel) && ontem.get(normalizarNome(a.base)) === normalizarNome(a.responsavel))
     .map((a) => `${a.responsavel} (${a.base})`);
   if (repetidos.length > 0) {
     avisos.push(`Por causa das ausências, repetiu a base do sorteio anterior: ${repetidos.join(', ')}.`);
@@ -179,19 +223,18 @@ export const realizarSorteio = (
   const nomeDoFeriado = feriado(data, feriadosLocais);
   if (ehFimDeSemana(data)) avisos.push('A data escolhida cai no fim de semana.');
   if (nomeDoFeriado) avisos.push(`A data escolhida é feriado (${nomeDoFeriado}).`);
-  if (disponiveis.length < cadastro.bases.length) {
-    avisos.push(
-      `${disponiveis.length} pessoa(s) para ${cadastro.bases.length} base(s): alguém fica com mais de uma base.`
-    );
-  }
-
   const { atribuicoes, avisos: avisosRodizio } = rodizio(
     cadastro.bases,
     cadastro.pessoas,
     historicoSemData,
     data,
-    ausentesCadastrados
+    ausentesCadastrados,
+    cadastro.semLote ?? []
   );
+  const porPessoa = new Map<string, number>();
+  for (const a of atribuicoes) if (!ehMarcador(a.responsavel)) porPessoa.set(a.responsavel, (porPessoa.get(a.responsavel) ?? 0) + 1);
+  const comDuas = [...porPessoa].filter(([, n]) => n > 1).map(([p]) => p);
+  if (comDuas.length > 0) avisos.push(`Por causa das ausências, ${comDuas.join(', ')} fica(m) com mais de uma base.`);
   avisos.push(...avisosRodizio);
 
   const comBase = new Set(atribuicoes.map((a) => a.responsavel));
@@ -249,8 +292,13 @@ export const textoDaEscala = (resultado: ResultadoSorteio): string => {
     `ESCALA DE BASES — ATIVO`,
     `${isoParaBr(resultado.data)} (${diaDaSemana(resultado.data)})`,
     '',
-    ...resultado.atribuicoes.map((a) => `• ${a.base}: ${a.responsavel}`),
+    ...resultado.atribuicoes.filter((a) => !ehMarcador(a.responsavel)).map((a) => `• ${a.base}: ${a.responsavel}`),
   ];
+  const reservas = resultado.atribuicoes.filter((a) => a.responsavel === RESERVA).map((a) => a.base);
+  const semLote = resultado.atribuicoes.filter((a) => a.responsavel === SEM_LOTE).map((a) => a.base);
+  if (reservas.length || semLote.length) linhas.push('');
+  if (reservas.length) linhas.push(`Reserva: ${reservas.join(', ')}`);
+  if (semLote.length) linhas.push(`Sem lote: ${semLote.join(', ')}`);
   if (resultado.ausentes.length > 0) {
     linhas.push('', `Ausentes: ${resultado.ausentes.join(', ')}`);
   }

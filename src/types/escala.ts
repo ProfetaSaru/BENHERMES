@@ -15,6 +15,8 @@ export interface EscalaRegistro {
 export interface EscalaCadastro {
   bases: string[];
   pessoas: string[];
+  /** Bases cujo lote acabou: ninguém trabalha nelas até "Lote novo" */
+  semLote?: string[];
 }
 
 export interface EscalaAtribuicao {
