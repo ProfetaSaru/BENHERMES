@@ -227,6 +227,13 @@ describe('quinta base, reserva do dia e lote acabou', () => {
     });
   });
 
+  it('ao cadastrar a 5ª base, a roda continua de onde parou (dia antigo sem a base nova conta como reserva)', () => {
+    const historico = [...dia('2026-11-20', ['CARLA', 'DIEGO', 'ANA', 'BRUNO']), ...dia('2026-11-23', ['BRUNO', 'CARLA', 'DIEGO', 'ANA'])];
+    const r = realizarSorteio(cadastro(), historico, '2026-11-24', []);
+    // 23/11 = [BRUNO, CARLA, DIEGO, ANA, (reserva)]; cada um anda uma posição
+    expect(nomesDe(r.atribuicoes)).toEqual([RESERVA, 'BRUNO', 'CARLA', 'DIEGO', 'ANA']);
+  });
+
   it('texto do chat: reserva e sem lote em linhas próprias', () => {
     const r0 = realizarSorteio(cadastro(), [], SEMANA[0], []);
     const daAna = r0.atribuicoes.find((a) => a.responsavel === 'ANA')!.base;

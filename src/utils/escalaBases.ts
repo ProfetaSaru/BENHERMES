@@ -91,7 +91,9 @@ export const pontoDePartida = (
         .filter((r) => r.data === datas[i])
         .map((r) => [normalizarNome(r.base), normalizarNome(r.responsavel)] as [string, string])
     );
-    const nomes = bases.map((b) => doDia.get(normalizarNome(b)) ?? '');
+    // Base que não aparece no dia (foi cadastrada depois, como a 5ª base) conta como reserva naquele dia,
+    // para a roda continuar de onde parou
+    const nomes = bases.map((b) => doDia.get(normalizarNome(b)) ?? RESERVA);
     const gente = nomes.filter((n) => n !== RESERVA);
     // Dia com base sem lote (ou ausência) não serve: alguém saiu da sua posição na roda
     const completo =
